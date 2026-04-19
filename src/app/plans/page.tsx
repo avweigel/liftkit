@@ -64,6 +64,15 @@ export default async function PlansPage() {
     .order("name")
     .returns<PlanCard[]>();
 
+  const profileRes = await supabase
+    .from("profiles")
+    .select("active_plan_id")
+    .eq("id", user!.id)
+    .maybeSingle();
+  const activePlanId = profileRes.error
+    ? null
+    : ((profileRes.data?.active_plan_id as string | null | undefined) ?? null);
+
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-3 py-5 sm:px-6 sm:py-10">
       <header className="flex items-end justify-between gap-3">
@@ -87,6 +96,7 @@ export default async function PlansPage() {
         </h2>
         <PlanGrid
           plans={mine ?? []}
+          activeId={activePlanId}
           empty="setting up your plans… refresh in a moment."
         />
       </section>
@@ -96,14 +106,22 @@ export default async function PlansPage() {
           <h2 className="text-sm font-semibold uppercase tracking-wider text-(--muted)">
             community
           </h2>
-          <PlanGrid plans={community ?? []} empty="" />
+          <PlanGrid plans={community ?? []} activeId={activePlanId} empty="" />
         </section>
       )}
     </main>
   );
 }
 
-function PlanGrid({ plans, empty }: { plans: PlanCard[]; empty: string }) {
+function PlanGrid({
+  plans,
+  activeId,
+  empty,
+}: {
+  plans: PlanCard[];
+  activeId: string | null;
+  empty: string;
+}) {
   if (plans.length === 0) {
     if (!empty) return null;
     return (
@@ -126,15 +144,29 @@ function PlanGrid({ plans, empty }: { plans: PlanCard[]; empty: string }) {
           .sort((a, b) => a.day_number - b.day_number)
           .slice(0, 6)
           .map((d) => formatDayLabel(d.day_number, d.name));
+        const isActive = activeId === p.id;
         return (
           <li key={p.id}>
             <Link
               href={`/plans/${p.id}`}
-              className="group block h-full rounded-xl border border-(--border) bg-(--surface) p-4 transition hover:border-(--accent)"
+              className={`group block h-full rounded-xl border p-4 transition ${
+                isActive
+                  ? "border-(--accent) bg-(--accent-soft)"
+                  : "border-(--border) bg-(--surface) hover:border-(--accent)"
+              }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="truncate text-base font-bold">{p.name}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-base font-bold">
+                      {p.name}
+                    </span>
+                    {isActive && (
+                      <span className="shrink-0 rounded-full bg-(--accent) px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-(--accent-contrast)">
+                        active
+                      </span>
+                    )}
+                  </div>
                   {p.description && (
                     <p className="mt-0.5 line-clamp-2 text-xs text-(--muted)">
                       {p.description}

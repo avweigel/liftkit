@@ -152,6 +152,18 @@ type PlanFull = {
   }>;
 };
 
+export async function setActivePlan(planId: string | null) {
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ active_plan_id: planId })
+    .eq("id", user.id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/");
+  revalidatePath("/plans");
+  if (planId) revalidatePath(`/plans/${planId}`);
+}
+
 export async function duplicatePlan(planId: string) {
   const { supabase, user } = await requireUser();
   const { data: src, error } = await supabase

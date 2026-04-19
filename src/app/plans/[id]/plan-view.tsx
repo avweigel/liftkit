@@ -8,6 +8,7 @@ import {
   removePlanDayExercise,
   renamePlanDay,
   reorderDayExercise,
+  setActivePlan,
   updatePlanDayExercise,
 } from "@/lib/actions/plans";
 import { startSession } from "@/lib/actions/sessions";
@@ -18,15 +19,22 @@ type Props = {
   plan: PlanDetail;
   library: Exercise[];
   canEdit: boolean;
+  isActive: boolean;
 };
 
-export function PlanView({ plan, library, canEdit }: Props) {
+export function PlanView({ plan, library, canEdit, isActive }: Props) {
   const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const onDuplicate = () => {
     startTransition(async () => {
       await duplicatePlan(plan.id);
+    });
+  };
+
+  const onToggleActive = () => {
+    startTransition(async () => {
+      await setActivePlan(isActive ? null : plan.id);
     });
   };
 
@@ -41,10 +49,15 @@ export function PlanView({ plan, library, canEdit }: Props) {
         </Link>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">
                 {plan.name}
               </h1>
+              {isActive && (
+                <span className="rounded-full bg-(--accent) px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-(--accent-contrast)">
+                  active phase
+                </span>
+              )}
               {plan.is_public && (
                 <span className="rounded border border-(--border) px-1.5 text-[10px] uppercase tracking-wider text-(--muted)">
                   public
@@ -77,6 +90,24 @@ export function PlanView({ plan, library, canEdit }: Props) {
             </button>
           </div>
         </div>
+        {!editing && (
+          <button
+            type="button"
+            onClick={onToggleActive}
+            disabled={pending}
+            className={`inline-flex h-11 w-full items-center justify-center rounded-lg text-sm font-bold disabled:opacity-60 ${
+              isActive
+                ? "border border-(--border) bg-(--background) text-(--muted)"
+                : "bg-(--accent) text-(--accent-contrast) shadow-sm active:scale-[0.99]"
+            }`}
+          >
+            {pending
+              ? "…"
+              : isActive
+                ? "✓ on this phase — tap to switch off"
+                : "start this phase (6-8 weeks)"}
+          </button>
+        )}
         {plan.source_url && (
           <p className="text-xs text-(--muted)">
             source:{" "}

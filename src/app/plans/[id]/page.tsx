@@ -12,7 +12,7 @@ export default async function PlanDetailPage({ params }: Props) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: plan }, { data: library }] = await Promise.all([
+  const [{ data: plan }, { data: library }, profileResult] = await Promise.all([
     supabase
       .from("workout_plans")
       .select(
@@ -40,11 +40,21 @@ export default async function PlanDetailPage({ params }: Props) {
       .or(`owner_id.is.null,owner_id.eq.${user!.id}`)
       .order("name")
       .returns<Exercise[]>(),
+    supabase
+      .from("profiles")
+      .select("active_plan_id")
+      .eq("id", user!.id)
+      .maybeSingle(),
   ]);
 
   if (!plan) notFound();
 
   const canEdit = plan.owner_id === user!.id;
+  const activePlanId = profileResult.error
+    ? null
+    : (profileResult.data?.active_plan_id as string | null | undefined) ??
+      null;
+  const isActive = activePlanId === plan.id;
 
   const weeks = [...(plan.plan_weeks ?? [])]
     .sort((a, b) => a.week_number - b.week_number)
@@ -65,6 +75,7 @@ export default async function PlanDetailPage({ params }: Props) {
       plan={{ ...plan, plan_weeks: weeks }}
       library={library ?? []}
       canEdit={canEdit}
+      isActive={isActive}
     />
   );
 }

@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatDayLabel } from "@/lib/display/format-day";
+import {
+  StartOtherDayButton,
+  StartTodayButton,
+} from "./dashboard-start-button";
 
 type SessionRow = {
   id: string;
@@ -15,6 +19,19 @@ type SessionRow = {
       plan: { id: string; name: string } | null;
     } | null;
   } | null;
+};
+
+type ActivePlan = {
+  id: string;
+  name: string;
+  plan_weeks: Array<{
+    plan_days: Array<{
+      id: string;
+      day_number: number;
+      name: string | null;
+      plan_day_exercises: Array<{ id: string }>;
+    }>;
+  }>;
 };
 
 type Props = { userId: string; email: string };
@@ -50,42 +67,78 @@ export async function Dashboard({ userId, email }: Props) {
     .select("id", { count: "exact", head: true })
     .eq("owner_id", userId);
 
+  const profileRes = await supabase
+    .from("profiles")
+    .select("active_plan_id")
+    .eq("id", userId)
+    .maybeSingle();
+  const activePlanId = profileRes.error
+    ? null
+    : ((profileRes.data?.active_plan_id as string | null | undefined) ?? null);
+
+  let activePlan: ActivePlan | null = null;
+  if (activePlanId) {
+    const { data } = await supabase
+      .from("workout_plans")
+      .select(
+        `
+          id, name,
+          plan_weeks (
+            plan_days (
+              id, day_number, name,
+              plan_day_exercises ( id )
+            )
+          )
+        `,
+      )
+      .eq("id", activePlanId)
+      .maybeSingle()
+      .returns<ActivePlan>();
+    activePlan = data;
+  }
+
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 space-y-8 px-4 py-8 sm:px-6 sm:py-10">
+    <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-3 py-5 sm:px-6 sm:py-10">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">today</h1>
-        <p className="text-sm text-zinc-500">signed in as {email}</p>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">today</h1>
+        <p className="text-sm text-(--muted)">
+          signed in as <span className="text-(--foreground)">{email}</span>
+        </p>
       </header>
 
-      <TodayCard hasPlan={(planCount ?? 0) > 0} />
+      {activePlan ? (
+        <ActivePhaseBlock plan={activePlan} />
+      ) : (
+        <PickPhaseCard hasAnyPlan={(planCount ?? 0) > 0} />
+      )}
 
       <section className="space-y-3">
-        <div className="flex items-end justify-between">
-          <h2 className="text-lg font-medium">recent sessions</h2>
-        </div>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-(--muted)">
+          recent sessions
+        </h2>
 
         {!sessions || sessions.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-zinc-300 p-6 text-center text-sm text-zinc-500 dark:border-zinc-700">
+          <p className="rounded-lg border border-dashed border-(--border) p-6 text-center text-sm text-(--muted)">
             no sessions yet. start one above.
           </p>
         ) : (
-          <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+          <ul className="divide-y divide-(--border) overflow-hidden rounded-xl border border-(--border) bg-(--surface)">
             {sessions.map((s) => (
               <li key={s.id}>
                 <Link
                   href={`/log/${s.id}`}
-                  className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                  className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-(--accent-soft)"
                 >
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">
                       {sessionTitle(s)}
                     </div>
-                    <div className="text-xs text-zinc-500">
+                    <div className="text-xs text-(--muted)">
                       {formatDate(s.started_at)}
                       {s.finished_at ? "" : " · in progress"}
                     </div>
                   </div>
-                  <span className="text-zinc-400">→</span>
+                  <span className="text-(--muted)">→</span>
                 </Link>
               </li>
             ))}
@@ -96,35 +149,139 @@ export async function Dashboard({ userId, email }: Props) {
   );
 }
 
-function TodayCard({ hasPlan }: { hasPlan: boolean }) {
+function ActivePhaseBlock({ plan }: { plan: ActivePlan }) {
+  const days = (plan.plan_weeks ?? [])
+    .flatMap((w) => w.plan_days ?? [])
+    .sort((a, b) => a.day_number - b.day_number);
+
+  const dow = new Date().getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  const todayDayNumber = dow === 0 ? null : dow;
+  const todayDay =
+    todayDayNumber != null
+      ? days.find((d) => d.day_number === todayDayNumber) ?? null
+      : null;
+  const otherDays = days.filter((d) => d !== todayDay);
+
   return (
-    <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="space-y-4">
+    <section className="space-y-4">
+      <div className="flex items-baseline justify-between gap-2">
         <div>
-          <h2 className="text-lg font-medium">ready to lift?</h2>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            {hasPlan
-              ? "pick a plan day from your plans."
-              : "you don't have a plan yet. pick one to get started."}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-(--muted)">
+            active phase
+          </div>
           <Link
-            href="/plans"
-            className="inline-flex h-11 items-center rounded-lg bg-zinc-900 px-5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            href={`/plans/${plan.id}`}
+            className="text-base font-bold hover:underline"
           >
-            {hasPlan ? "browse my plans" : "browse plans"}
+            {plan.name}
           </Link>
-          {!hasPlan && (
-            <Link
-              href="/plans/new"
-              className="inline-flex h-11 items-center rounded-lg border border-zinc-300 bg-white px-5 text-sm font-medium text-zinc-900 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900"
-            >
-              import a plan
-            </Link>
-          )}
         </div>
+        <Link
+          href="/plans"
+          className="text-xs text-(--muted) underline hover:text-(--foreground)"
+        >
+          switch phase
+        </Link>
       </div>
+
+      {todayDay ? (
+        <TodayCard day={todayDay} />
+      ) : (
+        <RestDayCard planName={plan.name} />
+      )}
+
+      {otherDays.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-(--muted)">
+            other days this week
+          </h3>
+          <ul className="divide-y divide-(--border) overflow-hidden rounded-xl border border-(--border) bg-(--surface)">
+            {otherDays.map((d) => {
+              const label = formatDayLabel(d.day_number, d.name);
+              return (
+                <li
+                  key={d.id}
+                  className="flex items-center justify-between gap-3 px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-(--accent)">
+                      {label.weekdayShort}
+                    </div>
+                    <div className="truncate text-sm font-medium">
+                      {label.name}
+                    </div>
+                  </div>
+                  <StartOtherDayButton
+                    dayId={d.id}
+                    label={`log ${label.weekdayShort.toLowerCase()}`}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function TodayCard({
+  day,
+}: {
+  day: ActivePlan["plan_weeks"][number]["plan_days"][number];
+}) {
+  const label = formatDayLabel(day.day_number, day.name);
+  const exerciseCount = day.plan_day_exercises.length;
+  return (
+    <section className="rounded-2xl border-2 border-(--accent) bg-(--accent-soft) p-5 sm:p-6">
+      <div className="space-y-1">
+        <div className="text-xs font-bold uppercase tracking-wider text-(--accent)">
+          today · {label.weekday}
+        </div>
+        <h2 className="text-2xl font-bold leading-tight sm:text-3xl">
+          {label.name}
+        </h2>
+        <p className="text-sm text-(--muted)">
+          {exerciseCount} exercise{exerciseCount === 1 ? "" : "s"} planned
+        </p>
+      </div>
+      <StartTodayButton dayId={day.id} />
+    </section>
+  );
+}
+
+function RestDayCard({ planName }: { planName: string }) {
+  return (
+    <section className="rounded-2xl border border-dashed border-(--border) bg-(--surface) p-5 text-center">
+      <div className="text-xs font-semibold uppercase tracking-wider text-(--muted)">
+        rest day
+      </div>
+      <h2 className="mt-1 text-xl font-bold">no workout today</h2>
+      <p className="mt-1 text-sm text-(--muted)">
+        {planName} runs monday-saturday. take a rest, or pick another day below
+        if you want to train.
+      </p>
+    </section>
+  );
+}
+
+function PickPhaseCard({ hasAnyPlan }: { hasAnyPlan: boolean }) {
+  return (
+    <section className="rounded-2xl border border-(--border) bg-(--surface) p-5">
+      <div>
+        <h2 className="text-lg font-bold">pick a phase</h2>
+        <p className="mt-1 text-sm text-(--muted)">
+          {hasAnyPlan
+            ? "start a phase to follow for the next 6-8 weeks. today's workout will auto-select based on the day of the week."
+            : "we're setting up your 12 phases now. refresh in a moment to pick one."}
+        </p>
+      </div>
+      <Link
+        href="/plans"
+        className="mt-4 inline-flex h-11 items-center rounded-lg bg-(--accent) px-5 text-sm font-bold text-(--accent-contrast) shadow-sm active:scale-[0.99]"
+      >
+        browse phases
+      </Link>
     </section>
   );
 }
