@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   deleteSessionSet,
   finishSession,
+  updateSession,
   upsertSessionSet,
 } from "@/lib/actions/sessions";
 import { groupIntoSupersets, parseSetCode } from "@/lib/set-code";
@@ -196,7 +197,7 @@ export function SessionLogger({
                   .sort((a, b) => a.set_number - b.set_number)}
                 onUpsert={(set) => upsert(item._ex.exercise_id, set)}
                 onDelete={del}
-                finished={finished}
+                finished={false}
               />
             );
           }
@@ -215,26 +216,27 @@ export function SessionLogger({
               )}
               onUpsert={upsert}
               onDelete={del}
-              finished={finished}
+              finished={false}
             />
           );
         })}
       </div>
 
-      {!finished && (
-        <div className="space-y-1 rounded-xl border border-(--border) bg-(--surface) p-3">
-          <label className="block space-y-1 text-xs">
-            <span className="text-(--muted)">session notes</span>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              placeholder="how it felt, weight jumps, anything to remember"
-              className="w-full resize-y rounded border border-(--border) bg-(--background) px-2 py-1 text-sm outline-none focus:border-(--accent)"
-            />
-          </label>
-        </div>
-      )}
+      <div className="space-y-1 rounded-xl border border-(--border) bg-(--surface) p-3">
+        <label className="block space-y-1 text-xs">
+          <span className="text-(--muted)">session notes</span>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            onBlur={() => {
+              if (finished) updateSession(sessionId, { notes });
+            }}
+            rows={2}
+            placeholder="how it felt, weight jumps, anything to remember"
+            className="w-full resize-y rounded border border-(--border) bg-(--background) px-2 py-1 text-sm outline-none focus:border-(--accent)"
+          />
+        </label>
+      </div>
 
       {!finished && (
         <div className="safe-bottom fixed bottom-0 left-0 right-0 z-20 border-t border-(--border) bg-(--background)/95 backdrop-blur">

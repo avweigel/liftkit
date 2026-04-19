@@ -138,6 +138,33 @@ export async function deleteSessionSet(sessionId: string, setId: string) {
   revalidatePath(`/log/${sessionId}`);
 }
 
+export async function deleteSession(sessionId: string) {
+  const { supabase } = await requireUser();
+  const { error: setsErr } = await supabase
+    .from("session_sets")
+    .delete()
+    .eq("session_id", sessionId);
+  if (setsErr) throw new Error(setsErr.message);
+  const { error } = await supabase
+    .from("workout_sessions")
+    .delete()
+    .eq("id", sessionId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/");
+  redirect("/");
+}
+
+export async function reopenSession(sessionId: string) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase
+    .from("workout_sessions")
+    .update({ finished_at: null })
+    .eq("id", sessionId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/");
+  revalidatePath(`/log/${sessionId}`);
+}
+
 function coerceIso(v: string | undefined): string | null {
   if (!v) return null;
   const d = new Date(v);

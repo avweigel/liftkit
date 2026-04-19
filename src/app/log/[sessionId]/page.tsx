@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatDayLabel } from "@/lib/display/format-day";
+import { SessionActions } from "./session-actions";
 import { SessionLogger } from "./session-logger";
 import { SessionStartedAt } from "./session-started-at";
 
@@ -201,6 +202,12 @@ export default async function LogSessionPage({ params }: Props) {
             startedAt={session.started_at}
             finishedAt={session.finished_at}
           />
+          <div className="mt-2">
+            <SessionActions
+              sessionId={session.id}
+              finished={!!session.finished_at}
+            />
+          </div>
         </div>
       </header>
 
