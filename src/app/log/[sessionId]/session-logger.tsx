@@ -8,6 +8,7 @@ import {
   upsertSessionSet,
 } from "@/lib/actions/sessions";
 import { groupIntoSupersets, parseSetCode } from "@/lib/set-code";
+import { formatRxReps, repTargetForSet } from "@/lib/display/reps";
 
 type LastSessionSet = {
   set_number: number;
@@ -441,7 +442,8 @@ function ExerciseHeader({
 }
 
 function buildRx(ex: Exercise): string {
-  const base = `${ex.prescribed_sets} × ${ex.prescribed_reps}`;
+  const reps = formatRxReps(ex.prescribed_reps);
+  const base = `${ex.prescribed_sets} × ${reps}`;
   if (ex.prescribed_weight != null) return `${base} @ ${ex.prescribed_weight}`;
   return base;
 }
@@ -492,21 +494,28 @@ function SetList({
   const lastForSet = (n: number): LastSessionSet | null =>
     exercise.last_session?.sets.find((s) => s.set_number === n) ?? null;
 
-  const suggestedForSet = (n: number): { weight: number | null; reps: number | null } => {
-    const prevInSession =
-      sets.find((s) => s.set_number === n - 1) ??
-      sets[sets.length - 1] ??
-      null;
-    if (prevInSession) {
-      return { weight: prevInSession.weight, reps: prevInSession.reps };
-    }
+  const suggestedForSet = (
+    n: number,
+  ): { weight: number | null; reps: number | null } => {
+    const target = repTargetForSet(exercise.prescribed_reps, n);
+    const prevInSession = sets.find((s) => s.set_number === n - 1) ?? null;
     const sameSetLast = lastForSet(n);
-    if (sameSetLast)
-      return { weight: sameSetLast.weight, reps: sameSetLast.reps };
-    return {
-      weight: exercise.prescribed_weight,
-      reps: firstNumber(exercise.prescribed_reps),
-    };
+
+    // weight priority: previous set in this session > same set last time > prescribed
+    const weight =
+      prevInSession?.weight ??
+      sameSetLast?.weight ??
+      exercise.prescribed_weight;
+
+    // reps priority: same set last time > per-set target > previous set in this session
+    // (target beats copying previous set when the scheme is per-set descending like 20,15,10)
+    const reps =
+      sameSetLast?.reps ??
+      target.value ??
+      prevInSession?.reps ??
+      null;
+
+    return { weight, reps };
   };
 
   return (
@@ -562,12 +571,15 @@ function SetList({
           );
         }
         const suggest = suggestedForSet(r.n);
+        const target = repTargetForSet(exercise.prescribed_reps, r.n);
         return (
           <li key={r.n}>
             <QuickLogRow
               setNumber={r.n}
               weight={suggest.weight}
               reps={suggest.reps}
+              targetText={target.text}
+              showTarget={target.perSet}
               finished={finished}
               compact={compact}
               onExpand={() => setExpandedSetNumber(r.n)}
@@ -646,6 +658,8 @@ function QuickLogRow({
   setNumber,
   weight,
   reps,
+  targetText,
+  showTarget,
   finished,
   compact,
   onExpand,
@@ -654,6 +668,8 @@ function QuickLogRow({
   setNumber: number;
   weight: number | null;
   reps: number | null;
+  targetText: string;
+  showTarget: boolean;
   finished: boolean;
   compact: boolean;
   onExpand: () => void;
@@ -686,11 +702,22 @@ function QuickLogRow({
         type="button"
         onClick={onExpand}
         disabled={finished}
-        className={`min-w-0 flex-1 truncate text-left font-semibold tabular-nums text-(--foreground) disabled:opacity-60 ${
-          compact ? "text-sm" : "text-base"
-        }`}
+        className="min-w-0 flex-1 text-left disabled:opacity-60"
       >
-        {display}
+        <div
+          className={`truncate font-semibold tabular-nums text-(--foreground) ${
+            compact ? "text-sm" : "text-base"
+          }`}
+        >
+          {display}
+        </div>
+        {showTarget && targetText && (
+          <div
+            className={`text-(--muted) ${compact ? "text-[10px]" : "text-[11px]"}`}
+          >
+            target {targetText}
+          </div>
+        )}
       </button>
       <button
         type="button"
@@ -901,11 +928,6 @@ function Stepper({
       </div>
     </div>
   );
-}
-
-function firstNumber(s: string): number | null {
-  const m = s.match(/(\d+)/);
-  return m ? Number(m[1]) : null;
 }
 
 function relativeDays(iso: string): string {
