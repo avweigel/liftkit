@@ -46,6 +46,8 @@ body {
   font-family: var(--font-sans), system-ui, -apple-system, Segoe UI, Roboto,
     sans-serif;
   -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  text-size-adjust: 100%;
 }
 
 input,
@@ -53,6 +55,28 @@ button,
 select,
 textarea {
   font-family: inherit;
+}
+
+/* Prevent iOS Safari from zooming the viewport when a text input gains focus */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="datetime-local"],
+textarea,
+select {
+  font-size: 16px;
+}
+
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.75rem);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 @supports (font-variant-numeric: tabular-nums) {

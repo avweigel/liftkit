@@ -166,7 +166,7 @@ export function SessionLogger({
   };
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="space-y-3 pb-28">
       <ProgressHeader
         done={workingSetsLogged}
         total={totalSets}
@@ -236,8 +236,8 @@ export function SessionLogger({
       )}
 
       {!finished && (
-        <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-(--border) bg-(--background)/95 backdrop-blur">
-          <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3 sm:px-6">
+        <div className="safe-bottom fixed bottom-0 left-0 right-0 z-20 border-t border-(--border) bg-(--background)/95 backdrop-blur">
+          <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 pt-3 sm:px-6">
             <button
               type="button"
               onClick={finish}
@@ -254,7 +254,8 @@ export function SessionLogger({
         <button
           type="button"
           onClick={() => setRestSecondsLeft(null)}
-          className="fixed bottom-20 left-1/2 z-30 -translate-x-1/2 rounded-full bg-(--foreground) px-5 py-2 text-sm font-semibold text-(--background) shadow-lg tabular-nums"
+          className="fixed bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full bg-(--foreground) px-5 py-2 text-sm font-semibold text-(--background) shadow-lg tabular-nums"
+          style={{ bottom: "calc(env(safe-area-inset-bottom) + 5rem)" }}
         >
           rest · {formatRest(restSecondsLeft)}
         </button>
@@ -329,7 +330,7 @@ function SoloExerciseCard({
   finished: boolean;
 }) {
   return (
-    <section className="space-y-3 rounded-xl border border-(--border) bg-(--background) p-3">
+    <section className="space-y-2.5 rounded-xl border border-(--border) bg-(--background) p-3">
       <ExerciseHeader exercise={exercise} />
       <SetList
         exercise={exercise}
@@ -361,23 +362,20 @@ function SupersetBlock({
 }) {
   const cols = Math.min(exercises.length, 2);
   return (
-    <section className="space-y-2 rounded-xl border-2 border-(--accent)/30 bg-(--background) p-2.5">
-      <div className="flex items-center gap-2 px-1 text-[11px] font-bold uppercase tracking-wider text-(--accent)">
+    <section className="space-y-2 rounded-xl border-2 border-(--accent)/30 bg-(--background) p-2">
+      <div className="flex items-center gap-1.5 px-1 text-[11px] font-bold uppercase tracking-wider text-(--accent)">
         <span className="inline-block h-1.5 w-1.5 rounded-full bg-(--accent)" />
         superset {letter}
-        <span className="ml-auto font-normal normal-case text-[10px] text-(--muted)">
-          alternate between lifts
-        </span>
       </div>
 
       <div
-        className="grid gap-2"
+        className="grid gap-1.5"
         style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
       >
         {exercises.map((ex) => (
           <div
             key={ex.id}
-            className="space-y-2 rounded-lg bg-(--surface) p-2"
+            className="space-y-2 rounded-lg bg-(--surface) p-1.5"
           >
             <ExerciseHeader exercise={ex} compact />
             <SetList
@@ -408,27 +406,31 @@ function ExerciseHeader({
     <header className="space-y-1">
       <Link
         href={`/exercises/${exercise.exercise_id}`}
-        className={`block font-bold leading-tight hover:underline ${
-          compact ? "text-sm" : "text-base sm:text-lg"
+        className={`block font-bold leading-tight line-clamp-2 hover:underline ${
+          compact ? "text-[13px]" : "text-base sm:text-lg"
         }`}
       >
         {exercise.name}
       </Link>
       <div
-        className={`inline-block rounded-md bg-(--accent-soft) px-2 py-0.5 font-semibold text-(--accent) tabular-nums ${
-          compact ? "text-xs" : "text-sm"
+        className={`inline-block max-w-full truncate rounded-md bg-(--accent-soft) px-1.5 py-0.5 font-semibold text-(--accent) tabular-nums ${
+          compact ? "text-[11px]" : "text-sm"
         }`}
       >
-        target: {rx}
+        {rx}
       </div>
       {exercise.last_session && (
-        <div className={`text-(--muted) ${compact ? "text-[11px]" : "text-xs"}`}>
-          last ({relativeDays(exercise.last_session.logged_at)}):{" "}
-          <span className="tabular-nums text-(--foreground)/70">
-            {exercise.last_session.sets
-              .map((s) => `${s.weight ?? "bw"}×${s.reps}`)
-              .join("  ")}
-          </span>
+        <div className={compact ? "text-[10px]" : "text-xs"}>
+          <div className="text-(--muted)">
+            last {relativeDays(exercise.last_session.logged_at)}
+          </div>
+          <div className="flex flex-wrap gap-x-2 tabular-nums text-(--foreground)/70">
+            {exercise.last_session.sets.map((s, i) => (
+              <span key={i}>
+                {s.weight ?? "bw"}×{s.reps}
+              </span>
+            ))}
+          </div>
         </div>
       )}
       {cleanNotes && !compact && (
@@ -616,22 +618,22 @@ function LoggedRow({
     <button
       type="button"
       onClick={onEdit}
-      className={`grid w-full grid-cols-[20px,1fr,auto] items-center gap-1.5 rounded-md border border-(--border) bg-(--accent-soft)/60 px-2 py-1.5 text-left ${
-        compact ? "text-xs" : "text-sm"
+      className={`flex min-h-10 w-full items-center gap-2 rounded-md border border-(--border) bg-(--accent-soft)/60 px-2 text-left ${
+        compact ? "text-sm" : "text-base"
       }`}
     >
-      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-(--accent) text-[10px] font-bold text-(--accent-contrast)">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-(--accent) text-xs font-bold text-(--accent-contrast)">
         ✓
       </span>
-      <span className="truncate text-(--muted) tabular-nums">
+      <span className="text-xs text-(--muted) tabular-nums">
         {set.set_number}
         {set.is_warmup && (
           <span className="ml-1 rounded bg-(--border) px-1 text-[9px] uppercase tracking-wider">
-            warmup
+            wu
           </span>
         )}
       </span>
-      <span className="font-bold tabular-nums">
+      <span className="ml-auto font-bold tabular-nums">
         {set.weight ?? "bw"}
         <span className="mx-0.5 text-(--muted)">×</span>
         {set.reps}
@@ -670,18 +672,12 @@ function QuickLogRow({
     }
   };
   return (
-    <div
-      className={`grid items-center gap-1.5 rounded-md border border-(--border) ${
-        compact
-          ? "grid-cols-[20px,1fr,auto] px-2 py-1.5 text-xs"
-          : "grid-cols-[20px,1fr,auto] px-2 py-1.5 text-sm"
-      }`}
-    >
+    <div className="flex min-h-11 items-center gap-2 rounded-md border border-(--border) px-1.5">
       <button
         type="button"
         onClick={onExpand}
         disabled={finished}
-        className="flex h-5 w-5 items-center justify-center rounded-full border border-(--border) text-[10px] text-(--muted) hover:border-(--accent) hover:text-(--accent) disabled:opacity-60"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-(--border) text-xs text-(--muted) hover:border-(--accent) hover:text-(--accent) disabled:opacity-60"
         aria-label={`edit set ${setNumber}`}
       >
         {setNumber}
@@ -690,7 +686,9 @@ function QuickLogRow({
         type="button"
         onClick={onExpand}
         disabled={finished}
-        className="min-w-0 truncate text-left font-medium tabular-nums text-(--foreground) disabled:opacity-60"
+        className={`min-w-0 flex-1 truncate text-left font-semibold tabular-nums text-(--foreground) disabled:opacity-60 ${
+          compact ? "text-sm" : "text-base"
+        }`}
       >
         {display}
       </button>
@@ -698,8 +696,8 @@ function QuickLogRow({
         type="button"
         onClick={handleQuick}
         disabled={pending || finished || reps === null}
-        className={`flex items-center justify-center rounded bg-(--accent) font-bold text-(--accent-contrast) active:scale-95 disabled:opacity-60 ${
-          compact ? "h-7 w-9 text-sm" : "h-8 w-11 text-base"
+        className={`flex shrink-0 items-center justify-center rounded-md bg-(--accent) font-bold text-(--accent-contrast) active:scale-95 disabled:opacity-60 ${
+          compact ? "h-9 w-10 text-base" : "h-10 w-12 text-lg"
         }`}
         aria-label="log with these values"
       >
@@ -867,16 +865,16 @@ function Stepper({
   };
 
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="w-12 text-[10px] font-semibold uppercase tracking-wider text-(--muted)">
+    <div className="flex items-center gap-2">
+      <span className="w-11 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-(--muted)">
         {label}
       </span>
-      <div className="grid flex-1 grid-cols-[auto,1fr,auto] items-stretch rounded-md border border-(--border) bg-(--background)">
+      <div className="grid min-w-0 flex-1 grid-cols-[auto,1fr,auto] items-stretch rounded-md border border-(--border) bg-(--background)">
         <button
           type="button"
           onClick={() => bump(-1)}
           disabled={disabled}
-          className="flex h-10 w-9 items-center justify-center rounded-l-md text-base font-semibold text-(--muted) active:bg-(--accent-soft) disabled:opacity-40"
+          className="flex h-11 w-11 items-center justify-center rounded-l-md text-xl font-semibold text-(--muted) active:bg-(--accent-soft) disabled:opacity-40"
           aria-label={`decrease ${label}`}
         >
           −
@@ -888,13 +886,14 @@ function Stepper({
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
           placeholder={allowEmpty ? "bw" : "0"}
-          className="h-10 w-full border-x border-(--border) bg-transparent text-center text-base font-bold tabular-nums outline-none focus:bg-(--background) disabled:opacity-60"
+          className="h-11 w-full border-x border-(--border) bg-transparent text-center font-bold tabular-nums outline-none focus:bg-(--background) disabled:opacity-60"
+          style={{ fontSize: "18px" }}
         />
         <button
           type="button"
           onClick={() => bump(+1)}
           disabled={disabled}
-          className="flex h-10 w-9 items-center justify-center rounded-r-md text-base font-semibold text-(--muted) active:bg-(--accent-soft) disabled:opacity-40"
+          className="flex h-11 w-11 items-center justify-center rounded-r-md text-xl font-semibold text-(--muted) active:bg-(--accent-soft) disabled:opacity-40"
           aria-label={`increase ${label}`}
         >
           +

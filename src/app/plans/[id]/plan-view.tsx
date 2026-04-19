@@ -30,54 +30,54 @@ export function PlanView({ plan, library, canEdit }: Props) {
   };
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-8 sm:px-6 sm:py-10">
-      <header className="space-y-3">
+    <main className="mx-auto w-full max-w-3xl flex-1 space-y-5 px-3 py-5 sm:px-6 sm:py-10">
+      <header className="space-y-2">
         <Link
           href="/plans"
-          className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+          className="text-sm text-(--muted) hover:text-(--foreground)"
         >
           ← plans
         </Link>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h1 className="truncate text-2xl font-semibold tracking-tight">
+              <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">
                 {plan.name}
               </h1>
               {plan.is_public && (
-                <span className="rounded border border-zinc-200 px-1.5 text-xs text-zinc-500 dark:border-zinc-800">
+                <span className="rounded border border-(--border) px-1.5 text-[10px] uppercase tracking-wider text-(--muted)">
                   public
                 </span>
               )}
             </div>
             {plan.description && (
-              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              <p className="mt-1 text-sm text-(--muted)">
                 {plan.description}
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {canEdit && (
               <button
                 type="button"
                 onClick={() => setEditing((v) => !v)}
-                className="inline-flex h-9 items-center rounded-lg border border-zinc-300 bg-white px-3 text-sm font-medium hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+                className="inline-flex h-10 items-center rounded-lg border border-(--border) bg-(--background) px-3 text-sm font-medium hover:bg-(--surface)"
               >
-                {editing ? "done editing" : "edit"}
+                {editing ? "done" : "edit"}
               </button>
             )}
             <button
               type="button"
               onClick={onDuplicate}
               disabled={pending}
-              className="inline-flex h-9 items-center rounded-lg border border-zinc-300 bg-white px-3 text-sm font-medium hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+              className="inline-flex h-10 items-center rounded-lg border border-(--border) bg-(--background) px-3 text-sm font-medium hover:bg-(--surface) disabled:opacity-60"
             >
               {pending ? "…" : "duplicate"}
             </button>
           </div>
         </div>
         {plan.source_url && (
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-(--muted)">
             source:{" "}
             <a
               href={plan.source_url}
@@ -91,7 +91,7 @@ export function PlanView({ plan, library, canEdit }: Props) {
         )}
       </header>
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         {plan.plan_weeks.flatMap((w) =>
           w.plan_days.map((d) => (
             <DayCard
@@ -144,10 +144,10 @@ function DayCard({
   };
 
   return (
-    <section className="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+    <section className="space-y-3 rounded-xl border border-(--border) bg-(--background) p-3 sm:p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-xs uppercase tracking-wider text-zinc-500">
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-(--muted)">
             day {day.day_number}
           </div>
           {editing ? (
@@ -155,30 +155,31 @@ function DayCard({
               defaultValue={day.name ?? ""}
               onBlur={(e) => onRename(e.target.value)}
               placeholder="day name"
-              className="mt-1 w-full rounded border border-zinc-300 bg-white px-2 py-1 text-base font-medium outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:focus:border-zinc-100"
+              className="mt-1 w-full rounded border border-(--border) bg-(--surface) px-2 py-1 font-semibold outline-none focus:border-(--accent)"
             />
           ) : (
-            <h2 className="mt-0.5 text-base font-semibold">
+            <h2 className="mt-0.5 text-lg font-bold leading-tight">
               {day.name?.trim() || `day ${day.day_number}`}
             </h2>
           )}
         </div>
         {!editing && (
-          <div className="flex flex-col items-end gap-1">
+          <div className="flex shrink-0 items-stretch gap-1.5">
             <button
               type="button"
               onClick={onStart}
               disabled={pending}
-              className="inline-flex h-10 items-center rounded-lg bg-(--accent) px-4 text-sm font-semibold text-(--accent-contrast) shadow-sm active:scale-[0.99] disabled:opacity-60"
+              className="inline-flex h-11 items-center rounded-lg bg-(--accent) px-4 text-sm font-bold text-(--accent-contrast) shadow-sm active:scale-[0.99] disabled:opacity-60"
             >
-              {pending ? "starting…" : "start workout →"}
+              {pending ? "starting…" : "start →"}
             </button>
             <button
               type="button"
               onClick={() => setPastOpen((v) => !v)}
-              className="text-[11px] text-(--muted) underline hover:text-(--foreground)"
+              className="inline-flex h-11 items-center rounded-lg border border-(--border) bg-(--background) px-3 text-xs font-medium text-(--muted)"
+              aria-label="log past workout"
             >
-              log past workout
+              past
             </button>
           </div>
         )}
@@ -190,20 +191,20 @@ function DayCard({
             type="datetime-local"
             value={pastValue}
             onChange={(e) => setPastValue(e.target.value)}
-            className="rounded border border-(--border) bg-(--background) px-2 py-1"
+            className="min-w-0 flex-1 rounded border border-(--border) bg-(--background) px-2 py-1.5"
           />
           <button
             type="button"
             onClick={onStartPast}
             disabled={pending}
-            className="rounded bg-(--foreground) px-3 py-1 text-xs font-semibold text-(--background) disabled:opacity-60"
+            className="h-9 rounded-md bg-(--foreground) px-3 text-xs font-semibold text-(--background) disabled:opacity-60"
           >
             {pending ? "…" : "start backdated"}
           </button>
           <button
             type="button"
             onClick={() => setPastOpen(false)}
-            className="text-(--muted)"
+            className="h-9 rounded-md px-2 text-(--muted)"
           >
             cancel
           </button>
@@ -215,11 +216,11 @@ function DayCard({
       )}
 
       {day.plan_day_exercises.length === 0 ? (
-        <p className="rounded border border-dashed border-zinc-300 p-4 text-center text-xs text-zinc-500 dark:border-zinc-700">
+        <p className="rounded border border-dashed border-(--border) p-4 text-center text-xs text-(--muted)">
           no exercises
         </p>
       ) : (
-        <ul className="divide-y divide-zinc-200 overflow-hidden rounded border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+        <ul className="divide-y divide-(--border) overflow-hidden rounded-lg border border-(--border) bg-(--surface)">
           {day.plan_day_exercises.map((ex, i) => (
             <ExerciseRow
               key={ex.id}
@@ -332,9 +333,11 @@ function ExerciseRow({
           <div className="truncate font-medium">
             {ex.exercise?.name ?? "(deleted)"}
           </div>
-          {ex.notes && <p className="text-xs text-zinc-500">{ex.notes}</p>}
+          {ex.notes && (
+            <p className="text-xs text-(--muted)">{ex.notes}</p>
+          )}
         </div>
-        <div className="shrink-0 text-xs text-zinc-500 tabular-nums">
+        <div className="shrink-0 text-xs text-(--muted) tabular-nums">
           {ex.prescribed_sets}×{ex.prescribed_reps}
           {ex.prescribed_weight !== null ? ` @ ${ex.prescribed_weight}` : ""}
           {ex.rest_seconds !== null ? ` · ${ex.rest_seconds}s` : ""}
@@ -356,7 +359,7 @@ function ExerciseRow({
             type="button"
             onClick={() => move("up")}
             disabled={isFirst || pending}
-            className="h-7 w-7 rounded border border-zinc-300 text-xs disabled:opacity-30 dark:border-zinc-700"
+            className="h-9 w-9 rounded border border-(--border) text-base disabled:opacity-30"
             aria-label="move up"
           >
             ↑
@@ -365,7 +368,7 @@ function ExerciseRow({
             type="button"
             onClick={() => move("down")}
             disabled={isLast || pending}
-            className="h-7 w-7 rounded border border-zinc-300 text-xs disabled:opacity-30 dark:border-zinc-700"
+            className="h-9 w-9 rounded border border-(--border) text-base disabled:opacity-30"
             aria-label="move down"
           >
             ↓
@@ -374,7 +377,7 @@ function ExerciseRow({
             type="button"
             onClick={remove}
             disabled={pending}
-            className="h-7 rounded border border-red-300 px-2 text-xs text-red-700 disabled:opacity-30 dark:border-red-900 dark:text-red-400"
+            className="h-9 rounded border border-red-300 px-2 text-xs text-red-700 disabled:opacity-30 dark:border-red-900 dark:text-red-400"
           >
             remove
           </button>
@@ -549,7 +552,7 @@ function Field({
 }
 
 const inputCls =
-  "block w-full rounded border border-zinc-300 bg-white px-2 py-1 text-sm outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:focus:border-zinc-100";
+  "block h-10 w-full rounded border border-(--border) bg-(--background) px-2 outline-none focus:border-(--accent)";
 
 function toLocalInputValue(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");

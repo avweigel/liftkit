@@ -173,8 +173,8 @@ export default async function LogSessionPage({ params }: Props) {
     .filter((e) => e.exercise_id.length > 0);
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 space-y-5 px-4 py-5 sm:px-6 sm:py-8">
-      <header className="space-y-2">
+    <main className="mx-auto w-full max-w-2xl flex-1 space-y-4 px-3 py-4 sm:px-6 sm:py-8">
+      <header className="space-y-1">
         <Link
           href="/"
           className="inline-flex items-center text-sm text-(--muted) hover:text-(--foreground)"
@@ -182,7 +182,7 @@ export default async function LogSessionPage({ params }: Props) {
           ← home
         </Link>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+          <h1 className="text-xl font-bold leading-tight tracking-tight sm:text-3xl">
             {sessionTitle(session)}
           </h1>
           <SessionStartedAt
