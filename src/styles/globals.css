@@ -1,29 +1,53 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #0a0a0a;
-  --muted: #6e6e6e;
-  --surface: #fafafa;
-  --border: #e4e4e7;
-  --accent: #ea580c;
-  --accent-contrast: #ffffff;
-  --accent-soft: #fff7ed;
-  --ok: #15803d;
+  color-scheme: light dark;
+
+  --background: light-dark(#ffffff, #0a0a0a);
+  --foreground: light-dark(#0a0a0a, #fafafa);
+  --muted: light-dark(#6e6e6e, #a1a1aa);
+  --surface: light-dark(#fafafa, #161618);
+  --border: light-dark(#e4e4e7, #27272a);
+
+  --accent: light-dark(#ea580c, #fb923c);
+  --accent-contrast: light-dark(#ffffff, #18120a);
+  --accent-soft: light-dark(#fff7ed, #2a1709);
+
+  --ok: light-dark(#15803d, #4ade80);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #fafafa;
-    --muted: #a1a1aa;
-    --surface: #161618;
-    --border: #27272a;
-    --accent: #fb923c;
-    --accent-contrast: #18120a;
-    --accent-soft: #2a1709;
-    --ok: #4ade80;
-  }
+[data-theme="light"] {
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* accent presets */
+[data-accent="crimson"] {
+  --accent: light-dark(#dc2626, #f87171);
+  --accent-contrast: light-dark(#ffffff, #190505);
+  --accent-soft: light-dark(#fef2f2, #2c0606);
+}
+[data-accent="indigo"] {
+  --accent: light-dark(#4f46e5, #a5b4fc);
+  --accent-contrast: light-dark(#ffffff, #0b0a1f);
+  --accent-soft: light-dark(#eef2ff, #1e1b4b);
+}
+[data-accent="teal"] {
+  --accent: light-dark(#0d9488, #2dd4bf);
+  --accent-contrast: light-dark(#ffffff, #042521);
+  --accent-soft: light-dark(#f0fdfa, #0f2925);
+}
+[data-accent="rose"] {
+  --accent: light-dark(#e11d48, #fb7185);
+  --accent-contrast: light-dark(#ffffff, #1c0410);
+  --accent-soft: light-dark(#fff1f2, #2d0a14);
+}
+[data-accent="slate"] {
+  --accent: light-dark(#334155, #cbd5e1);
+  --accent-contrast: light-dark(#ffffff, #0f172a);
+  --accent-soft: light-dark(#f1f5f9, #1e293b);
 }
 
 @theme inline {
@@ -57,7 +81,6 @@ textarea {
   font-family: inherit;
 }
 
-/* Prevent iOS Safari from zooming the viewport when a text input gains focus */
 input[type="text"],
 input[type="number"],
 input[type="email"],
@@ -77,10 +100,4 @@ select {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
-}
-
-@supports (font-variant-numeric: tabular-nums) {
-  .tabular-nums {
-    font-variant-numeric: tabular-nums;
-  }
 }

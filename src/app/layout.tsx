@@ -18,6 +18,8 @@ export const metadata: Metadata = {
   description: "a personal workout tracker",
 };
 
+const INIT_THEME = `(function(){try{var t=localStorage.getItem('liftkit:theme');var a=localStorage.getItem('liftkit:accent');if(t&&t!=='system')document.documentElement.dataset.theme=t;if(a&&a!=='amber')document.documentElement.dataset.accent=a;}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -25,8 +27,12 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: INIT_THEME }} />
+      </head>
+      <body className="flex min-h-full flex-col bg-(--background) text-(--foreground)">
         <Nav />
         <div className="flex flex-1 flex-col">{children}</div>
       </body>
