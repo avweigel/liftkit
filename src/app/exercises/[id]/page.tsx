@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { findCanonical } from "@/lib/exercise-normalize";
 import { ProgressChart, type ChartPoint } from "./progress-chart";
 
 type Props = { params: Promise<{ id: string }> };
@@ -11,6 +12,7 @@ type Exercise = {
   primary_muscle: string;
   equipment: string;
   owner_id: string | null;
+  notes: string | null;
 };
 
 type SetRow = {
@@ -40,7 +42,7 @@ export default async function ExerciseDetailPage({ params }: Props) {
     await Promise.all([
       supabase
         .from("exercises")
-        .select("id,name,primary_muscle,equipment,owner_id")
+        .select("id,name,primary_muscle,equipment,owner_id,notes")
         .eq("id", id)
         .maybeSingle()
         .returns<Exercise>(),
@@ -82,6 +84,17 @@ export default async function ExerciseDetailPage({ params }: Props) {
           <p className="mt-1 text-sm text-(--muted)">
             {exercise.primary_muscle.replace("_", " ")} · {exercise.equipment}
           </p>
+          {(() => {
+            const description =
+              exercise.notes?.trim() ||
+              findCanonical(exercise.name)?.description ||
+              null;
+            return description ? (
+              <p className="mt-3 text-sm leading-relaxed text-(--foreground)/80">
+                {description}
+              </p>
+            ) : null;
+          })()}
         </div>
       </header>
 

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { ExerciseBrowser } from "./exercise-browser";
+import { NormalizeButton } from "./normalize-button";
 
 type Row = {
   id: string;
@@ -35,6 +36,7 @@ export default async function ExercisesPage() {
           tap one to see how your numbers have moved.
         </p>
       </header>
+      {items.some((i) => i.mine) && <NormalizeButton />}
       <ExerciseBrowser items={items} />
     </main>
   );
