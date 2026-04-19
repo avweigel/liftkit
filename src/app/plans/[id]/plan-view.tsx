@@ -159,9 +159,9 @@ function DayCard({
             type="button"
             onClick={onStart}
             disabled={pending}
-            className="inline-flex h-9 items-center rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="inline-flex h-10 items-center rounded-lg bg-(--accent) px-4 text-sm font-semibold text-(--accent-contrast) shadow-sm active:scale-[0.99] disabled:opacity-60"
           >
-            {pending ? "starting…" : "start workout"}
+            {pending ? "starting…" : "start workout →"}
           </button>
         )}
       </div>

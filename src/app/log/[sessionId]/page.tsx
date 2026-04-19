@@ -46,6 +46,14 @@ type SessionSet = {
   logged_at: string;
 };
 
+type LastPerformed = {
+  user_id: string;
+  exercise_id: string;
+  weight: number | null;
+  reps: number;
+  logged_at: string;
+};
+
 export default async function LogSessionPage({ params }: Props) {
   const { sessionId } = await params;
   const supabase = await createClient();
@@ -79,20 +87,47 @@ export default async function LogSessionPage({ params }: Props) {
   if (!session) notFound();
   if (session.user_id !== user!.id) redirect("/");
 
-  const { data: sets } = await supabase
-    .from("session_sets")
-    .select(
-      "id,exercise_id,set_number,weight,reps,rpe,is_warmup,notes,logged_at",
-    )
-    .eq("session_id", sessionId)
-    .order("logged_at", { ascending: true })
-    .returns<SessionSet[]>();
+  const exerciseIds = (session.plan_day?.plan_day_exercises ?? [])
+    .map((pde) => pde.exercise?.id)
+    .filter((id): id is string => !!id);
+
+  const [{ data: sets }, { data: lastPerformed }] = await Promise.all([
+    supabase
+      .from("session_sets")
+      .select(
+        "id,exercise_id,set_number,weight,reps,rpe,is_warmup,notes,logged_at",
+      )
+      .eq("session_id", sessionId)
+      .order("logged_at", { ascending: true })
+      .returns<SessionSet[]>(),
+    exerciseIds.length > 0
+      ? supabase
+          .from("v_exercise_last_performed")
+          .select("user_id,exercise_id,weight,reps,logged_at")
+          .eq("user_id", user!.id)
+          .in("exercise_id", exerciseIds)
+          .returns<LastPerformed[]>()
+      : Promise.resolve({ data: [] as LastPerformed[] }),
+  ]);
+
+  const lastByExercise = new Map<
+    string,
+    { weight: number | null; reps: number; logged_at: string }
+  >();
+  for (const r of lastPerformed ?? []) {
+    lastByExercise.set(r.exercise_id, {
+      weight: r.weight,
+      reps: r.reps,
+      logged_at: r.logged_at,
+    });
+  }
 
   const exercises = (session.plan_day?.plan_day_exercises ?? [])
     .slice()
     .sort((a, b) => a.order_index - b.order_index)
     .map((pde) => ({
-      plan_day_exercise_id: pde.id,
+      id: pde.id,
+      order_index: pde.order_index,
       exercise_id: pde.exercise?.id ?? "",
       name: pde.exercise?.name ?? "(deleted)",
       prescribed_sets: pde.prescribed_sets,
@@ -100,27 +135,32 @@ export default async function LogSessionPage({ params }: Props) {
       prescribed_weight: pde.prescribed_weight,
       rest_seconds: pde.rest_seconds,
       notes: pde.notes,
+      last_performed: pde.exercise
+        ? lastByExercise.get(pde.exercise.id) ?? null
+        : null,
     }))
     .filter((e) => e.exercise_id.length > 0);
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+    <main className="mx-auto w-full max-w-2xl flex-1 space-y-5 px-4 py-5 sm:px-6 sm:py-8">
       <header className="space-y-2">
         <Link
           href="/"
-          className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+          className="inline-flex items-center text-sm text-(--muted) hover:text-(--foreground)"
         >
           ← home
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {sessionTitle(session)}
-        </h1>
-        <p className="text-xs text-zinc-500">
-          started {formatDateTime(session.started_at)}
-          {session.finished_at
-            ? ` · finished ${formatDateTime(session.finished_at)}`
-            : ""}
-        </p>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+            {sessionTitle(session)}
+          </h1>
+          <p className="mt-1 text-xs text-(--muted)">
+            started {formatDateTime(session.started_at)}
+            {session.finished_at
+              ? ` · finished ${formatDateTime(session.finished_at)}`
+              : ""}
+          </p>
+        </div>
       </header>
 
       <SessionLogger
@@ -140,7 +180,7 @@ function sessionTitle(s: SessionData): string {
   const planName = d.plan_week?.plan?.name;
   const weekNum = d.plan_week?.week_number;
   const dayLabel = d.name?.trim() || `day ${d.day_number}`;
-  return planName ? `${planName} · w${weekNum} ${dayLabel}` : dayLabel;
+  return planName ? `${dayLabel} · ${planName} w${weekNum}` : dayLabel;
 }
 
 function formatDateTime(iso: string) {

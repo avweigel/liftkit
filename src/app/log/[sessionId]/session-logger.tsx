@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   deleteSessionSet,
   finishSession,
   upsertSessionSet,
 } from "@/lib/actions/sessions";
+import { groupIntoSupersets, parseSetCode } from "@/lib/set-code";
 
 type Exercise = {
-  plan_day_exercise_id: string;
+  id: string;
+  order_index: number;
   exercise_id: string;
   name: string;
   prescribed_sets: number;
@@ -16,6 +18,11 @@ type Exercise = {
   prescribed_weight: number | null;
   rest_seconds: number | null;
   notes: string | null;
+  last_performed: {
+    weight: number | null;
+    reps: number;
+    logged_at: string;
+  } | null;
 };
 
 type SessionSet = {
@@ -46,12 +53,50 @@ export function SessionLogger({
 }: Props) {
   const [sets, setSets] = useState<SessionSet[]>(initialSets);
   const [notes, setNotes] = useState(initialNotes);
+  const [restOn, setRestOn] = useState(false);
+  const [restSecondsLeft, setRestSecondsLeft] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const setsByExercise = (exerciseId: string) =>
-    sets
-      .filter((s) => s.exercise_id === exerciseId)
-      .sort((a, b) => a.set_number - b.set_number);
+  const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (restSecondsLeft === null) return;
+    if (restTimerRef.current) clearInterval(restTimerRef.current);
+    restTimerRef.current = setInterval(() => {
+      setRestSecondsLeft((s) => {
+        if (s === null) return null;
+        if (s <= 1) {
+          if (restTimerRef.current) clearInterval(restTimerRef.current);
+          return null;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => {
+      if (restTimerRef.current) clearInterval(restTimerRef.current);
+    };
+  }, [restSecondsLeft !== null]);
+
+  const totalSets = useMemo(
+    () => exercises.reduce((n, ex) => n + ex.prescribed_sets, 0),
+    [exercises],
+  );
+  const workingSetsLogged = useMemo(
+    () => sets.filter((s) => !s.is_warmup).length,
+    [sets],
+  );
+
+  const groups = useMemo(
+    () =>
+      groupIntoSupersets(
+        exercises.map((e) => ({
+          id: e.id,
+          order_index: e.order_index,
+          notes: e.notes,
+          _ex: e,
+        })),
+      ),
+    [exercises],
+  );
 
   const upsert = async (
     exerciseId: string,
@@ -75,13 +120,13 @@ export function SessionLogger({
       notes: set.notes,
     });
     setSets((prev) => {
-      const withoutOld = prev.filter(
+      const filtered = prev.filter(
         (s) =>
           !(set.id && s.id === set.id) &&
           !(s.exercise_id === exerciseId && s.set_number === set.set_number),
       );
       return [
-        ...withoutOld,
+        ...filtered,
         {
           id,
           exercise_id: exerciseId,
@@ -94,6 +139,13 @@ export function SessionLogger({
         },
       ];
     });
+    if (restOn && !set.is_warmup) {
+      const restFor =
+        exercises.find((e) => e.exercise_id === exerciseId)?.rest_seconds ??
+        60;
+      setRestSecondsLeft(Math.max(15, restFor));
+    }
+    return id;
   };
 
   const del = async (setId: string) => {
@@ -108,301 +160,382 @@ export function SessionLogger({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5 pb-24">
+      <ProgressHeader
+        done={workingSetsLogged}
+        total={totalSets}
+        restOn={restOn}
+        onToggleRest={() => setRestOn((v) => !v)}
+        finished={finished}
+      />
+
       {exercises.length === 0 && (
-        <p className="rounded-lg border border-dashed border-zinc-300 p-6 text-center text-sm text-zinc-500 dark:border-zinc-700">
-          no exercises on this day. this is an ad hoc session.
+        <p className="rounded-lg border border-dashed border-(--border) p-6 text-center text-sm text-(--muted)">
+          no exercises on this day.
         </p>
       )}
 
-      <div className="space-y-3">
-        {exercises.map((ex) => (
-          <ExerciseCard
-            key={ex.plan_day_exercise_id}
-            ex={ex}
-            sets={setsByExercise(ex.exercise_id)}
-            onUpsert={upsert}
-            onDelete={del}
-            finished={finished}
-          />
-        ))}
+      <div className="space-y-4">
+        {groups.map((g) => {
+          const isSuperset = g.items.length > 1 && g.letter;
+          return (
+            <div key={g.id} className="space-y-2">
+              {isSuperset && (
+                <div className="flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wider text-(--accent)">
+                  <span className="inline-block h-1 w-1 rounded-full bg-(--accent)" />
+                  superset {g.letter}
+                </div>
+              )}
+              <div
+                className={
+                  isSuperset
+                    ? "space-y-3 rounded-xl border-2 border-(--accent)/20 p-2 sm:p-3"
+                    : "space-y-3"
+                }
+              >
+                {g.items.map((item) => (
+                  <ExerciseCard
+                    key={item._ex.id}
+                    exercise={item._ex}
+                    sets={sets
+                      .filter((s) => s.exercise_id === item._ex.exercise_id)
+                      .sort((a, b) => a.set_number - b.set_number)}
+                    onUpsert={(set) => upsert(item._ex.exercise_id, set)}
+                    onDelete={del}
+                    finished={finished}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {!finished && (
-        <div className="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+        <div className="space-y-3 rounded-xl border border-(--border) bg-(--surface) p-4">
           <label className="block space-y-1 text-sm">
-            <span className="text-zinc-500">session notes</span>
+            <span className="text-(--muted)">session notes</span>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              placeholder="anything to remember about today"
-              className="w-full resize-y rounded border border-zinc-300 bg-white px-2 py-1 text-sm outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:focus:border-zinc-100"
+              placeholder="how it felt, weight jumps, anything to remember"
+              className="w-full resize-y rounded-lg border border-(--border) bg-(--background) px-3 py-2 text-sm outline-none focus:border-(--accent)"
             />
           </label>
-          <button
-            type="button"
-            onClick={finish}
-            disabled={pending}
-            className="inline-flex h-11 items-center rounded-lg bg-zinc-900 px-5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
-            {pending ? "finishing…" : "finish workout"}
-          </button>
         </div>
       )}
+
+      {!finished && (
+        <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-(--border) bg-(--background)/95 backdrop-blur">
+          <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3 sm:px-6">
+            <button
+              type="button"
+              onClick={finish}
+              disabled={pending}
+              className="h-12 flex-1 rounded-xl bg-(--accent) text-base font-semibold text-(--accent-contrast) shadow-sm active:scale-[0.99] disabled:opacity-60"
+            >
+              {pending ? "finishing…" : "finish workout"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {restOn && restSecondsLeft !== null && (
+        <button
+          type="button"
+          onClick={() => setRestSecondsLeft(null)}
+          className="fixed bottom-20 left-1/2 z-30 -translate-x-1/2 rounded-full bg-(--foreground) px-5 py-2 text-sm font-semibold text-(--background) shadow-lg tabular-nums"
+        >
+          rest · {formatRest(restSecondsLeft)}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ProgressHeader({
+  done,
+  total,
+  restOn,
+  onToggleRest,
+  finished,
+}: {
+  done: number;
+  total: number;
+  restOn: boolean;
+  onToggleRest: () => void;
+  finished: boolean;
+}) {
+  const pct = total === 0 ? 0 : Math.min(100, (done / total) * 100);
+  return (
+    <div className="space-y-2 rounded-xl border border-(--border) bg-(--surface) p-4">
+      <div className="flex items-end justify-between gap-2">
+        <div>
+          <div className="text-xs uppercase tracking-wider text-(--muted)">
+            progress
+          </div>
+          <div className="text-2xl font-semibold tabular-nums">
+            {done}
+            <span className="text-(--muted)"> / {total}</span>
+          </div>
+        </div>
+        {!finished && (
+          <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-(--muted)">
+            <span>rest timer</span>
+            <span
+              onClick={onToggleRest}
+              className={`relative inline-block h-5 w-9 rounded-full transition ${restOn ? "bg-(--accent)" : "bg-(--border)"}`}
+            >
+              <span
+                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${restOn ? "left-[18px]" : "left-0.5"}`}
+              />
+            </span>
+          </label>
+        )}
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-(--border)">
+        <div
+          className="h-full bg-(--accent) transition-all"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
   );
 }
 
 function ExerciseCard({
-  ex,
+  exercise,
   sets,
   onUpsert,
   onDelete,
   finished,
 }: {
-  ex: Exercise;
+  exercise: Exercise;
   sets: SessionSet[];
-  onUpsert: (
-    exerciseId: string,
-    set: {
-      id: string | null;
-      set_number: number;
-      weight: number | null;
-      reps: number;
-      rpe: number | null;
-      is_warmup: boolean;
-      notes: string | null;
-    },
-  ) => Promise<void>;
+  onUpsert: (set: {
+    id: string | null;
+    set_number: number;
+    weight: number | null;
+    reps: number;
+    rpe: number | null;
+    is_warmup: boolean;
+    notes: string | null;
+  }) => Promise<string>;
   onDelete: (setId: string) => Promise<void>;
   finished: boolean;
 }) {
-  const nextSetNumber =
-    sets.length === 0
-      ? 1
-      : Math.max(...sets.map((s) => s.set_number)) + 1;
+  const { cleanNotes } = parseSetCode(exercise.notes);
+  const lastPerformed = exercise.last_performed;
+
+  const setRows: Array<SessionSet | { placeholderNumber: number }> = [];
+  for (let i = 1; i <= exercise.prescribed_sets; i++) {
+    const existing = sets.find((s) => s.set_number === i);
+    if (existing) setRows.push(existing);
+    else setRows.push({ placeholderNumber: i });
+  }
+  for (const s of sets) {
+    if (s.set_number > exercise.prescribed_sets) setRows.push(s);
+  }
+
+  const lastLogged = sets.length > 0 ? sets[sets.length - 1] : null;
+  const suggestedWeight =
+    lastLogged?.weight ??
+    lastPerformed?.weight ??
+    exercise.prescribed_weight ??
+    null;
+  const suggestedReps =
+    lastLogged?.reps ??
+    firstNumber(exercise.prescribed_reps) ??
+    lastPerformed?.reps ??
+    null;
 
   return (
-    <section className="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-      <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <div className="min-w-0">
-          <h2 className="truncate text-base font-semibold">{ex.name}</h2>
-          <p className="mt-0.5 text-xs text-zinc-500">
-            prescribed: {ex.prescribed_sets}×{ex.prescribed_reps}
-            {ex.prescribed_weight !== null
-              ? ` @ ${ex.prescribed_weight}`
+    <section className="space-y-3 rounded-xl border border-(--border) bg-(--background) p-4">
+      <header className="space-y-1">
+        <h2 className="text-lg font-bold leading-tight">{exercise.name}</h2>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-(--muted)">
+          <span>
+            {exercise.prescribed_sets} × {exercise.prescribed_reps}
+            {exercise.prescribed_weight !== null
+              ? ` @ ${exercise.prescribed_weight}`
               : ""}
-            {ex.rest_seconds !== null ? ` · ${ex.rest_seconds}s rest` : ""}
-          </p>
-          {ex.notes && (
-            <p className="mt-0.5 text-xs text-zinc-500">{ex.notes}</p>
+          </span>
+          {lastPerformed && (
+            <span>
+              last: {lastPerformed.weight ?? "bw"} × {lastPerformed.reps}
+              <span className="ml-1 text-(--muted)/70">
+                ({relativeDays(lastPerformed.logged_at)})
+              </span>
+            </span>
+          )}
+          {exercise.rest_seconds !== null && (
+            <span>rest {exercise.rest_seconds}s</span>
           )}
         </div>
+        {cleanNotes && (
+          <p className="text-xs text-(--muted)">{cleanNotes}</p>
+        )}
       </header>
 
-      <div className="space-y-2">
-        {sets.map((s) => (
-          <SetRow
-            key={s.id}
-            exerciseId={ex.exercise_id}
-            initial={s}
-            onSave={(set) => onUpsert(ex.exercise_id, { ...set, id: s.id })}
-            onDelete={() => onDelete(s.id)}
-            finished={finished}
-          />
-        ))}
-        {!finished && (
-          <NewSetRow
-            key={`new-${nextSetNumber}-${sets.length}`}
-            exerciseId={ex.exercise_id}
-            setNumber={nextSetNumber}
-            suggestedWeight={
-              sets.length > 0 ? sets[sets.length - 1].weight : ex.prescribed_weight
-            }
-            onAdd={(set) => onUpsert(ex.exercise_id, { ...set, id: null })}
-          />
-        )}
-      </div>
+      <ul className="space-y-2">
+        {setRows.map((row, i) => {
+          if ("placeholderNumber" in row) {
+            return (
+              <SetEditor
+                key={`p-${row.placeholderNumber}`}
+                setNumber={row.placeholderNumber}
+                initialWeight={suggestedWeight}
+                initialReps={suggestedReps}
+                initialIsWarmup={false}
+                finished={finished}
+                onSave={async (state) => {
+                  await onUpsert({
+                    id: null,
+                    set_number: row.placeholderNumber,
+                    weight: state.weight,
+                    reps: state.reps,
+                    rpe: null,
+                    is_warmup: state.is_warmup,
+                    notes: null,
+                  });
+                }}
+              />
+            );
+          }
+          return (
+            <LoggedSet
+              key={row.id}
+              set={row}
+              finished={finished}
+              onSave={async (state) => {
+                await onUpsert({
+                  id: row.id,
+                  set_number: row.set_number,
+                  weight: state.weight,
+                  reps: state.reps,
+                  rpe: row.rpe,
+                  is_warmup: state.is_warmup,
+                  notes: row.notes,
+                });
+              }}
+              onDelete={() => onDelete(row.id)}
+            />
+          );
+        })}
+      </ul>
     </section>
   );
 }
 
-type EditableSet = {
-  set_number: number;
-  weight: number | null;
-  reps: number;
-  rpe: number | null;
-  is_warmup: boolean;
-  notes: string | null;
-};
-
-function SetRow({
-  initial,
+function LoggedSet({
+  set,
+  finished,
   onSave,
   onDelete,
-  finished,
 }: {
-  exerciseId: string;
-  initial: SessionSet;
-  onSave: (set: EditableSet) => Promise<void>;
-  onDelete: () => Promise<void>;
+  set: SessionSet;
   finished: boolean;
+  onSave: (state: {
+    weight: number | null;
+    reps: number;
+    is_warmup: boolean;
+  }) => Promise<void>;
+  onDelete: () => Promise<void>;
 }) {
-  const [weight, setWeight] = useState(
-    initial.weight === null ? "" : String(initial.weight),
-  );
-  const [reps, setReps] = useState(String(initial.reps));
-  const [rpe, setRpe] = useState(
-    initial.rpe === null ? "" : String(initial.rpe),
-  );
-  const [isWarmup, setIsWarmup] = useState(initial.is_warmup);
-  const [notes, setNotes] = useState(initial.notes ?? "");
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  const save = async () => {
-    setError(null);
-    const weightNum = weight.trim() === "" ? null : Number(weight);
-    const repsNum = Number(reps);
-    const rpeNum = rpe.trim() === "" ? null : Number(rpe);
-    if (!Number.isInteger(repsNum) || repsNum < 0) {
-      setError("reps must be ≥ 0");
-      return;
-    }
-    if (weightNum !== null && !Number.isFinite(weightNum)) {
-      setError("invalid weight");
-      return;
-    }
-    if (rpeNum !== null && (rpeNum < 1 || rpeNum > 10)) {
-      setError("rpe must be 1-10");
-      return;
-    }
-    setSaving(true);
-    try {
-      await onSave({
-        set_number: initial.set_number,
-        weight: weightNum,
-        reps: repsNum,
-        rpe: rpeNum,
-        is_warmup: isWarmup,
-        notes: notes.trim() || null,
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "save failed");
-    } finally {
-      setSaving(false);
-    }
-  };
-
+  const [editing, setEditing] = useState(false);
+  if (!editing) {
+    return (
+      <li>
+        <button
+          type="button"
+          onClick={() => !finished && setEditing(true)}
+          className="flex w-full items-center gap-3 rounded-lg border border-(--border) bg-(--surface) px-3 py-2 text-left active:bg-(--accent-soft)"
+        >
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--ok)/15 text-sm font-semibold text-(--ok)">
+            ✓
+          </span>
+          <span className="flex-1 text-sm text-(--muted)">
+            set {set.set_number}
+            {set.is_warmup && (
+              <span className="ml-1 rounded bg-(--border) px-1 text-[10px] uppercase tracking-wider text-(--muted)">
+                warmup
+              </span>
+            )}
+          </span>
+          <span className="text-lg font-bold tabular-nums">
+            {set.weight ?? "—"}
+          </span>
+          <span className="text-xs text-(--muted)">×</span>
+          <span className="text-lg font-bold tabular-nums">{set.reps}</span>
+        </button>
+      </li>
+    );
+  }
   return (
-    <div className="rounded border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="grid grid-cols-[auto,1fr,1fr,1fr,auto] items-center gap-2">
-        <span className="w-6 text-center text-xs text-zinc-500 tabular-nums">
-          {initial.set_number}
-        </span>
-        <CompactField label="wt">
-          <input
-            type="text"
-            inputMode="decimal"
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-            onBlur={save}
-            disabled={finished}
-            className={setInputCls}
-          />
-        </CompactField>
-        <CompactField label="reps">
-          <input
-            type="text"
-            inputMode="numeric"
-            value={reps}
-            onChange={(e) => setReps(e.target.value)}
-            onBlur={save}
-            disabled={finished}
-            className={setInputCls}
-          />
-        </CompactField>
-        <CompactField label="rpe">
-          <input
-            type="text"
-            inputMode="decimal"
-            value={rpe}
-            onChange={(e) => setRpe(e.target.value)}
-            onBlur={save}
-            disabled={finished}
-            placeholder="—"
-            className={setInputCls}
-          />
-        </CompactField>
-        {!finished && (
-          <button
-            type="button"
-            onClick={onDelete}
-            className="h-8 rounded border border-red-300 px-2 text-xs text-red-700 dark:border-red-900 dark:text-red-400"
-            aria-label="delete set"
-          >
-            ×
-          </button>
-        )}
-      </div>
-      {!finished && (
-        <div className="mt-2 flex items-center gap-3 text-xs">
-          <label className="flex items-center gap-1">
-            <input
-              type="checkbox"
-              checked={isWarmup}
-              onChange={(e) => {
-                setIsWarmup(e.target.checked);
-                setTimeout(save, 0);
-              }}
-            />
-            <span className="text-zinc-500">warmup</span>
-          </label>
-          <input
-            type="text"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            onBlur={save}
-            placeholder="notes"
-            className="flex-1 rounded border border-zinc-300 bg-white px-2 py-0.5 text-xs outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:focus:border-zinc-100"
-          />
-          {saving && <span className="text-xs text-zinc-500">saving…</span>}
-        </div>
-      )}
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-    </div>
+    <li>
+      <SetEditor
+        setNumber={set.set_number}
+        initialWeight={set.weight}
+        initialReps={set.reps}
+        initialIsWarmup={set.is_warmup}
+        finished={finished}
+        showDelete
+        onSave={async (state) => {
+          await onSave(state);
+          setEditing(false);
+        }}
+        onCancel={() => setEditing(false)}
+        onDelete={async () => {
+          await onDelete();
+          setEditing(false);
+        }}
+      />
+    </li>
   );
 }
 
-function NewSetRow({
+function SetEditor({
   setNumber,
-  suggestedWeight,
-  onAdd,
+  initialWeight,
+  initialReps,
+  initialIsWarmup,
+  finished,
+  showDelete = false,
+  onSave,
+  onCancel,
+  onDelete,
 }: {
-  exerciseId: string;
   setNumber: number;
-  suggestedWeight: number | null;
-  onAdd: (set: EditableSet) => Promise<void>;
+  initialWeight: number | null;
+  initialReps: number | null;
+  initialIsWarmup: boolean;
+  finished: boolean;
+  showDelete?: boolean;
+  onSave: (state: {
+    weight: number | null;
+    reps: number;
+    is_warmup: boolean;
+  }) => Promise<void>;
+  onCancel?: () => void;
+  onDelete?: () => Promise<void>;
 }) {
-  const [weight, setWeight] = useState(
-    suggestedWeight === null ? "" : String(suggestedWeight),
+  const [weight, setWeight] = useState<string>(
+    initialWeight === null ? "" : String(initialWeight),
   );
-  const [reps, setReps] = useState("");
-  const [isWarmup, setIsWarmup] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [reps, setReps] = useState<string>(
+    initialReps === null ? "" : String(initialReps),
+  );
+  const [isWarmup, setIsWarmup] = useState(initialIsWarmup);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
     setError(null);
-    if (reps.trim() === "") {
-      setError("enter reps to log the set");
-      return;
-    }
     const weightNum = weight.trim() === "" ? null : Number(weight);
     const repsNum = Number(reps);
     if (!Number.isInteger(repsNum) || repsNum < 0) {
-      setError("reps must be ≥ 0");
+      setError("enter reps");
       return;
     }
     if (weightNum !== null && !Number.isFinite(weightNum)) {
@@ -411,16 +544,7 @@ function NewSetRow({
     }
     setSaving(true);
     try {
-      await onAdd({
-        set_number: setNumber,
-        weight: weightNum,
-        reps: repsNum,
-        rpe: null,
-        is_warmup: isWarmup,
-        notes: null,
-      });
-      setReps("");
-      setIsWarmup(false);
+      await onSave({ weight: weightNum, reps: repsNum, is_warmup: isWarmup });
     } catch (e) {
       setError(e instanceof Error ? e.message : "save failed");
     } finally {
@@ -429,69 +553,156 @@ function NewSetRow({
   };
 
   return (
-    <div className="rounded border border-dashed border-zinc-300 p-2 dark:border-zinc-700">
-      <div className="grid grid-cols-[auto,1fr,1fr,auto] items-center gap-2">
-        <span className="w-6 text-center text-xs text-zinc-500 tabular-nums">
-          {setNumber}
-        </span>
-        <CompactField label="wt">
+    <div className="rounded-lg border border-(--border) bg-(--surface) p-3">
+      <div className="mb-3 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-(--muted)">
+        <span>set {setNumber}</span>
+        <label className="flex items-center gap-1.5 normal-case text-xs font-normal">
           <input
-            type="text"
-            inputMode="decimal"
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-            placeholder={suggestedWeight !== null ? String(suggestedWeight) : "—"}
-            className={setInputCls}
+            type="checkbox"
+            checked={isWarmup}
+            onChange={(e) => setIsWarmup(e.target.checked)}
+            className="h-4 w-4 accent-(--accent)"
           />
-        </CompactField>
-        <CompactField label="reps">
-          <input
-            type="text"
-            inputMode="numeric"
-            value={reps}
-            onChange={(e) => setReps(e.target.value)}
-            placeholder="reps"
-            className={setInputCls}
-          />
-        </CompactField>
+          warmup
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Stepper
+          label="weight"
+          value={weight}
+          onChange={setWeight}
+          step={5}
+          allowEmpty
+          disabled={finished}
+        />
+        <Stepper
+          label="reps"
+          value={reps}
+          onChange={setReps}
+          step={1}
+          integer
+          disabled={finished}
+        />
+      </div>
+
+      <div className="mt-3 flex gap-2">
         <button
           type="button"
           onClick={submit}
-          disabled={saving}
-          className="h-8 rounded bg-zinc-900 px-3 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+          disabled={saving || finished}
+          className="h-11 flex-1 rounded-lg bg-(--accent) text-sm font-semibold text-(--accent-contrast) active:scale-[0.99] disabled:opacity-60"
         >
-          {saving ? "…" : "log"}
+          {saving ? "saving…" : "log set"}
         </button>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="h-11 rounded-lg border border-(--border) px-3 text-sm text-(--muted)"
+          >
+            cancel
+          </button>
+        )}
+        {showDelete && onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="h-11 rounded-lg border border-(--border) px-3 text-sm text-red-600 dark:text-red-400"
+            aria-label="delete set"
+          >
+            ✕
+          </button>
+        )}
       </div>
-      <label className="mt-2 flex items-center gap-1 text-xs">
-        <input
-          type="checkbox"
-          checked={isWarmup}
-          onChange={(e) => setIsWarmup(e.target.checked)}
-        />
-        <span className="text-zinc-500">warmup</span>
-      </label>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
     </div>
   );
 }
 
-function CompactField({
+function Stepper({
   label,
-  children,
+  value,
+  onChange,
+  step,
+  integer = false,
+  allowEmpty = false,
+  disabled = false,
 }: {
   label: string;
-  children: React.ReactNode;
+  value: string;
+  onChange: (v: string) => void;
+  step: number;
+  integer?: boolean;
+  allowEmpty?: boolean;
+  disabled?: boolean;
 }) {
+  const current = Number(value);
+  const hasValue = value.trim() !== "" && Number.isFinite(current);
+
+  const bump = (dir: 1 | -1) => {
+    const base = hasValue ? current : 0;
+    const next = base + dir * step;
+    if (next < 0 && !allowEmpty) return;
+    const formatted = integer ? String(Math.max(0, Math.trunc(next))) : String(next);
+    onChange(formatted);
+  };
+
   return (
-    <label className="block">
-      <span className="block text-[10px] uppercase tracking-wider text-zinc-500">
+    <div className="space-y-1">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-(--muted)">
         {label}
-      </span>
-      {children}
-    </label>
+      </div>
+      <div className="grid grid-cols-[auto,1fr,auto] items-stretch gap-1 rounded-lg border border-(--border) bg-(--background)">
+        <button
+          type="button"
+          onClick={() => bump(-1)}
+          disabled={disabled}
+          className="flex h-12 w-11 items-center justify-center rounded-l-lg text-xl font-semibold text-(--muted) active:bg-(--accent-soft) disabled:opacity-40"
+          aria-label={`decrease ${label}`}
+        >
+          −
+        </button>
+        <input
+          type="text"
+          inputMode={integer ? "numeric" : "decimal"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          placeholder={allowEmpty ? "bw" : "0"}
+          className="h-12 w-full border-x border-(--border) bg-transparent text-center text-2xl font-bold tabular-nums outline-none focus:bg-(--accent-soft) disabled:opacity-60"
+        />
+        <button
+          type="button"
+          onClick={() => bump(+1)}
+          disabled={disabled}
+          className="flex h-12 w-11 items-center justify-center rounded-r-lg text-xl font-semibold text-(--muted) active:bg-(--accent-soft) disabled:opacity-40"
+          aria-label={`increase ${label}`}
+        >
+          +
+        </button>
+      </div>
+    </div>
   );
 }
 
-const setInputCls =
-  "block h-8 w-full rounded border border-zinc-300 bg-white px-2 text-sm outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:focus:border-zinc-100 disabled:opacity-60";
+function firstNumber(s: string): number | null {
+  const m = s.match(/(\d+)/);
+  return m ? Number(m[1]) : null;
+}
+
+function relativeDays(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(ms / 86400000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days}d ago`;
+  if (days < 30) return `${Math.round(days / 7)}w ago`;
+  return `${Math.round(days / 30)}mo ago`;
+}
+
+function formatRest(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
