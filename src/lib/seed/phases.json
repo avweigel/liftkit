@@ -963,7 +963,7 @@
     "name": "Phase 3",
     "days": [
       {
-        "name": "C/B 1",
+        "name": "Chest & Back 1",
         "exercises": [
           {
             "raw_name": "BB Bench Press",
@@ -1048,7 +1048,7 @@
         ]
       },
       {
-        "name": "S/A 1",
+        "name": "Shoulders & Arms 1",
         "exercises": [
           {
             "raw_name": "BB Shoulder Press",
@@ -1208,7 +1208,7 @@
         ]
       },
       {
-        "name": "C/B 2",
+        "name": "Chest & Back 2",
         "exercises": [
           {
             "raw_name": "Chin-Ups",
@@ -1293,7 +1293,7 @@
         ]
       },
       {
-        "name": "S/A 2",
+        "name": "Shoulders & Arms 2",
         "exercises": [
           {
             "raw_name": "Behind the Neck Shoulder Press",
@@ -4683,7 +4683,7 @@
     "name": "Phase 9",
     "days": [
       {
-        "name": "C/T",
+        "name": "Chest & Triceps",
         "exercises": [
           {
             "raw_name": "Barbell Bench Press",
@@ -4798,7 +4798,7 @@
         ]
       },
       {
-        "name": "B/B",
+        "name": "Back & Biceps",
         "exercises": [
           {
             "raw_name": "Weighted Chin-Ups",
@@ -4913,7 +4913,7 @@
         ]
       },
       {
-        "name": "H / G",
+        "name": "Hamstrings & Glutes",
         "exercises": [
           {
             "raw_name": "Deadlift",
@@ -5018,7 +5018,7 @@
         ]
       },
       {
-        "name": "S / T",
+        "name": "Shoulders & Triceps",
         "exercises": [
           {
             "raw_name": "Shoulder Press",
@@ -5133,7 +5133,7 @@
         ]
       },
       {
-        "name": "B / B",
+        "name": "Back & Biceps",
         "exercises": [
           {
             "raw_name": "Bent over BB Row",
@@ -5258,7 +5258,7 @@
         ]
       },
       {
-        "name": "Q / G",
+        "name": "Quads & Glutes",
         "exercises": [
           {
             "raw_name": "Back Squat",
@@ -5358,7 +5358,7 @@
     "name": "Phase 10",
     "days": [
       {
-        "name": "C / T",
+        "name": "Chest & Triceps",
         "exercises": [
           {
             "raw_name": "BB Bench Press",
@@ -5493,7 +5493,7 @@
         ]
       },
       {
-        "name": "B / B",
+        "name": "Back & Biceps",
         "exercises": [
           {
             "raw_name": "Weighted Chin-Ups",
@@ -5638,7 +5638,7 @@
         ]
       },
       {
-        "name": "H / G",
+        "name": "Hamstrings & Glutes",
         "exercises": [
           {
             "raw_name": "BB Deadlift",
@@ -5783,7 +5783,7 @@
         ]
       },
       {
-        "name": "S / T",
+        "name": "Shoulders & Triceps",
         "exercises": [
           {
             "raw_name": "BB Shoulder Press",
@@ -5928,7 +5928,7 @@
         ]
       },
       {
-        "name": "B / B",
+        "name": "Back & Biceps",
         "exercises": [
           {
             "raw_name": "Landmine T-bar row",
@@ -6093,7 +6093,7 @@
         ]
       },
       {
-        "name": "Q / G",
+        "name": "Quads & Glutes",
         "exercises": [
           {
             "raw_name": "BB Back Squat",
@@ -6263,7 +6263,7 @@
     "name": "Phase 11",
     "days": [
       {
-        "name": "H",
+        "name": "Horizontal",
         "exercises": [
           {
             "raw_name": "BB Bench",
@@ -6428,7 +6428,7 @@
         ]
       },
       {
-        "name": "V",
+        "name": "Vertical",
         "exercises": [
           {
             "raw_name": "BB Shoulder Press",
@@ -6553,7 +6553,7 @@
         ]
       },
       {
-        "name": "L 1",
+        "name": "Leg 1",
         "exercises": [
           {
             "raw_name": "BB Deadlift",
@@ -6708,7 +6708,7 @@
         ]
       },
       {
-        "name": "A",
+        "name": "Arms",
         "exercises": [
           {
             "raw_name": "Chin-Up",
@@ -6853,7 +6853,7 @@
         ]
       },
       {
-        "name": "M",
+        "name": "Metcon",
         "exercises": [
           {
             "raw_name": "Box Jumps",
@@ -7058,7 +7058,7 @@
         ]
       },
       {
-        "name": "L 2",
+        "name": "Leg 2",
         "exercises": [
           {
             "raw_name": "BB Back Squat",
@@ -7238,7 +7238,7 @@
     "name": "Phase 12",
     "days": [
       {
-        "name": "C / T",
+        "name": "Chest & Triceps",
         "exercises": [
           {
             "raw_name": "DB Bench",
@@ -7363,7 +7363,7 @@
         ]
       },
       {
-        "name": "B / B",
+        "name": "Back & Biceps",
         "exercises": [
           {
             "raw_name": "Lat Pull Down",
@@ -7488,7 +7488,7 @@
         ]
       },
       {
-        "name": "L 1",
+        "name": "Leg 1",
         "exercises": [
           {
             "raw_name": "DB Deadlift",
@@ -7623,7 +7623,7 @@
         ]
       },
       {
-        "name": "S / A",
+        "name": "Shoulders & Arms",
         "exercises": [
           {
             "raw_name": "BB Shoulder Press",
@@ -7738,7 +7738,7 @@
         ]
       },
       {
-        "name": "M",
+        "name": "Metcon",
         "exercises": [
           {
             "raw_name": "Box Jumps",
@@ -7873,7 +7873,7 @@
         ]
       },
       {
-        "name": "L 2",
+        "name": "Leg 2",
         "exercises": [
           {
             "raw_name": "BB Back Squat",

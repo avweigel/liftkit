@@ -8,6 +8,7 @@ type Result = {
   renamed: Array<{ from: string; to: string }>;
   unknowns: Array<{ id: string; name: string }>;
   total: number;
+  day_renamed: Array<{ from: string; to: string }>;
 };
 
 export function NormalizeButton() {
@@ -38,11 +39,11 @@ export function NormalizeButton() {
   return (
     <div className="space-y-3 rounded-xl border border-(--border) bg-(--surface) p-4">
       <div>
-        <h2 className="text-sm font-semibold">normalize names</h2>
+        <h2 className="text-sm font-semibold">clean up names</h2>
         <p className="mt-0.5 text-xs text-(--muted)">
-          expand abbreviations (db → dumbbell, bb → barbell), merge duplicates
-          into the global library, and add descriptions where we know the
-          movement.
+          expand abbreviations on exercises (db → dumbbell) and plan days
+          (c/t → chest &amp; triceps), merge duplicate exercises into the
+          global library, and add descriptions where the movement is known.
         </p>
       </div>
       {!result && (
@@ -71,6 +72,12 @@ export function NormalizeButton() {
               <strong className="tabular-nums">{result.unknowns.length}</strong>{" "}
               unknown
             </span>
+            <span>
+              <strong className="tabular-nums">
+                {result.day_renamed.length}
+              </strong>{" "}
+              day names
+            </span>
             <span className="text-(--muted)">
               of {result.total} user-owned
             </span>
@@ -78,11 +85,25 @@ export function NormalizeButton() {
           {result.renamed.length > 0 && (
             <details className="rounded border border-(--border) bg-(--background) p-3 text-xs">
               <summary className="cursor-pointer font-semibold">
-                renamed ({result.renamed.length})
+                exercises renamed ({result.renamed.length})
               </summary>
               <ul className="mt-2 space-y-0.5">
                 {result.renamed.map((r) => (
                   <li key={r.from}>
+                    {r.from} → <strong>{r.to}</strong>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          {result.day_renamed.length > 0 && (
+            <details className="rounded border border-(--border) bg-(--background) p-3 text-xs">
+              <summary className="cursor-pointer font-semibold">
+                day names expanded ({result.day_renamed.length})
+              </summary>
+              <ul className="mt-2 space-y-0.5">
+                {result.day_renamed.map((r, i) => (
+                  <li key={`${r.from}-${i}`}>
                     {r.from} → <strong>{r.to}</strong>
                   </li>
                 ))}

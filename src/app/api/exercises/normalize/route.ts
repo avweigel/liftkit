@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { findCanonical, normalizeName } from "@/lib/exercise-normalize";
+import { normalizeDayName } from "@/lib/day-name-normalize";
 import { slugify } from "@/lib/fuzzy";
 
 type MyExercise = {
@@ -111,12 +112,49 @@ export async function POST() {
     unknowns.push({ id: ex.id, name: ex.name });
   }
 
+  const dayRenamed = await normalizeUserDayNames(supabase, user.id);
+
   return NextResponse.json({
     merged,
     renamed,
     unknowns,
     total: mine.length,
+    day_renamed: dayRenamed,
   });
+}
+
+type PlanDayRow = {
+  id: string;
+  name: string | null;
+  plan_week: { plan: { owner_id: string } | null } | null;
+};
+
+async function normalizeUserDayNames(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<Array<{ from: string; to: string }>> {
+  const { data, error } = await supabase
+    .from("plan_days")
+    .select(
+      "id, name, plan_week:plan_weeks!inner ( plan:workout_plans!inner ( owner_id ) )",
+    )
+    .returns<PlanDayRow[]>();
+  if (error) return [];
+
+  const changes: Array<{ from: string; to: string }> = [];
+  for (const row of data ?? []) {
+    if (row.plan_week?.plan?.owner_id !== userId) continue;
+    const current = row.name ?? "";
+    const next = normalizeDayName(current);
+    if (next && next !== current) {
+      const { error: upErr } = await supabase
+        .from("plan_days")
+        .update({ name: next })
+        .eq("id", row.id);
+      if (!upErr) changes.push({ from: current, to: next });
+    }
+  }
+  return changes;
 }
 
 async function applyCanonical(
