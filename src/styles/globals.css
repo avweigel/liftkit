@@ -49,6 +49,39 @@
   --accent-contrast: light-dark(#ffffff, #0f172a);
   --accent-soft: light-dark(#f1f5f9, #1e293b);
 }
+[data-accent="emerald"] {
+  --accent: light-dark(#059669, #34d399);
+  --accent-contrast: light-dark(#ffffff, #042818);
+  --accent-soft: light-dark(#ecfdf5, #064e3b);
+}
+[data-accent="sky"] {
+  --accent: light-dark(#0284c7, #7dd3fc);
+  --accent-contrast: light-dark(#ffffff, #082032);
+  --accent-soft: light-dark(#f0f9ff, #0c4a6e);
+}
+[data-accent="fuchsia"] {
+  --accent: light-dark(#c026d3, #e879f9);
+  --accent-contrast: light-dark(#ffffff, #2e0735);
+  --accent-soft: light-dark(#fdf4ff, #581c5e);
+}
+[data-accent="rainbow"] {
+  --accent: light-dark(#9333ea, #c084fc);
+  --accent-contrast: #ffffff;
+  --accent-soft: light-dark(#faf5ff, #2e1065);
+}
+[data-accent="rainbow"] .bg-\(--accent\) {
+  background-image: linear-gradient(
+    135deg,
+    #ef4444 0%,
+    #f97316 18%,
+    #eab308 36%,
+    #22c55e 54%,
+    #06b6d4 72%,
+    #8b5cf6 86%,
+    #ec4899 100%
+  );
+  color: #ffffff;
+}
 
 @theme inline {
   --color-background: var(--background);

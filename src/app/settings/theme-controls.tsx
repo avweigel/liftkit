@@ -3,7 +3,17 @@
 import { useEffect, useState } from "react";
 
 type ThemeMode = "system" | "light" | "dark";
-type Accent = "amber" | "crimson" | "indigo" | "teal" | "rose" | "slate";
+type Accent =
+  | "amber"
+  | "crimson"
+  | "rose"
+  | "fuchsia"
+  | "indigo"
+  | "sky"
+  | "teal"
+  | "emerald"
+  | "slate"
+  | "rainbow";
 
 const MODES: Array<{ value: ThemeMode; label: string; hint: string }> = [
   { value: "system", label: "system", hint: "follow your device" },
@@ -14,8 +24,8 @@ const MODES: Array<{ value: ThemeMode; label: string; hint: string }> = [
 type AccentPreset = {
   value: Accent;
   label: string;
-  group: "warm" | "cool" | "neutral";
-  swatch: { light: string; dark: string };
+  group: "warm" | "cool" | "neutral" | "multi";
+  swatch: { light: string; dark: string } | "rainbow";
 };
 
 const ACCENTS: AccentPreset[] = [
@@ -38,10 +48,22 @@ const ACCENTS: AccentPreset[] = [
     swatch: { light: "#e11d48", dark: "#fb7185" },
   },
   {
+    value: "fuchsia",
+    label: "fuchsia",
+    group: "warm",
+    swatch: { light: "#c026d3", dark: "#e879f9" },
+  },
+  {
     value: "indigo",
     label: "indigo",
     group: "cool",
     swatch: { light: "#4f46e5", dark: "#a5b4fc" },
+  },
+  {
+    value: "sky",
+    label: "sky",
+    group: "cool",
+    swatch: { light: "#0284c7", dark: "#7dd3fc" },
   },
   {
     value: "teal",
@@ -50,10 +72,22 @@ const ACCENTS: AccentPreset[] = [
     swatch: { light: "#0d9488", dark: "#2dd4bf" },
   },
   {
+    value: "emerald",
+    label: "emerald",
+    group: "cool",
+    swatch: { light: "#059669", dark: "#34d399" },
+  },
+  {
     value: "slate",
     label: "slate",
     group: "neutral",
     swatch: { light: "#334155", dark: "#cbd5e1" },
+  },
+  {
+    value: "rainbow",
+    label: "rainbow",
+    group: "multi",
+    swatch: "rainbow",
   },
 ];
 
@@ -175,7 +209,10 @@ export function ThemeControls() {
                 <span
                   className="h-8 w-8 shrink-0 rounded-full"
                   style={{
-                    background: `linear-gradient(135deg, ${a.swatch.light} 0%, ${a.swatch.light} 50%, ${a.swatch.dark} 50%, ${a.swatch.dark} 100%)`,
+                    background:
+                      a.swatch === "rainbow"
+                        ? "conic-gradient(from 180deg, #ef4444, #f97316, #eab308, #22c55e, #06b6d4, #8b5cf6, #ec4899, #ef4444)"
+                        : `linear-gradient(135deg, ${a.swatch.light} 0%, ${a.swatch.light} 50%, ${a.swatch.dark} 50%, ${a.swatch.dark} 100%)`,
                   }}
                 />
                 <span className="min-w-0">
@@ -219,6 +256,11 @@ export function ThemeControls() {
           </span>
         </div>
       </section>
+
+      <p className="text-xs text-(--muted)">
+        saved on this device only. switching devices will start fresh
+        defaults.
+      </p>
     </div>
   );
 }

@@ -107,7 +107,18 @@ export async function Dashboard({ userId, email }: Props) {
       </header>
 
       {activePlan ? (
-        <ActivePhaseBlock plan={activePlan} />
+        <>
+          <ActivePhaseBlock plan={activePlan} />
+          <p className="text-xs text-(--muted)">
+            tip: &ldquo;today&rsquo;s workout&rdquo; auto-selects the day of
+            the week from your active phase (monday = day 1, saturday = day
+            6). use the list below to train a different day. switch phases at{" "}
+            <Link href="/plans" className="underline">
+              plans
+            </Link>
+            .
+          </p>
+        </>
       ) : (
         <PickPhaseCard hasAnyPlan={(planCount ?? 0) > 0} />
       )}
@@ -267,20 +278,35 @@ function RestDayCard({ planName }: { planName: string }) {
 
 function PickPhaseCard({ hasAnyPlan }: { hasAnyPlan: boolean }) {
   return (
-    <section className="rounded-2xl border border-(--border) bg-(--surface) p-5">
-      <div>
-        <h2 className="text-lg font-bold">pick a phase</h2>
-        <p className="mt-1 text-sm text-(--muted)">
-          {hasAnyPlan
-            ? "start a phase to follow for the next 6-8 weeks. today's workout will auto-select based on the day of the week."
-            : "we're setting up your 12 phases now. refresh in a moment to pick one."}
-        </p>
+    <section className="rounded-2xl border-2 border-(--accent)/30 bg-(--accent-soft) p-5">
+      <div className="text-[11px] font-bold uppercase tracking-wider text-(--accent)">
+        start here
       </div>
+      <h2 className="mt-1 text-lg font-bold">pick a phase</h2>
+      <p className="mt-1 text-sm text-(--muted)">
+        {hasAnyPlan
+          ? "a phase is a workout plan you follow for 6-8 weeks. once you pick one, this home page will show today's workout automatically — no day-picking every session."
+          : "we're loading your 12 phases right now. refresh in a moment, then pick one."}
+      </p>
+      <ol className="mt-3 space-y-1 text-xs text-(--muted)">
+        <li>
+          <span className="mr-1 font-bold text-(--accent)">1.</span>
+          browse the phases list
+        </li>
+        <li>
+          <span className="mr-1 font-bold text-(--accent)">2.</span>
+          tap &ldquo;start this phase&rdquo; on one you want to follow
+        </li>
+        <li>
+          <span className="mr-1 font-bold text-(--accent)">3.</span>
+          come back here each day to log your workout
+        </li>
+      </ol>
       <Link
         href="/plans"
         className="mt-4 inline-flex h-11 items-center rounded-lg bg-(--accent) px-5 text-sm font-bold text-(--accent-contrast) shadow-sm active:scale-[0.99]"
       >
-        browse phases
+        browse phases →
       </Link>
     </section>
   );

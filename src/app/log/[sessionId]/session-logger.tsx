@@ -183,6 +183,26 @@ export function SessionLogger({
         </p>
       )}
 
+      {!finished && sets.length === 0 && exercises.length > 0 && (
+        <div className="rounded-lg border border-(--accent)/30 bg-(--accent-soft) p-3 text-xs text-(--foreground)/80">
+          <div className="font-bold text-(--accent)">how to log</div>
+          <ul className="mt-1 space-y-0.5">
+            <li>
+              tap the big{" "}
+              <span className="font-bold text-(--accent)">✓</span> to log a
+              set with the pre-filled weight × reps.
+            </li>
+            <li>tap the numbers to adjust first, then log.</li>
+            <li>tap a logged row to edit or delete it.</li>
+            <li>
+              when you&rsquo;re done for the day, tap{" "}
+              <span className="font-semibold">finish workout</span> at the
+              bottom.
+            </li>
+          </ul>
+        </div>
+      )}
+
       <div className="space-y-4">
         {groups.map((g) => {
           const isSuperset = g.items.length > 1 && !!g.letter;

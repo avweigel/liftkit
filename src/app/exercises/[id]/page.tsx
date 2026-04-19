@@ -108,6 +108,12 @@ export default async function ExerciseDetailPage({ params }: Props) {
         <PRChip label="best reps" value={pr?.max_reps} />
         <PRChip label="best volume" value={pr?.max_volume} unit="lb" />
       </section>
+      {totalWorkingSets === 0 && (
+        <p className="text-xs text-(--muted)">
+          prs and the chart fill in automatically once you log working sets.
+          warmup sets don&rsquo;t count.
+        </p>
+      )}
 
       <section className="space-y-3 rounded-xl border border-(--border) bg-(--surface) p-4">
         <div className="flex items-baseline justify-between">
@@ -121,7 +127,8 @@ export default async function ExerciseDetailPage({ params }: Props) {
         </div>
         {points.length === 0 ? (
           <p className="py-6 text-center text-sm text-(--muted)">
-            no working sets logged yet. start a workout to fill this in.
+            no working sets logged yet. your top set per session will show up
+            as a dot on this chart once you start logging.
           </p>
         ) : (
           <ProgressChart points={points} />

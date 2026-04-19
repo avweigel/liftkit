@@ -91,22 +91,29 @@ export function PlanView({ plan, library, canEdit, isActive }: Props) {
           </div>
         </div>
         {!editing && (
-          <button
-            type="button"
-            onClick={onToggleActive}
-            disabled={pending}
-            className={`inline-flex h-11 w-full items-center justify-center rounded-lg text-sm font-bold disabled:opacity-60 ${
-              isActive
-                ? "border border-(--border) bg-(--background) text-(--muted)"
-                : "bg-(--accent) text-(--accent-contrast) shadow-sm active:scale-[0.99]"
-            }`}
-          >
-            {pending
-              ? "…"
-              : isActive
-                ? "✓ on this phase — tap to switch off"
-                : "start this phase (6-8 weeks)"}
-          </button>
+          <div className="space-y-1.5">
+            <button
+              type="button"
+              onClick={onToggleActive}
+              disabled={pending}
+              className={`inline-flex h-11 w-full items-center justify-center rounded-lg text-sm font-bold disabled:opacity-60 ${
+                isActive
+                  ? "border border-(--border) bg-(--background) text-(--muted)"
+                  : "bg-(--accent) text-(--accent-contrast) shadow-sm active:scale-[0.99]"
+              }`}
+            >
+              {pending
+                ? "…"
+                : isActive
+                  ? "✓ on this phase — tap to switch off"
+                  : "start this phase (6-8 weeks)"}
+            </button>
+            <p className="text-xs text-(--muted)">
+              {isActive
+                ? "today's workout on the home page pulls from this phase. you can switch any time — your logged workouts stay."
+                : "makes this your active phase. the home page will auto-select today's workout based on the day of the week, so you don't pick a plan each session."}
+            </p>
+          </div>
         )}
         {plan.source_url && (
           <p className="text-xs text-(--muted)">

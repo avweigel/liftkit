@@ -77,9 +77,15 @@ export default async function PlansPage() {
     <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-3 py-5 sm:px-6 sm:py-10">
       <header className="flex items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">plans</h1>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+            phases
+          </h1>
           <p className="mt-1 text-sm text-(--muted)">
-            pick a plan to start tracking.
+            pick one to follow for 6-8 weeks. the one you start becomes your{" "}
+            <span className="font-semibold text-(--foreground)">
+              active phase
+            </span>{" "}
+            and drives today&rsquo;s workout on the home page.
           </p>
         </div>
         <Link
