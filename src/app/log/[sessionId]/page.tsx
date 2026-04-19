@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { formatDayLabel } from "@/lib/display/format-day";
 import { SessionLogger } from "./session-logger";
 import { SessionStartedAt } from "./session-started-at";
 
@@ -172,6 +173,8 @@ export default async function LogSessionPage({ params }: Props) {
     })
     .filter((e) => e.exercise_id.length > 0);
 
+  const title = sessionTitle(session);
+
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 space-y-4 px-3 py-4 sm:px-6 sm:py-8">
       <header className="space-y-1">
@@ -182,9 +185,17 @@ export default async function LogSessionPage({ params }: Props) {
           ← home
         </Link>
         <div>
+          {title.weekday && (
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-(--accent)">
+              {title.weekday}
+            </div>
+          )}
           <h1 className="text-xl font-bold leading-tight tracking-tight sm:text-3xl">
-            {sessionTitle(session)}
+            {title.main}
           </h1>
+          {title.sub && (
+            <p className="mt-0.5 text-sm text-(--muted)">{title.sub}</p>
+          )}
           <SessionStartedAt
             sessionId={session.id}
             startedAt={session.started_at}
@@ -204,11 +215,18 @@ export default async function LogSessionPage({ params }: Props) {
   );
 }
 
-function sessionTitle(s: SessionData): string {
+function sessionTitle(s: SessionData): {
+  weekday: string | null;
+  main: string;
+  sub: string | null;
+} {
   const d = s.plan_day;
-  if (!d) return "ad hoc session";
+  if (!d) return { weekday: null, main: "Ad Hoc Session", sub: null };
+  const label = formatDayLabel(d.day_number, d.name);
   const planName = d.plan_week?.plan?.name;
-  const weekNum = d.plan_week?.week_number;
-  const dayLabel = d.name?.trim() || `day ${d.day_number}`;
-  return planName ? `${dayLabel} · ${planName} w${weekNum}` : dayLabel;
+  return {
+    weekday: label.weekday,
+    main: label.name,
+    sub: planName ?? null,
+  };
 }

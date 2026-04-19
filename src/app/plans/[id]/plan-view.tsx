@@ -11,6 +11,7 @@ import {
   updatePlanDayExercise,
 } from "@/lib/actions/plans";
 import { startSession } from "@/lib/actions/sessions";
+import { formatDayLabel } from "@/lib/display/format-day";
 import type { Exercise, PlanDetail, PlanDay, PlanDayExerciseRow } from "./types";
 
 type Props = {
@@ -147,8 +148,8 @@ function DayCard({
     <section className="space-y-3 rounded-xl border border-(--border) bg-(--background) p-3 sm:p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-(--muted)">
-            day {day.day_number}
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-(--accent)">
+            {formatDayLabel(day.day_number, day.name).weekday}
           </div>
           {editing ? (
             <input
@@ -159,7 +160,7 @@ function DayCard({
             />
           ) : (
             <h2 className="mt-0.5 text-lg font-bold leading-tight">
-              {day.name?.trim() || `day ${day.day_number}`}
+              {formatDayLabel(day.day_number, day.name).name}
             </h2>
           )}
         </div>

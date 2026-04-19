@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { formatDayLabel } from "@/lib/display/format-day";
 
 type SessionRow = {
   id: string;
@@ -131,11 +132,10 @@ function TodayCard({ hasPlan }: { hasPlan: boolean }) {
 function sessionTitle(s: SessionRow) {
   const day = s.plan_day;
   const plan = day?.plan_week?.plan;
-  if (!day || !plan) return "ad hoc session";
-  const dayLabel =
-    day.name ?? `day ${day.day_number}`;
-  const weekNum = day.plan_week?.week_number;
-  return `${plan.name} · w${weekNum} ${dayLabel}`;
+  if (!day) return "ad hoc session";
+  const label = formatDayLabel(day.day_number, day.name);
+  if (!plan) return `${label.weekdayShort} · ${label.name}`;
+  return `${label.weekdayShort} · ${label.name} — ${plan.name}`;
 }
 
 function formatDate(iso: string) {
