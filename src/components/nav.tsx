@@ -29,18 +29,6 @@ export async function Nav() {
             >
               plans
             </Link>
-            <Link
-              href="/history"
-              className="rounded-md px-2.5 py-1.5 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
-            >
-              history
-            </Link>
-            <Link
-              href="/exercises"
-              className="rounded-md px-2.5 py-1.5 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
-            >
-              exercises
-            </Link>
             <span className="mx-2 hidden h-5 w-px bg-zinc-200 sm:inline-block dark:bg-zinc-800" />
             <SignOutButton />
           </nav>

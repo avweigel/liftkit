@@ -61,14 +61,6 @@ export async function Dashboard({ userId, email }: Props) {
       <section className="space-y-3">
         <div className="flex items-end justify-between">
           <h2 className="text-lg font-medium">recent sessions</h2>
-          {(sessions?.length ?? 0) > 0 && (
-            <Link
-              href="/history"
-              className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-            >
-              all history →
-            </Link>
-          )}
         </div>
 
         {!sessions || sessions.length === 0 ? (
@@ -80,7 +72,7 @@ export async function Dashboard({ userId, email }: Props) {
             {sessions.map((s) => (
               <li key={s.id}>
                 <Link
-                  href={`/history/${s.id}`}
+                  href={`/log/${s.id}`}
                   className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-900"
                 >
                   <div className="min-w-0">
@@ -111,16 +103,16 @@ function TodayCard({ hasPlan }: { hasPlan: boolean }) {
           <h2 className="text-lg font-medium">ready to lift?</h2>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
             {hasPlan
-              ? "start today's workout from your plan, or log something ad hoc."
-              : "you don't have a plan yet. import one from a sheet, or just log an ad hoc session."}
+              ? "pick a plan day from your plans."
+              : "you don't have a plan yet. pick one to get started."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
-            href="/log"
+            href="/plans"
             className="inline-flex h-11 items-center rounded-lg bg-zinc-900 px-5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
-            start a workout
+            {hasPlan ? "browse my plans" : "browse plans"}
           </Link>
           {!hasPlan && (
             <Link
