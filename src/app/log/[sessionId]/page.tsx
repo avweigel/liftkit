@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SessionLogger } from "./session-logger";
+import { SessionStartedAt } from "./session-started-at";
 
 type Props = { params: Promise<{ sessionId: string }> };
 
@@ -46,9 +47,10 @@ type SessionSet = {
   logged_at: string;
 };
 
-type LastPerformed = {
-  user_id: string;
+type HistoryRow = {
   exercise_id: string;
+  session_id: string;
+  set_number: number;
   weight: number | null;
   reps: number;
   logged_at: string;
@@ -91,7 +93,11 @@ export default async function LogSessionPage({ params }: Props) {
     .map((pde) => pde.exercise?.id)
     .filter((id): id is string => !!id);
 
-  const [{ data: sets }, { data: lastPerformed }] = await Promise.all([
+  const ninetyDaysAgo = new Date(
+    Date.now() - 90 * 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  const [{ data: sets }, { data: history }] = await Promise.all([
     supabase
       .from("session_sets")
       .select(
@@ -102,43 +108,68 @@ export default async function LogSessionPage({ params }: Props) {
       .returns<SessionSet[]>(),
     exerciseIds.length > 0
       ? supabase
-          .from("v_exercise_last_performed")
-          .select("user_id,exercise_id,weight,reps,logged_at")
-          .eq("user_id", user!.id)
+          .from("session_sets")
+          .select(
+            "exercise_id,session_id,set_number,weight,reps,logged_at",
+          )
           .in("exercise_id", exerciseIds)
-          .returns<LastPerformed[]>()
-      : Promise.resolve({ data: [] as LastPerformed[] }),
+          .eq("is_warmup", false)
+          .neq("session_id", sessionId)
+          .gte("logged_at", ninetyDaysAgo)
+          .order("logged_at", { ascending: false })
+          .returns<HistoryRow[]>()
+      : Promise.resolve({ data: [] as HistoryRow[] }),
   ]);
 
-  const lastByExercise = new Map<
+  const lastSessionByExercise = new Map<
     string,
-    { weight: number | null; reps: number; logged_at: string }
+    { session_id: string; logged_at: string; sets: HistoryRow[] }
   >();
-  for (const r of lastPerformed ?? []) {
-    lastByExercise.set(r.exercise_id, {
-      weight: r.weight,
-      reps: r.reps,
-      logged_at: r.logged_at,
-    });
+  for (const row of history ?? []) {
+    const current = lastSessionByExercise.get(row.exercise_id);
+    if (!current) {
+      lastSessionByExercise.set(row.exercise_id, {
+        session_id: row.session_id,
+        logged_at: row.logged_at,
+        sets: [row],
+      });
+    } else if (current.session_id === row.session_id) {
+      current.sets.push(row);
+    }
   }
 
   const exercises = (session.plan_day?.plan_day_exercises ?? [])
     .slice()
     .sort((a, b) => a.order_index - b.order_index)
-    .map((pde) => ({
-      id: pde.id,
-      order_index: pde.order_index,
-      exercise_id: pde.exercise?.id ?? "",
-      name: pde.exercise?.name ?? "(deleted)",
-      prescribed_sets: pde.prescribed_sets,
-      prescribed_reps: pde.prescribed_reps,
-      prescribed_weight: pde.prescribed_weight,
-      rest_seconds: pde.rest_seconds,
-      notes: pde.notes,
-      last_performed: pde.exercise
-        ? lastByExercise.get(pde.exercise.id) ?? null
-        : null,
-    }))
+    .map((pde) => {
+      const last = pde.exercise
+        ? lastSessionByExercise.get(pde.exercise.id) ?? null
+        : null;
+      return {
+        id: pde.id,
+        order_index: pde.order_index,
+        exercise_id: pde.exercise?.id ?? "",
+        name: pde.exercise?.name ?? "(deleted)",
+        prescribed_sets: pde.prescribed_sets,
+        prescribed_reps: pde.prescribed_reps,
+        prescribed_weight: pde.prescribed_weight,
+        rest_seconds: pde.rest_seconds,
+        notes: pde.notes,
+        last_session: last
+          ? {
+              logged_at: last.logged_at,
+              sets: last.sets
+                .slice()
+                .sort((a, b) => a.set_number - b.set_number)
+                .map((s) => ({
+                  set_number: s.set_number,
+                  weight: s.weight,
+                  reps: s.reps,
+                })),
+            }
+          : null,
+      };
+    })
     .filter((e) => e.exercise_id.length > 0);
 
   return (
@@ -154,12 +185,11 @@ export default async function LogSessionPage({ params }: Props) {
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
             {sessionTitle(session)}
           </h1>
-          <p className="mt-1 text-xs text-(--muted)">
-            started {formatDateTime(session.started_at)}
-            {session.finished_at
-              ? ` · finished ${formatDateTime(session.finished_at)}`
-              : ""}
-          </p>
+          <SessionStartedAt
+            sessionId={session.id}
+            startedAt={session.started_at}
+            finishedAt={session.finished_at}
+          />
         </div>
       </header>
 
@@ -181,14 +211,4 @@ function sessionTitle(s: SessionData): string {
   const weekNum = d.plan_week?.week_number;
   const dayLabel = d.name?.trim() || `day ${d.day_number}`;
   return planName ? `${dayLabel} · ${planName} w${weekNum}` : dayLabel;
-}
-
-function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
 }

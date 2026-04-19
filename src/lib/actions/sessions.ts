@@ -14,14 +14,18 @@ async function requireUser() {
   return { supabase, user };
 }
 
-export async function startSession(planDayId: string | null) {
+export async function startSession(
+  planDayId: string | null,
+  startedAtIso?: string,
+) {
   const { supabase, user } = await requireUser();
+  const started = coerceIso(startedAtIso) ?? new Date().toISOString();
   const { data: session, error } = await supabase
     .from("workout_sessions")
     .insert({
       user_id: user.id,
       plan_day_id: planDayId,
-      started_at: new Date().toISOString(),
+      started_at: started,
     })
     .select("id")
     .single();
@@ -44,6 +48,40 @@ export async function finishSession(sessionId: string, notes?: string) {
   revalidatePath("/");
   revalidatePath(`/log/${sessionId}`);
   redirect("/");
+}
+
+export async function updateSession(
+  sessionId: string,
+  patch: {
+    started_at?: string | null;
+    finished_at?: string | null;
+    notes?: string | null;
+  },
+) {
+  const { supabase } = await requireUser();
+  const update: Record<string, string | null> = {};
+  if ("started_at" in patch) {
+    const iso = coerceIso(patch.started_at ?? undefined);
+    if (!iso) throw new Error("invalid start time");
+    update.started_at = iso;
+  }
+  if ("finished_at" in patch) {
+    update.finished_at = patch.finished_at
+      ? coerceIso(patch.finished_at) ?? null
+      : null;
+  }
+  if ("notes" in patch) {
+    const trimmed = (patch.notes ?? "").trim();
+    update.notes = trimmed.length > 0 ? trimmed : null;
+  }
+  if (Object.keys(update).length === 0) return;
+  const { error } = await supabase
+    .from("workout_sessions")
+    .update(update)
+    .eq("id", sessionId);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/log/${sessionId}`);
+  revalidatePath("/");
 }
 
 export async function upsertSessionSet(
@@ -98,4 +136,11 @@ export async function deleteSessionSet(sessionId: string, setId: string) {
     .eq("id", setId);
   if (error) throw new Error(error.message);
   revalidatePath(`/log/${sessionId}`);
+}
+
+function coerceIso(v: string | undefined): string | null {
+  if (!v) return null;
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString();
 }

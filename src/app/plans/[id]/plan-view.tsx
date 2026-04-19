@@ -120,6 +120,8 @@ function DayCard({
   editing: boolean;
 }) {
   const [pending, startTransition] = useTransition();
+  const [pastOpen, setPastOpen] = useState(false);
+  const [pastValue, setPastValue] = useState(() => toLocalInputValue(new Date()));
 
   const onRename = (name: string) => {
     if ((name || "") === (day.name || "")) return;
@@ -131,6 +133,13 @@ function DayCard({
   const onStart = () => {
     startTransition(async () => {
       await startSession(day.id);
+    });
+  };
+
+  const onStartPast = () => {
+    const iso = new Date(pastValue).toISOString();
+    startTransition(async () => {
+      await startSession(day.id, iso);
     });
   };
 
@@ -155,19 +164,54 @@ function DayCard({
           )}
         </div>
         {!editing && (
-          <button
-            type="button"
-            onClick={onStart}
-            disabled={pending}
-            className="inline-flex h-10 items-center rounded-lg bg-(--accent) px-4 text-sm font-semibold text-(--accent-contrast) shadow-sm active:scale-[0.99] disabled:opacity-60"
-          >
-            {pending ? "starting…" : "start workout →"}
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              type="button"
+              onClick={onStart}
+              disabled={pending}
+              className="inline-flex h-10 items-center rounded-lg bg-(--accent) px-4 text-sm font-semibold text-(--accent-contrast) shadow-sm active:scale-[0.99] disabled:opacity-60"
+            >
+              {pending ? "starting…" : "start workout →"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPastOpen((v) => !v)}
+              className="text-[11px] text-(--muted) underline hover:text-(--foreground)"
+            >
+              log past workout
+            </button>
+          </div>
         )}
       </div>
 
+      {pastOpen && !editing && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-(--border) bg-(--surface) p-2 text-xs">
+          <input
+            type="datetime-local"
+            value={pastValue}
+            onChange={(e) => setPastValue(e.target.value)}
+            className="rounded border border-(--border) bg-(--background) px-2 py-1"
+          />
+          <button
+            type="button"
+            onClick={onStartPast}
+            disabled={pending}
+            className="rounded bg-(--foreground) px-3 py-1 text-xs font-semibold text-(--background) disabled:opacity-60"
+          >
+            {pending ? "…" : "start backdated"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setPastOpen(false)}
+            className="text-(--muted)"
+          >
+            cancel
+          </button>
+        </div>
+      )}
+
       {day.notes && !editing && (
-        <p className="text-xs text-zinc-500">{day.notes}</p>
+        <p className="text-xs text-(--muted)">{day.notes}</p>
       )}
 
       {day.plan_day_exercises.length === 0 ? (
@@ -506,3 +550,8 @@ function Field({
 
 const inputCls =
   "block w-full rounded border border-zinc-300 bg-white px-2 py-1 text-sm outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:focus:border-zinc-100";
+
+function toLocalInputValue(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}

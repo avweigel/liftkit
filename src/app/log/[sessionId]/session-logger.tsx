@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   deleteSessionSet,
@@ -7,6 +8,12 @@ import {
   upsertSessionSet,
 } from "@/lib/actions/sessions";
 import { groupIntoSupersets, parseSetCode } from "@/lib/set-code";
+
+type LastSessionSet = {
+  set_number: number;
+  weight: number | null;
+  reps: number;
+};
 
 type Exercise = {
   id: string;
@@ -18,10 +25,9 @@ type Exercise = {
   prescribed_weight: number | null;
   rest_seconds: number | null;
   notes: string | null;
-  last_performed: {
-    weight: number | null;
-    reps: number;
+  last_session: {
     logged_at: string;
+    sets: LastSessionSet[];
   } | null;
 };
 
@@ -160,7 +166,7 @@ export function SessionLogger({
   };
 
   return (
-    <div className="space-y-5 pb-24">
+    <div className="space-y-4 pb-24">
       <ProgressHeader
         done={workingSetsLogged}
         total={totalSets}
@@ -175,13 +181,13 @@ export function SessionLogger({
         </p>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {groups.map((g) => {
           const isSuperset = g.items.length > 1 && g.letter;
           return (
-            <div key={g.id} className="space-y-2">
+            <div key={g.id} className="space-y-1.5">
               {isSuperset && (
-                <div className="flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wider text-(--accent)">
+                <div className="flex items-center gap-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-(--accent)">
                   <span className="inline-block h-1 w-1 rounded-full bg-(--accent)" />
                   superset {g.letter}
                 </div>
@@ -189,8 +195,8 @@ export function SessionLogger({
               <div
                 className={
                   isSuperset
-                    ? "space-y-3 rounded-xl border-2 border-(--accent)/20 p-2 sm:p-3"
-                    : "space-y-3"
+                    ? "space-y-2 rounded-xl border-2 border-(--accent)/25 p-1.5"
+                    : "space-y-2"
                 }
               >
                 {g.items.map((item) => (
@@ -212,15 +218,15 @@ export function SessionLogger({
       </div>
 
       {!finished && (
-        <div className="space-y-3 rounded-xl border border-(--border) bg-(--surface) p-4">
-          <label className="block space-y-1 text-sm">
+        <div className="space-y-1 rounded-xl border border-(--border) bg-(--surface) p-3">
+          <label className="block space-y-1 text-xs">
             <span className="text-(--muted)">session notes</span>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
               placeholder="how it felt, weight jumps, anything to remember"
-              className="w-full resize-y rounded-lg border border-(--border) bg-(--background) px-3 py-2 text-sm outline-none focus:border-(--accent)"
+              className="w-full resize-y rounded border border-(--border) bg-(--background) px-2 py-1 text-sm outline-none focus:border-(--accent)"
             />
           </label>
         </div>
@@ -269,13 +275,13 @@ function ProgressHeader({
 }) {
   const pct = total === 0 ? 0 : Math.min(100, (done / total) * 100);
   return (
-    <div className="space-y-2 rounded-xl border border-(--border) bg-(--surface) p-4">
+    <div className="space-y-2 rounded-xl border border-(--border) bg-(--surface) p-3">
       <div className="flex items-end justify-between gap-2">
         <div>
-          <div className="text-xs uppercase tracking-wider text-(--muted)">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-(--muted)">
             progress
           </div>
-          <div className="text-2xl font-semibold tabular-nums">
+          <div className="text-xl font-semibold tabular-nums">
             {done}
             <span className="text-(--muted)"> / {total}</span>
           </div>
@@ -326,172 +332,223 @@ function ExerciseCard({
   finished: boolean;
 }) {
   const { cleanNotes } = parseSetCode(exercise.notes);
-  const lastPerformed = exercise.last_performed;
+  const [expandedSetNumber, setExpandedSetNumber] = useState<number | null>(
+    null,
+  );
 
-  const setRows: Array<SessionSet | { placeholderNumber: number }> = [];
-  for (let i = 1; i <= exercise.prescribed_sets; i++) {
-    const existing = sets.find((s) => s.set_number === i);
-    if (existing) setRows.push(existing);
-    else setRows.push({ placeholderNumber: i });
-  }
-  for (const s of sets) {
-    if (s.set_number > exercise.prescribed_sets) setRows.push(s);
+  const rows: Array<{ setNumber: number; logged: SessionSet | null }> = [];
+  const maxPrescribed = Math.max(
+    exercise.prescribed_sets,
+    ...sets.map((s) => s.set_number),
+    0,
+  );
+  for (let n = 1; n <= maxPrescribed; n++) {
+    rows.push({
+      setNumber: n,
+      logged: sets.find((s) => s.set_number === n) ?? null,
+    });
   }
 
-  const lastLogged = sets.length > 0 ? sets[sets.length - 1] : null;
-  const suggestedWeight =
-    lastLogged?.weight ??
-    lastPerformed?.weight ??
-    exercise.prescribed_weight ??
-    null;
-  const suggestedReps =
-    lastLogged?.reps ??
-    firstNumber(exercise.prescribed_reps) ??
-    lastPerformed?.reps ??
-    null;
+  const lastForSet = (n: number): LastSessionSet | null => {
+    if (!exercise.last_session) return null;
+    return (
+      exercise.last_session.sets.find((s) => s.set_number === n) ?? null
+    );
+  };
+
+  const suggestedForSet = (n: number) => {
+    const previousInSession =
+      sets.find((s) => s.set_number === n - 1) ??
+      sets[sets.length - 1] ??
+      null;
+    if (previousInSession) {
+      return {
+        weight: previousInSession.weight,
+        reps: previousInSession.reps,
+      };
+    }
+    const last = lastForSet(n);
+    if (last) return { weight: last.weight, reps: last.reps };
+    return {
+      weight: exercise.prescribed_weight,
+      reps: firstNumber(exercise.prescribed_reps),
+    };
+  };
 
   return (
-    <section className="space-y-3 rounded-xl border border-(--border) bg-(--background) p-4">
+    <section className="space-y-2 rounded-xl border border-(--border) bg-(--background) p-3">
       <header className="space-y-1">
-        <h2 className="text-lg font-bold leading-tight">{exercise.name}</h2>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-(--muted)">
-          <span>
-            {exercise.prescribed_sets} × {exercise.prescribed_reps}
+        <div className="flex items-start justify-between gap-2">
+          <Link
+            href={`/exercises/${exercise.exercise_id}`}
+            className="text-base font-bold leading-tight hover:underline"
+          >
+            {exercise.name}
+          </Link>
+          <span className="shrink-0 text-xs text-(--muted) tabular-nums">
+            {exercise.prescribed_sets}×{exercise.prescribed_reps}
             {exercise.prescribed_weight !== null
               ? ` @ ${exercise.prescribed_weight}`
               : ""}
           </span>
-          {lastPerformed && (
-            <span>
-              last: {lastPerformed.weight ?? "bw"} × {lastPerformed.reps}
-              <span className="ml-1 text-(--muted)/70">
-                ({relativeDays(lastPerformed.logged_at)})
-              </span>
-            </span>
-          )}
-          {exercise.rest_seconds !== null && (
-            <span>rest {exercise.rest_seconds}s</span>
-          )}
         </div>
+        {exercise.last_session && (
+          <div className="text-xs text-(--muted)">
+            <span className="font-semibold text-(--foreground)/70">last</span>
+            <span className="ml-1">
+              ({relativeDays(exercise.last_session.logged_at)}):{" "}
+              {exercise.last_session.sets
+                .map((s) => `${s.weight ?? "bw"}×${s.reps}`)
+                .join("  ")}
+            </span>
+          </div>
+        )}
         {cleanNotes && (
           <p className="text-xs text-(--muted)">{cleanNotes}</p>
         )}
       </header>
 
-      <ul className="space-y-2">
-        {setRows.map((row, i) => {
-          if ("placeholderNumber" in row) {
-            return (
-              <SetEditor
-                key={`p-${row.placeholderNumber}`}
-                setNumber={row.placeholderNumber}
-                initialWeight={suggestedWeight}
-                initialReps={suggestedReps}
-                initialIsWarmup={false}
-                finished={finished}
-                onSave={async (state) => {
-                  await onUpsert({
-                    id: null,
-                    set_number: row.placeholderNumber,
-                    weight: state.weight,
-                    reps: state.reps,
-                    rpe: null,
-                    is_warmup: state.is_warmup,
-                    notes: null,
-                  });
-                }}
-              />
-            );
-          }
+      <ul className="space-y-1">
+        {rows.map((r) => {
+          const expanded = expandedSetNumber === r.setNumber;
+          const suggested = suggestedForSet(r.setNumber);
+          const lastSameSet = lastForSet(r.setNumber);
           return (
-            <LoggedSet
-              key={row.id}
-              set={row}
-              finished={finished}
-              onSave={async (state) => {
-                await onUpsert({
-                  id: row.id,
-                  set_number: row.set_number,
-                  weight: state.weight,
-                  reps: state.reps,
-                  rpe: row.rpe,
-                  is_warmup: state.is_warmup,
-                  notes: row.notes,
-                });
-              }}
-              onDelete={() => onDelete(row.id)}
-            />
+            <li key={r.setNumber}>
+              {r.logged && !expanded ? (
+                <LoggedRow
+                  set={r.logged}
+                  onTap={() =>
+                    !finished && setExpandedSetNumber(r.setNumber)
+                  }
+                />
+              ) : expanded ? (
+                <SetEditor
+                  setNumber={r.setNumber}
+                  initialWeight={
+                    r.logged?.weight ?? suggested.weight ?? null
+                  }
+                  initialReps={
+                    r.logged?.reps ?? suggested.reps ?? null
+                  }
+                  initialIsWarmup={r.logged?.is_warmup ?? false}
+                  finished={finished}
+                  showDelete={!!r.logged}
+                  onSave={async (state) => {
+                    await onUpsert({
+                      id: r.logged?.id ?? null,
+                      set_number: r.setNumber,
+                      weight: state.weight,
+                      reps: state.reps,
+                      rpe: r.logged?.rpe ?? null,
+                      is_warmup: state.is_warmup,
+                      notes: r.logged?.notes ?? null,
+                    });
+                    setExpandedSetNumber(null);
+                  }}
+                  onCancel={() => setExpandedSetNumber(null)}
+                  onDelete={
+                    r.logged
+                      ? async () => {
+                          await onDelete(r.logged!.id);
+                          setExpandedSetNumber(null);
+                        }
+                      : undefined
+                  }
+                />
+              ) : (
+                <EmptyRow
+                  setNumber={r.setNumber}
+                  lastSameSet={lastSameSet}
+                  onTap={() =>
+                    !finished && setExpandedSetNumber(r.setNumber)
+                  }
+                  disabled={finished}
+                />
+              )}
+            </li>
           );
         })}
+        {!finished && (
+          <li>
+            <button
+              type="button"
+              onClick={() =>
+                setExpandedSetNumber(
+                  Math.max(exercise.prescribed_sets, ...sets.map((s) => s.set_number), 0) + 1,
+                )
+              }
+              className="h-8 w-full rounded border border-dashed border-(--border) text-xs text-(--muted) hover:text-(--accent) hover:border-(--accent)"
+            >
+              + add set
+            </button>
+          </li>
+        )}
       </ul>
     </section>
   );
 }
 
-function LoggedSet({
+function LoggedRow({
   set,
-  finished,
-  onSave,
-  onDelete,
+  onTap,
 }: {
   set: SessionSet;
-  finished: boolean;
-  onSave: (state: {
-    weight: number | null;
-    reps: number;
-    is_warmup: boolean;
-  }) => Promise<void>;
-  onDelete: () => Promise<void>;
+  onTap: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  if (!editing) {
-    return (
-      <li>
-        <button
-          type="button"
-          onClick={() => !finished && setEditing(true)}
-          className="flex w-full items-center gap-3 rounded-lg border border-(--border) bg-(--surface) px-3 py-2 text-left active:bg-(--accent-soft)"
-        >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--ok)/15 text-sm font-semibold text-(--ok)">
-            ✓
-          </span>
-          <span className="flex-1 text-sm text-(--muted)">
-            set {set.set_number}
-            {set.is_warmup && (
-              <span className="ml-1 rounded bg-(--border) px-1 text-[10px] uppercase tracking-wider text-(--muted)">
-                warmup
-              </span>
-            )}
-          </span>
-          <span className="text-lg font-bold tabular-nums">
-            {set.weight ?? "—"}
-          </span>
-          <span className="text-xs text-(--muted)">×</span>
-          <span className="text-lg font-bold tabular-nums">{set.reps}</span>
-        </button>
-      </li>
-    );
-  }
   return (
-    <li>
-      <SetEditor
-        setNumber={set.set_number}
-        initialWeight={set.weight}
-        initialReps={set.reps}
-        initialIsWarmup={set.is_warmup}
-        finished={finished}
-        showDelete
-        onSave={async (state) => {
-          await onSave(state);
-          setEditing(false);
-        }}
-        onCancel={() => setEditing(false)}
-        onDelete={async () => {
-          await onDelete();
-          setEditing(false);
-        }}
-      />
-    </li>
+    <button
+      type="button"
+      onClick={onTap}
+      className="grid w-full grid-cols-[24px,1fr,auto] items-center gap-2 rounded-md border border-(--border) bg-(--accent-soft) px-2.5 py-2 text-left"
+    >
+      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-(--accent) text-[11px] font-bold text-(--accent-contrast)">
+        ✓
+      </span>
+      <span className="text-sm text-(--muted)">
+        set {set.set_number}
+        {set.is_warmup && (
+          <span className="ml-1.5 rounded bg-(--border) px-1 text-[9px] uppercase tracking-wider text-(--muted)">
+            warmup
+          </span>
+        )}
+      </span>
+      <span className="text-sm font-bold tabular-nums">
+        {set.weight ?? "bw"} <span className="text-(--muted)">×</span>{" "}
+        {set.reps}
+      </span>
+    </button>
+  );
+}
+
+function EmptyRow({
+  setNumber,
+  lastSameSet,
+  onTap,
+  disabled,
+}: {
+  setNumber: number;
+  lastSameSet: LastSessionSet | null;
+  onTap: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onTap}
+      disabled={disabled}
+      className="grid w-full grid-cols-[24px,1fr,auto] items-center gap-2 rounded-md border border-(--border) px-2.5 py-2 text-left text-(--muted) hover:border-(--accent) active:bg-(--accent-soft) disabled:opacity-60"
+    >
+      <span className="flex h-5 w-5 items-center justify-center rounded-full border border-(--border) text-[11px]">
+        {setNumber}
+      </span>
+      <span className="text-sm">set {setNumber}</span>
+      <span className="text-xs tabular-nums">
+        {lastSameSet
+          ? `${lastSameSet.weight ?? "bw"} × ${lastSameSet.reps}`
+          : "tap to log"}
+      </span>
+    </button>
   );
 }
 
@@ -553,8 +610,8 @@ function SetEditor({
   };
 
   return (
-    <div className="rounded-lg border border-(--border) bg-(--surface) p-3">
-      <div className="mb-3 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-(--muted)">
+    <div className="rounded-lg border-2 border-(--accent) bg-(--accent-soft) p-2">
+      <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-(--muted)">
         <span>set {setNumber}</span>
         <label className="flex items-center gap-1.5 normal-case text-xs font-normal">
           <input
@@ -567,7 +624,7 @@ function SetEditor({
         </label>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2">
         <Stepper
           label="weight"
           value={weight}
@@ -586,12 +643,12 @@ function SetEditor({
         />
       </div>
 
-      <div className="mt-3 flex gap-2">
+      <div className="mt-2 flex gap-2">
         <button
           type="button"
           onClick={submit}
           disabled={saving || finished}
-          className="h-11 flex-1 rounded-lg bg-(--accent) text-sm font-semibold text-(--accent-contrast) active:scale-[0.99] disabled:opacity-60"
+          className="h-10 flex-1 rounded-md bg-(--accent) text-sm font-semibold text-(--accent-contrast) active:scale-[0.99] disabled:opacity-60"
         >
           {saving ? "saving…" : "log set"}
         </button>
@@ -599,7 +656,7 @@ function SetEditor({
           <button
             type="button"
             onClick={onCancel}
-            className="h-11 rounded-lg border border-(--border) px-3 text-sm text-(--muted)"
+            className="h-10 rounded-md border border-(--border) bg-(--background) px-3 text-sm text-(--muted)"
           >
             cancel
           </button>
@@ -608,14 +665,14 @@ function SetEditor({
           <button
             type="button"
             onClick={onDelete}
-            className="h-11 rounded-lg border border-(--border) px-3 text-sm text-red-600 dark:text-red-400"
+            className="h-10 rounded-md border border-(--border) bg-(--background) px-3 text-sm text-red-600 dark:text-red-400"
             aria-label="delete set"
           >
             ✕
           </button>
         )}
       </div>
-      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </div>
   );
 }
@@ -644,21 +701,23 @@ function Stepper({
     const base = hasValue ? current : 0;
     const next = base + dir * step;
     if (next < 0 && !allowEmpty) return;
-    const formatted = integer ? String(Math.max(0, Math.trunc(next))) : String(next);
+    const formatted = integer
+      ? String(Math.max(0, Math.trunc(next)))
+      : String(next);
     onChange(formatted);
   };
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-0.5">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-(--muted)">
         {label}
       </div>
-      <div className="grid grid-cols-[auto,1fr,auto] items-stretch gap-1 rounded-lg border border-(--border) bg-(--background)">
+      <div className="grid grid-cols-[auto,1fr,auto] items-stretch rounded-md border border-(--border) bg-(--background)">
         <button
           type="button"
           onClick={() => bump(-1)}
           disabled={disabled}
-          className="flex h-12 w-11 items-center justify-center rounded-l-lg text-xl font-semibold text-(--muted) active:bg-(--accent-soft) disabled:opacity-40"
+          className="flex h-10 w-10 items-center justify-center rounded-l-md text-lg font-semibold text-(--muted) active:bg-(--accent-soft) disabled:opacity-40"
           aria-label={`decrease ${label}`}
         >
           −
@@ -670,13 +729,13 @@ function Stepper({
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
           placeholder={allowEmpty ? "bw" : "0"}
-          className="h-12 w-full border-x border-(--border) bg-transparent text-center text-2xl font-bold tabular-nums outline-none focus:bg-(--accent-soft) disabled:opacity-60"
+          className="h-10 w-full border-x border-(--border) bg-transparent text-center text-xl font-bold tabular-nums outline-none focus:bg-(--background) disabled:opacity-60"
         />
         <button
           type="button"
           onClick={() => bump(+1)}
           disabled={disabled}
-          className="flex h-12 w-11 items-center justify-center rounded-r-lg text-xl font-semibold text-(--muted) active:bg-(--accent-soft) disabled:opacity-40"
+          className="flex h-10 w-10 items-center justify-center rounded-r-md text-lg font-semibold text-(--muted) active:bg-(--accent-soft) disabled:opacity-40"
           aria-label={`increase ${label}`}
         >
           +
