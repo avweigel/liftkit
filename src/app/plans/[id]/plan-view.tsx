@@ -7,6 +7,7 @@ import {
   duplicatePlan,
   removePlanDayExercise,
   renamePlanDay,
+  renamePlanExerciseVariant,
   reorderDayExercise,
   setActivePlan,
   updatePlanDayExercise,
@@ -371,6 +372,24 @@ function ExerciseRow({
     });
   };
 
+  const renameVariant = () => {
+    const current = ex.exercise?.name ?? "";
+    const next = window.prompt(
+      "rename this row to create or use a variant (e.g. add \" (L)\" for left side). this only changes which exercise this plan row points to — the library keeps the original.",
+      current,
+    );
+    if (next === null) return;
+    const trimmed = next.trim();
+    if (trimmed.length === 0 || trimmed === current) return;
+    startTransition(async () => {
+      try {
+        await renamePlanExerciseVariant(ex.id, planId, trimmed);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "rename failed");
+      }
+    });
+  };
+
   if (!editing) {
     return (
       <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
@@ -395,9 +414,17 @@ function ExerciseRow({
     <li className="space-y-2 px-3 py-3 text-sm">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <div className="truncate font-medium">
+          <button
+            type="button"
+            onClick={renameVariant}
+            className="block w-full truncate text-left font-medium hover:underline"
+            title="tap to rename this row (creates or uses a variant)"
+          >
             {ex.exercise?.name ?? "(deleted)"}
-          </div>
+          </button>
+          <p className="text-[10px] text-(--muted)">
+            tap name to rename as a variant (e.g. add &ldquo;(L)&rdquo;)
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button

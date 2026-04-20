@@ -9,6 +9,7 @@ import {
   StartOtherDayButton,
   StartTodayButton,
 } from "./dashboard-start-button";
+import { DashboardSessionDelete } from "./dashboard-session-delete";
 
 type SessionRow = {
   id: string;
@@ -175,12 +176,13 @@ export async function Dashboard({ userId, email }: Props) {
             {sessions.map((s) => {
               const open = !s.finished_at;
               return (
-                <li key={s.id}>
+                <li
+                  key={s.id}
+                  className={`flex items-stretch ${open ? "bg-(--accent-soft)/60" : ""}`}
+                >
                   <Link
                     href={`/log/${s.id}`}
-                    className={`flex items-center justify-between gap-4 px-4 py-3 hover:bg-(--accent-soft) ${
-                      open ? "bg-(--accent-soft)/60" : ""
-                    }`}
+                    className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 hover:bg-(--accent-soft)"
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -199,6 +201,9 @@ export async function Dashboard({ userId, email }: Props) {
                     </div>
                     <span className="text-(--muted)">→</span>
                   </Link>
+                  <div className="flex items-center px-2">
+                    <DashboardSessionDelete sessionId={s.id} />
+                  </div>
                 </li>
               );
             })}

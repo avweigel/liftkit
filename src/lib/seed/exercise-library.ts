@@ -883,15 +883,12 @@ export const CANONICAL_LIBRARY: CanonicalExercise[] = [
     primary_muscle: "triceps",
     equipment: "dumbbell",
     description:
-      "bent-over single-arm tricep extension. peak contraction at full elbow lockout.",
+      "bent-over tricep extension with a dumbbell. peak contraction at full elbow lockout. variants specify left vs right or both arms — the library keeps them distinct so you can log each separately.",
     aliases: [
       "tricep kickback",
       "tricep kickbacks",
       "db kickbacks",
       "bent-over tricep kickbacks",
-      "single arm tricep kickback",
-      "single arm tricep extension",
-      "single arm tricep ext",
     ],
   },
 

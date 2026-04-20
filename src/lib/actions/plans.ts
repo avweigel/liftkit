@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { planDayExerciseInputSchema } from "@/lib/schemas/session";
+import { slugify } from "@/lib/fuzzy";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -151,6 +152,84 @@ type PlanFull = {
     }>;
   }>;
 };
+
+type SrcExerciseFields = {
+  primary_muscle: string | null;
+  equipment: string | null;
+};
+
+export async function renamePlanExerciseVariant(
+  planDayExerciseId: string,
+  planId: string,
+  newName: string,
+) {
+  const { supabase, user } = await requireUser();
+  const trimmed = newName.trim();
+  if (trimmed.length < 2) throw new Error("name too short");
+  if (trimmed.length > 120) throw new Error("name too long");
+
+  const { data: pde, error: pdeErr } = await supabase
+    .from("plan_day_exercises")
+    .select("id, exercise_id, exercise:exercises ( primary_muscle, equipment )")
+    .eq("id", planDayExerciseId)
+    .maybeSingle();
+  if (pdeErr) throw new Error(pdeErr.message);
+  if (!pde) throw new Error("plan exercise not found");
+  const rawSrc = pde.exercise as unknown as
+    | SrcExerciseFields
+    | SrcExerciseFields[]
+    | null;
+  const src: SrcExerciseFields | null = Array.isArray(rawSrc)
+    ? rawSrc[0] ?? null
+    : rawSrc;
+
+  const { data: existing } = await supabase
+    .from("exercises")
+    .select("id")
+    .ilike("name", trimmed)
+    .or(`owner_id.is.null,owner_id.eq.${user.id}`)
+    .maybeSingle();
+
+  let newExerciseId: string;
+  if (existing) {
+    newExerciseId = existing.id;
+  } else {
+    let slug = slugify(trimmed) || "exercise";
+    const base = slug;
+    for (let i = 2; i < 500; i++) {
+      const { data: clash } = await supabase
+        .from("exercises")
+        .select("id")
+        .eq("slug", slug)
+        .maybeSingle();
+      if (!clash) break;
+      slug = `${base}-${i}`;
+    }
+    const muscle = (src?.primary_muscle as string | null) ?? "other";
+    const equipment = (src?.equipment as string | null) ?? "other";
+    const { data: created, error: createErr } = await supabase
+      .from("exercises")
+      .insert({
+        owner_id: user.id,
+        name: trimmed,
+        slug,
+        primary_muscle: muscle,
+        equipment,
+      })
+      .select("id")
+      .single();
+    if (createErr) throw new Error(createErr.message);
+    newExerciseId = created.id;
+  }
+
+  const { error: updErr } = await supabase
+    .from("plan_day_exercises")
+    .update({ exercise_id: newExerciseId })
+    .eq("id", planDayExerciseId);
+  if (updErr) throw new Error(updErr.message);
+
+  revalidatePath(`/plans/${planId}`);
+}
 
 export async function setActivePlan(planId: string | null) {
   const { supabase, user } = await requireUser();

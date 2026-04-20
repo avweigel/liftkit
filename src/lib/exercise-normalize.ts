@@ -17,18 +17,37 @@ const ABBREVIATIONS: Array<[RegExp, string]> = [
   [/\bP[-\s]?Bar\b/gi, "Parallel Bar"],
 ];
 
-const SIDE_SUFFIX =
-  /\s*(?:\(\s*[lr]\s*\)|-\s*[lr]\b|\s+[lr]$)/i;
+const SIDE_CAPTURE =
+  /\s*(?:\(\s*([lr])\s*\)|-\s*([lr])\b|\s+([lr])$)/i;
 const WEIGHT_SUFFIX = /\s*\(\s*\d+[-\d]*\s*#?\s*\)\s*$/;
 
 export function normalizeName(raw: string): string {
   let s = raw.trim();
   s = s.replace(WEIGHT_SUFFIX, "");
-  s = s.replace(SIDE_SUFFIX, "");
+
+  // extract side (L / R) so we can re-attach it in a canonical "(L)" form
+  // after normalizing the rest. unilateral programming often lists left and
+  // right as separate rows, and collapsing the side info erases that signal.
+  const sideMatch = s.match(SIDE_CAPTURE);
+  const side = sideMatch
+    ? (sideMatch[1] || sideMatch[2] || sideMatch[3]).toUpperCase()
+    : null;
+  if (sideMatch) s = s.replace(sideMatch[0], "");
+
   for (const [re, to] of ABBREVIATIONS) s = s.replace(re, to);
   s = s.replace(/\s+/g, " ").trim();
-  // sentence case most things; lowercase small connectors
-  const SMALL = new Set(["of", "the", "and", "to", "with", "a", "on", "in", "or"]);
+
+  const SMALL = new Set([
+    "of",
+    "the",
+    "and",
+    "to",
+    "with",
+    "a",
+    "on",
+    "in",
+    "or",
+  ]);
   s = s
     .split(" ")
     .map((w, i) => {
@@ -38,7 +57,8 @@ export function normalizeName(raw: string): string {
       return lower.charAt(0).toUpperCase() + lower.slice(1);
     })
     .join(" ");
-  return s;
+
+  return side ? `${s} (${side})` : s;
 }
 
 const ALIAS_MAP = buildAliasMap();

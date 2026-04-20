@@ -115,10 +115,24 @@ export function SessionLogger({
     };
   }, [restSecondsLeft !== null]);
 
-  const totalSets = useMemo(
-    () => exercises.reduce((n, ex) => n + ex.prescribed_sets, 0),
-    [exercises],
-  );
+  // totalSets dedup by exercise_id: plan rows that collapsed to the same
+  // exercise (e.g. an old import where "Tricep Kickback - L/R/bilateral"
+  // all mapped to one library entry) share the same sets in the logger,
+  // so counting 3 × prescribed is misleading. take the max prescribed
+  // per exercise_id instead — that's how many unique sets you can log.
+  const totalSets = useMemo(() => {
+    const maxByExerciseId = new Map<string, number>();
+    for (const ex of exercises) {
+      const cur = maxByExerciseId.get(ex.exercise_id) ?? 0;
+      maxByExerciseId.set(
+        ex.exercise_id,
+        Math.max(cur, ex.prescribed_sets),
+      );
+    }
+    let total = 0;
+    for (const v of maxByExerciseId.values()) total += v;
+    return total;
+  }, [exercises]);
   const workingSetsLogged = useMemo(
     () => sets.filter((s) => !s.is_warmup).length,
     [sets],
