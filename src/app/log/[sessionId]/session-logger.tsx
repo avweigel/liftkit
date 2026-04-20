@@ -220,13 +220,15 @@ export function SessionLogger({
 
   return (
     <div className="space-y-3 pb-28">
-      <ProgressHeader
-        done={workingSetsLogged}
-        total={totalSets}
-        restOn={restOn}
-        onToggleRest={() => setRestOn((v) => !v)}
-        finished={finished}
-      />
+      <div className="sticky top-0 z-10 -mx-3 bg-(--background)/92 px-3 pt-1 pb-1 backdrop-blur sm:-mx-6 sm:px-6">
+        <ProgressHeader
+          done={workingSetsLogged}
+          total={totalSets}
+          restOn={restOn}
+          onToggleRest={() => setRestOn((v) => !v)}
+          finished={finished}
+        />
+      </div>
 
       {exercises.length === 0 && (
         <p className="rounded-lg border border-dashed border-(--border) p-6 text-center text-sm text-(--muted)">
@@ -646,8 +648,11 @@ function SetList({
   );
   const weightConv = weightConvention(exercise.name, exercise.equipment);
 
+  // warmups don't count toward the prescribed working-set goal, so
+  // reserve an extra row for each warmup already logged.
+  const warmupCount = sets.filter((s) => s.is_warmup).length;
   const maxSet = Math.max(
-    exercise.prescribed_sets,
+    exercise.prescribed_sets + warmupCount,
     ...sets.map((s) => s.set_number),
     0,
   );
@@ -667,17 +672,39 @@ function SetList({
     n: number,
   ): { weight: number | null; reps: number | null } => {
     const target = repTargetForSet(exercise.prescribed_reps, n);
-    const prevInSession = sets.find((s) => s.set_number === n - 1) ?? null;
+    // previous working set in this session (skip warmups for weight scaling)
+    const prevInSession =
+      [...sets]
+        .filter((s) => !s.is_warmup)
+        .sort((a, b) => b.set_number - a.set_number)[0] ?? null;
     const sameSetLast = lastForSet(n);
 
-    // weight priority: previous set in this session > same set last time > prescribed
-    const weight =
-      prevInSession?.weight ??
-      sameSetLast?.weight ??
-      exercise.prescribed_weight;
+    // weight priority:
+    // 1. same-set-number from last session (most accurate — you did exactly this)
+    // 2. scale previous working set's weight via epley 1rm if target reps differ
+    // 3. fallback to previous working set's weight as-is
+    // 4. fallback to prescribed_weight
+    let weight: number | null;
+    if (sameSetLast?.weight != null) {
+      weight = sameSetLast.weight;
+    } else if (
+      prevInSession?.weight != null &&
+      prevInSession.reps != null &&
+      target.value != null &&
+      target.perSet &&
+      target.value !== prevInSession.reps
+    ) {
+      // scale weight inversely with rep target using epley reciprocal
+      const oneRM = prevInSession.weight * (1 + prevInSession.reps / 30);
+      const raw = oneRM / (1 + target.value / 30);
+      const rounded = Math.max(0, Math.round(raw / 5) * 5);
+      weight = rounded;
+    } else {
+      weight =
+        prevInSession?.weight ?? exercise.prescribed_weight;
+    }
 
-    // reps priority: same set last time > per-set target > previous set in this session
-    // (target beats copying previous set when the scheme is per-set descending like 20,15,10)
+    // reps priority: same set last time > per-set target > previous set
     const reps =
       sameSetLast?.reps ??
       target.value ??

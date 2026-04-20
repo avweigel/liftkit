@@ -101,6 +101,37 @@ export async function Dashboard({ userId, email }: Props) {
     activePlan = data;
   }
 
+  // Today's plan day for the active plan
+  const dow = new Date().getDay();
+  const todayDayNumber = dow === 0 ? null : dow;
+  const todayDay = activePlan && todayDayNumber != null
+    ? activePlan.plan_weeks
+        .flatMap((w) => w.plan_days)
+        .find((d) => d.day_number === todayDayNumber) ?? null
+    : null;
+
+  // Any session for today's plan day started within the last 18 hours
+  let todaySession: {
+    id: string;
+    started_at: string;
+    finished_at: string | null;
+  } | null = null;
+  if (todayDay) {
+    const eighteenHoursAgo = new Date(
+      Date.now() - 18 * 60 * 60 * 1000,
+    ).toISOString();
+    const { data } = await supabase
+      .from("workout_sessions")
+      .select("id, started_at, finished_at")
+      .eq("user_id", userId)
+      .eq("plan_day_id", todayDay.id)
+      .gte("started_at", eighteenHoursAgo)
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    todaySession = data;
+  }
+
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-3 py-5 sm:px-6 sm:py-10">
       <header className="space-y-1">
@@ -112,7 +143,7 @@ export async function Dashboard({ userId, email }: Props) {
 
       {activePlan ? (
         <>
-          <ActivePhaseBlock plan={activePlan} />
+          <ActivePhaseBlock plan={activePlan} todaySession={todaySession} />
           <DismissibleHint storageKey={HINT_KEYS.dashboardTip}>
             <p className="pr-8 text-xs text-(--muted)">
               tip: &ldquo;today&rsquo;s workout&rdquo; auto-selects the day of
@@ -141,25 +172,36 @@ export async function Dashboard({ userId, email }: Props) {
           </p>
         ) : (
           <ul className="divide-y divide-(--border) overflow-hidden rounded-xl border border-(--border) bg-(--surface)">
-            {sessions.map((s) => (
-              <li key={s.id}>
-                <Link
-                  href={`/log/${s.id}`}
-                  className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-(--accent-soft)"
-                >
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">
-                      {sessionTitle(s)}
+            {sessions.map((s) => {
+              const open = !s.finished_at;
+              return (
+                <li key={s.id}>
+                  <Link
+                    href={`/log/${s.id}`}
+                    className={`flex items-center justify-between gap-4 px-4 py-3 hover:bg-(--accent-soft) ${
+                      open ? "bg-(--accent-soft)/60" : ""
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm font-medium">
+                          {sessionTitle(s)}
+                        </span>
+                        {open && (
+                          <span className="shrink-0 rounded-full bg-(--accent)/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-(--accent)">
+                            open · tap to finish
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-(--muted)">
+                        {formatDate(s.started_at)}
+                      </div>
                     </div>
-                    <div className="text-xs text-(--muted)">
-                      {formatDate(s.started_at)}
-                      {s.finished_at ? "" : " · in progress"}
-                    </div>
-                  </div>
-                  <span className="text-(--muted)">→</span>
-                </Link>
-              </li>
-            ))}
+                    <span className="text-(--muted)">→</span>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
@@ -167,7 +209,17 @@ export async function Dashboard({ userId, email }: Props) {
   );
 }
 
-function ActivePhaseBlock({ plan }: { plan: ActivePlan }) {
+function ActivePhaseBlock({
+  plan,
+  todaySession,
+}: {
+  plan: ActivePlan;
+  todaySession: {
+    id: string;
+    started_at: string;
+    finished_at: string | null;
+  } | null;
+}) {
   const days = (plan.plan_weeks ?? [])
     .flatMap((w) => w.plan_days ?? [])
     .sort((a, b) => a.day_number - b.day_number);
@@ -203,7 +255,7 @@ function ActivePhaseBlock({ plan }: { plan: ActivePlan }) {
       </div>
 
       {todayDay ? (
-        <TodayCard day={todayDay} />
+        <TodayCard day={todayDay} session={todaySession} />
       ) : (
         <RestDayCard planName={plan.name} />
       )}
@@ -245,11 +297,23 @@ function ActivePhaseBlock({ plan }: { plan: ActivePlan }) {
 
 function TodayCard({
   day,
+  session,
 }: {
   day: ActivePlan["plan_weeks"][number]["plan_days"][number];
+  session: {
+    id: string;
+    started_at: string;
+    finished_at: string | null;
+  } | null;
 }) {
   const label = formatDayLabel(day.day_number, day.name);
   const exerciseCount = day.plan_day_exercises.length;
+  const state: "done" | "in-progress" | "not-started" =
+    session?.finished_at
+      ? "done"
+      : session
+        ? "in-progress"
+        : "not-started";
   return (
     <section className="accent-wash relative overflow-hidden rounded-2xl border border-(--accent)/40 bg-(--surface) p-5 sm:p-6">
       <div
@@ -258,8 +322,18 @@ function TodayCard({
         style={{ background: "var(--accent)" }}
       />
       <div className="relative space-y-1">
-        <div className="text-xs font-bold uppercase tracking-wider text-(--accent)">
-          today · {label.weekday}
+        <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider text-(--accent)">
+          <span>today · {label.weekday}</span>
+          {state === "done" && (
+            <span className="rounded-full bg-(--ok)/20 px-2 py-0.5 text-[10px] text-(--ok)">
+              ✓ completed
+            </span>
+          )}
+          {state === "in-progress" && (
+            <span className="rounded-full bg-(--accent)/20 px-2 py-0.5 text-[10px]">
+              in progress
+            </span>
+          )}
         </div>
         <h2 className="text-2xl font-bold leading-tight sm:text-3xl">
           {label.name}
@@ -269,7 +343,26 @@ function TodayCard({
         </p>
       </div>
       <div className="relative">
-        <StartTodayButton dayId={day.id} />
+        {state === "not-started" && <StartTodayButton dayId={day.id} />}
+        {state === "in-progress" && session && (
+          <Link
+            href={`/log/${session.id}`}
+            className="mt-4 inline-flex h-12 w-full items-center justify-center rounded-xl bg-(--accent) text-base font-bold text-(--accent-contrast) shadow-sm active:scale-[0.99]"
+          >
+            continue today&rsquo;s workout →
+          </Link>
+        )}
+        {state === "done" && session && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              href={`/log/${session.id}`}
+              className="inline-flex h-11 items-center rounded-lg border border-(--border) bg-(--background) px-4 text-sm font-medium"
+            >
+              view today&rsquo;s session
+            </Link>
+            <StartTodayButton dayId={day.id} />
+          </div>
+        )}
       </div>
     </section>
   );

@@ -85,7 +85,8 @@ export default async function PlansPage() {
             <span className="font-semibold text-(--foreground)">
               active phase
             </span>{" "}
-            and drives today&rsquo;s workout on the home page.
+            and drives today&rsquo;s workout on the home page. phases can be
+            done in any order — they&rsquo;re not sequential.
           </p>
         </div>
         <Link
