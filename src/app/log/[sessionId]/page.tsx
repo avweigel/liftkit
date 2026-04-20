@@ -63,6 +63,32 @@ type HistoryRow = {
   logged_at: string;
 };
 
+type ExtraRow = {
+  id: string;
+  exercise_id: string;
+  superset_code: string | null;
+  order_index: number;
+  prescribed_sets: number;
+  prescribed_reps: string;
+  prescribed_weight: number | null;
+  rest_seconds: number | null;
+  notes: string | null;
+  exercise: {
+    id: string;
+    name: string;
+    primary_muscle: string;
+    equipment: string;
+  } | null;
+};
+
+type LibraryRow = {
+  id: string;
+  name: string;
+  primary_muscle: string;
+  equipment: string;
+  owner_id: string | null;
+};
+
 export default async function LogSessionPage({ params }: Props) {
   const { sessionId } = await params;
   const supabase = await createClient();
@@ -96,9 +122,28 @@ export default async function LogSessionPage({ params }: Props) {
   if (!session) notFound();
   if (session.user_id !== user!.id) redirect("/");
 
-  const exerciseIds = (session.plan_day?.plan_day_exercises ?? [])
+  const { data: extrasRaw } = await supabase
+    .from("session_extra_exercises")
+    .select(
+      `id, exercise_id, superset_code, order_index,
+       prescribed_sets, prescribed_reps, prescribed_weight,
+       rest_seconds, notes,
+       exercise:exercises ( id, name, primary_muscle, equipment )`,
+    )
+    .eq("session_id", sessionId)
+    .order("order_index", { ascending: true })
+    .returns<ExtraRow[]>();
+  const extras = extrasRaw ?? [];
+
+  const planExerciseIds = (session.plan_day?.plan_day_exercises ?? [])
     .map((pde) => pde.exercise?.id)
     .filter((id): id is string => !!id);
+  const extraExerciseIds = extras
+    .map((e) => e.exercise?.id)
+    .filter((id): id is string => !!id);
+  const exerciseIds = [
+    ...new Set([...planExerciseIds, ...extraExerciseIds]),
+  ];
 
   const ninetyDaysAgo = new Date(
     Date.now() - 90 * 24 * 60 * 60 * 1000,
@@ -145,40 +190,91 @@ export default async function LogSessionPage({ params }: Props) {
     }
   }
 
-  const exercises = (session.plan_day?.plan_day_exercises ?? [])
+  const attachLast = (
+    exerciseId: string,
+  ): {
+    logged_at: string;
+    sets: Array<{ set_number: number; weight: number | null; reps: number }>;
+  } | null => {
+    const last = lastSessionByExercise.get(exerciseId);
+    if (!last) return null;
+    return {
+      logged_at: last.logged_at,
+      sets: last.sets
+        .slice()
+        .sort((a, b) => a.set_number - b.set_number)
+        .map((s) => ({
+          set_number: s.set_number,
+          weight: s.weight,
+          reps: s.reps,
+        })),
+    };
+  };
+
+  const planExercises = (session.plan_day?.plan_day_exercises ?? [])
     .slice()
     .sort((a, b) => a.order_index - b.order_index)
-    .map((pde) => {
-      const last = pde.exercise
-        ? lastSessionByExercise.get(pde.exercise.id) ?? null
-        : null;
-      return {
-        id: pde.id,
-        order_index: pde.order_index,
-        exercise_id: pde.exercise?.id ?? "",
-        name: pde.exercise?.name ?? "(deleted)",
-        equipment: pde.exercise?.equipment ?? null,
-        prescribed_sets: pde.prescribed_sets,
-        prescribed_reps: pde.prescribed_reps,
-        prescribed_weight: pde.prescribed_weight,
-        rest_seconds: pde.rest_seconds,
-        notes: pde.notes,
-        last_session: last
-          ? {
-              logged_at: last.logged_at,
-              sets: last.sets
-                .slice()
-                .sort((a, b) => a.set_number - b.set_number)
-                .map((s) => ({
-                  set_number: s.set_number,
-                  weight: s.weight,
-                  reps: s.reps,
-                })),
-            }
-          : null,
-      };
-    })
+    .map((pde) => ({
+      id: pde.id,
+      order_index: pde.order_index,
+      exercise_id: pde.exercise?.id ?? "",
+      name: pde.exercise?.name ?? "(deleted)",
+      equipment: pde.exercise?.equipment ?? null,
+      prescribed_sets: pde.prescribed_sets,
+      prescribed_reps: pde.prescribed_reps,
+      prescribed_weight: pde.prescribed_weight,
+      rest_seconds: pde.rest_seconds,
+      notes: pde.notes,
+      is_extra: false as const,
+      extra_id: null as string | null,
+      superset_code_override: null as string | null,
+      last_session: attachLast(pde.exercise?.id ?? ""),
+    }))
     .filter((e) => e.exercise_id.length > 0);
+
+  const extraExercises = extras
+    .filter((e) => !!e.exercise)
+    .map((e) => ({
+      id: e.id,
+      order_index: 10_000 + e.order_index,
+      exercise_id: e.exercise!.id,
+      name: e.exercise!.name,
+      equipment: e.exercise!.equipment ?? null,
+      prescribed_sets: e.prescribed_sets,
+      prescribed_reps: e.prescribed_reps,
+      prescribed_weight: e.prescribed_weight,
+      rest_seconds: e.rest_seconds,
+      notes: e.notes,
+      is_extra: true as const,
+      extra_id: e.id,
+      superset_code_override: e.superset_code,
+      last_session: attachLast(e.exercise!.id),
+    }));
+
+  const exercises = [...planExercises, ...extraExercises];
+
+  const { data: libraryRaw } = await supabase
+    .from("exercises")
+    .select("id,name,primary_muscle,equipment,owner_id")
+    .or(`owner_id.is.null,owner_id.eq.${user!.id}`)
+    .order("name")
+    .returns<LibraryRow[]>();
+  const library = libraryRaw ?? [];
+
+  const activeSupersetCodes = [
+    ...new Set(
+      exercises
+        .map((e) =>
+          e.superset_code_override ??
+          (e.notes?.match(/^\[([A-Za-z]+)\d+\]/)?.[1] ?? null),
+        )
+        .filter((c): c is string => !!c)
+        .map((c) => c.toUpperCase()),
+    ),
+  ].sort();
+
+  const planName =
+    session.plan_day?.plan_week?.plan?.name ?? null;
 
   const title = sessionTitle(session);
 
@@ -223,6 +319,10 @@ export default async function LogSessionPage({ params }: Props) {
         initialNotes={session.notes ?? ""}
         exercises={exercises}
         initialSets={sets ?? []}
+        library={library}
+        activeSupersetCodes={activeSupersetCodes}
+        planName={planName}
+        hasPlanDay={!!session.plan_day_id}
       />
     </main>
   );

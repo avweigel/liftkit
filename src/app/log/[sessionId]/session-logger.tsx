@@ -8,6 +8,12 @@ import {
   updateSession,
   upsertSessionSet,
 } from "@/lib/actions/sessions";
+import {
+  addSessionExtra,
+  removeSessionExtra,
+  saveExtrasAsNewPhase,
+  saveExtrasToCurrentPhase,
+} from "@/lib/actions/session-extras";
 import { groupIntoSupersets, parseSetCode } from "@/lib/set-code";
 import { formatRxReps, repTargetForSet } from "@/lib/display/reps";
 import { weightConvention } from "@/lib/display/weight-convention";
@@ -33,10 +39,21 @@ type Exercise = {
   prescribed_weight: number | null;
   rest_seconds: number | null;
   notes: string | null;
+  is_extra: boolean;
+  extra_id: string | null;
+  superset_code_override: string | null;
   last_session: {
     logged_at: string;
     sets: LastSessionSet[];
   } | null;
+};
+
+type LibraryItem = {
+  id: string;
+  name: string;
+  primary_muscle: string;
+  equipment: string;
+  owner_id: string | null;
 };
 
 type SessionSet = {
@@ -56,6 +73,10 @@ type Props = {
   initialNotes: string;
   exercises: Exercise[];
   initialSets: SessionSet[];
+  library: LibraryItem[];
+  activeSupersetCodes: string[];
+  planName: string | null;
+  hasPlanDay: boolean;
 };
 
 export function SessionLogger({
@@ -64,6 +85,10 @@ export function SessionLogger({
   initialNotes,
   exercises,
   initialSets,
+  library,
+  activeSupersetCodes,
+  planName,
+  hasPlanDay,
 }: Props) {
   const [sets, setSets] = useState<SessionSet[]>(initialSets);
   const [notes, setNotes] = useState(initialNotes);
@@ -105,7 +130,12 @@ export function SessionLogger({
         exercises.map((e) => ({
           id: e.id,
           order_index: e.order_index,
-          notes: e.notes,
+          // for session extras, synthesize a set-code prefix so the
+          // groupIntoSupersets helper treats them as part of the letter
+          // even though their real notes don't have the code.
+          notes: e.superset_code_override
+            ? `[${e.superset_code_override.toUpperCase()}99] ${e.notes ?? ""}`
+            : e.notes,
           _ex: e,
         })),
       ),
@@ -167,10 +197,25 @@ export function SessionLogger({
     setSets((prev) => prev.filter((s) => s.id !== setId));
   };
 
-  const finish = () => {
+  const hasExtras = useMemo(
+    () => exercises.some((e) => e.is_extra),
+    [exercises],
+  );
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [finishPromptOpen, setFinishPromptOpen] = useState(false);
+
+  const finishDirect = () => {
     startTransition(async () => {
       await finishSession(sessionId, notes);
     });
+  };
+
+  const onFinishTap = () => {
+    if (hasExtras && hasPlanDay) {
+      setFinishPromptOpen(true);
+    } else {
+      finishDirect();
+    }
   };
 
   return (
@@ -225,6 +270,11 @@ export function SessionLogger({
                   .sort((a, b) => a.set_number - b.set_number)}
                 onUpsert={(set) => upsert(item._ex.exercise_id, set)}
                 onDelete={del}
+                onRemoveExtra={
+                  item._ex.is_extra && item._ex.extra_id
+                    ? () => removeSessionExtra(item._ex.extra_id!, sessionId)
+                    : undefined
+                }
                 finished={false}
               />
             );
@@ -244,10 +294,23 @@ export function SessionLogger({
               )}
               onUpsert={upsert}
               onDelete={del}
+              onRemoveExtra={async (extraId) => {
+                await removeSessionExtra(extraId, sessionId);
+              }}
               finished={false}
             />
           );
         })}
+
+        {!finished && (
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="h-11 w-full rounded-xl border-2 border-dashed border-(--border) text-sm font-medium text-(--muted) hover:border-(--accent) hover:text-(--accent)"
+          >
+            + add exercise to this session
+          </button>
+        )}
       </div>
 
       <div className="space-y-1 rounded-xl border border-(--border) bg-(--surface) p-3">
@@ -271,7 +334,7 @@ export function SessionLogger({
           <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 pt-3 sm:px-6">
             <button
               type="button"
-              onClick={finish}
+              onClick={onFinishTap}
               disabled={pending}
               className="h-12 flex-1 rounded-xl bg-(--accent-3) text-base font-semibold text-(--accent-3-contrast) shadow-sm active:scale-[0.99] disabled:opacity-60"
             >
@@ -279,6 +342,28 @@ export function SessionLogger({
             </button>
           </div>
         </div>
+      )}
+
+      {pickerOpen && (
+        <AddExercisePicker
+          library={library}
+          existingExerciseIds={exercises.map((e) => e.exercise_id)}
+          activeSupersetCodes={activeSupersetCodes}
+          onAdd={async (input) => {
+            await addSessionExtra(sessionId, input);
+            setPickerOpen(false);
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
+
+      {finishPromptOpen && (
+        <FinishWorkoutPrompt
+          sessionId={sessionId}
+          planName={planName}
+          notes={notes}
+          onClose={() => setFinishPromptOpen(false)}
+        />
       )}
 
       {restOn && restSecondsLeft !== null && (
@@ -352,17 +437,22 @@ function SoloExerciseCard({
   sets,
   onUpsert,
   onDelete,
+  onRemoveExtra,
   finished,
 }: {
   exercise: Exercise;
   sets: SessionSet[];
   onUpsert: (set: UpsertPayload) => Promise<string>;
   onDelete: (setId: string) => Promise<void>;
+  onRemoveExtra?: () => Promise<void>;
   finished: boolean;
 }) {
   return (
     <section className="space-y-2.5 rounded-xl border border-(--border) bg-(--background) p-3">
-      <ExerciseHeader exercise={exercise} />
+      <ExerciseHeader
+        exercise={exercise}
+        onRemoveExtra={onRemoveExtra}
+      />
       <SetList
         exercise={exercise}
         sets={sets}
@@ -382,6 +472,7 @@ function SupersetBlock({
   setsByExercise,
   onUpsert,
   onDelete,
+  onRemoveExtra,
   finished,
 }: {
   letter: string;
@@ -389,6 +480,7 @@ function SupersetBlock({
   setsByExercise: Record<string, SessionSet[]>;
   onUpsert: (exerciseId: string, set: UpsertPayload) => Promise<string>;
   onDelete: (setId: string) => Promise<void>;
+  onRemoveExtra?: (extraId: string) => Promise<void>;
   finished: boolean;
 }) {
   const cols = Math.min(exercises.length, 2);
@@ -408,7 +500,15 @@ function SupersetBlock({
             key={ex.id}
             className="space-y-2 rounded-lg bg-(--surface) p-1.5"
           >
-            <ExerciseHeader exercise={ex} compact />
+            <ExerciseHeader
+              exercise={ex}
+              compact
+              onRemoveExtra={
+                ex.is_extra && ex.extra_id && onRemoveExtra
+                  ? () => onRemoveExtra(ex.extra_id!)
+                  : undefined
+              }
+            />
             <SetList
               exercise={ex}
               sets={setsByExercise[ex.exercise_id] ?? []}
@@ -427,23 +527,48 @@ function SupersetBlock({
 function ExerciseHeader({
   exercise,
   compact = false,
+  onRemoveExtra,
 }: {
   exercise: Exercise;
   compact?: boolean;
+  onRemoveExtra?: () => Promise<void> | void;
 }) {
   const { cleanNotes } = parseSetCode(exercise.notes);
   const rx = buildRx(exercise);
   const conv = weightConvention(exercise.name, exercise.equipment);
   return (
     <header className="space-y-1">
-      <Link
-        href={`/exercises/${exercise.exercise_id}`}
-        className={`block font-bold leading-tight line-clamp-2 hover:underline ${
-          compact ? "text-[13px]" : "text-base sm:text-lg"
-        }`}
-      >
-        {exercise.name}
-      </Link>
+      <div className="flex items-start justify-between gap-2">
+        <Link
+          href={`/exercises/${exercise.exercise_id}`}
+          className={`block flex-1 font-bold leading-tight line-clamp-2 hover:underline ${
+            compact ? "text-[13px]" : "text-base sm:text-lg"
+          }`}
+        >
+          {exercise.name}
+        </Link>
+        {exercise.is_extra && (
+          <span
+            className={`shrink-0 rounded border border-(--accent)/50 px-1.5 py-0 font-semibold text-(--accent) ${compact ? "text-[9px]" : "text-[10px]"} uppercase tracking-wider`}
+          >
+            added
+          </span>
+        )}
+        {onRemoveExtra && (
+          <button
+            type="button"
+            onClick={() => {
+              if (!confirm(`remove ${exercise.name} from this session?`))
+                return;
+              void onRemoveExtra();
+            }}
+            aria-label="remove this added exercise"
+            className="shrink-0 text-(--muted) hover:text-red-600"
+          >
+            ×
+          </button>
+        )}
+      </div>
       <div className="flex flex-wrap items-center gap-1">
         <div
           className={`inline-block max-w-full truncate rounded-md bg-(--accent-soft) px-1.5 py-0.5 font-semibold text-(--accent) tabular-nums ${
@@ -1014,6 +1139,352 @@ function WeightSplitHint({
   return (
     <div className="text-[11px] text-(--muted) tabular-nums">
       {num} {conv.equipment === "dumbbell" ? "lb per db" : "lb"}
+    </div>
+  );
+}
+
+// ----- Add exercise picker + finish prompt -----
+
+function AddExercisePicker({
+  library,
+  existingExerciseIds,
+  activeSupersetCodes,
+  onAdd,
+  onClose,
+}: {
+  library: LibraryItem[];
+  existingExerciseIds: string[];
+  activeSupersetCodes: string[];
+  onAdd: (input: {
+    exercise_id: string;
+    superset_code: string | null;
+    prescribed_sets: number;
+    prescribed_reps: string;
+  }) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [placement, setPlacement] = useState<string>("solo");
+  const [prescribedSets, setPrescribedSets] = useState("3");
+  const [prescribedReps, setPrescribedReps] = useState("8-12");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const existing = new Set(existingExerciseIds);
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return library
+      .filter((l) => !existing.has(l.id))
+      .filter((l) =>
+        q === "" ? true : l.name.toLowerCase().includes(q),
+      )
+      .slice(0, 20);
+  }, [library, query, existingExerciseIds.join(",")]);
+
+  const nextLetter = (() => {
+    const used = new Set(activeSupersetCodes.map((c) => c.toUpperCase()));
+    for (let i = 0; i < 26; i++) {
+      const l = String.fromCharCode(65 + i);
+      if (!used.has(l)) return l;
+    }
+    return "Z";
+  })();
+
+  const submit = async () => {
+    if (!pickedId) {
+      setError("pick an exercise first");
+      return;
+    }
+    const setsNum = Number(prescribedSets);
+    if (!Number.isInteger(setsNum) || setsNum < 1) {
+      setError("sets must be a positive integer");
+      return;
+    }
+    const reps = prescribedReps.trim();
+    if (!reps) {
+      setError("reps required");
+      return;
+    }
+
+    let supersetCode: string | null = null;
+    if (placement === "new") supersetCode = nextLetter;
+    else if (placement !== "solo") supersetCode = placement;
+
+    setSaving(true);
+    setError(null);
+    try {
+      await onAdd({
+        exercise_id: pickedId,
+        superset_code: supersetCode,
+        prescribed_sets: setsNum,
+        prescribed_reps: reps,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "couldn't add exercise");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div className="safe-bottom max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-(--background) p-4 shadow-2xl sm:rounded-2xl">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-bold">add exercise</h2>
+            <p className="text-xs text-(--muted)">
+              add to this session only. at the end, you can optionally save
+              the changes to your phase.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="close"
+            className="text-2xl leading-none text-(--muted) hover:text-(--foreground)"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="mt-3 space-y-3">
+          <input
+            autoFocus
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="search exercise name…"
+            className="h-11 w-full rounded-lg border border-(--border) bg-(--background) px-3 text-sm outline-none focus:border-(--accent)"
+          />
+
+          <div className="max-h-48 divide-y divide-(--border) overflow-y-auto rounded-lg border border-(--border) bg-(--surface)">
+            {results.length === 0 ? (
+              <p className="px-3 py-4 text-center text-xs text-(--muted)">
+                no match. try another term.
+              </p>
+            ) : (
+              results.map((l) => (
+                <button
+                  key={l.id}
+                  type="button"
+                  onClick={() => setPickedId(l.id)}
+                  className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm ${
+                    pickedId === l.id
+                      ? "bg-(--accent-soft) text-(--accent)"
+                      : ""
+                  }`}
+                >
+                  <span className="truncate">{l.name}</span>
+                  <span className="shrink-0 text-[10px] uppercase tracking-wider text-(--muted)">
+                    {l.primary_muscle.replace("_", " ")} · {l.equipment}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-(--muted)">
+              placement
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <PlacementOption
+                active={placement === "solo"}
+                onClick={() => setPlacement("solo")}
+              >
+                solo
+              </PlacementOption>
+              <PlacementOption
+                active={placement === "new"}
+                onClick={() => setPlacement("new")}
+              >
+                new superset ({nextLetter})
+              </PlacementOption>
+              {activeSupersetCodes.map((code) => (
+                <PlacementOption
+                  key={code}
+                  active={placement === code}
+                  onClick={() => setPlacement(code)}
+                >
+                  add to {code}
+                </PlacementOption>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <label className="space-y-1 text-[11px] font-semibold uppercase tracking-wider text-(--muted)">
+              sets
+              <input
+                type="text"
+                inputMode="numeric"
+                value={prescribedSets}
+                onChange={(e) => setPrescribedSets(e.target.value)}
+                className="mt-1 h-10 w-full rounded border border-(--border) bg-(--background) px-2 text-base font-bold normal-case tabular-nums outline-none focus:border-(--accent)"
+              />
+            </label>
+            <label className="space-y-1 text-[11px] font-semibold uppercase tracking-wider text-(--muted)">
+              reps
+              <input
+                type="text"
+                value={prescribedReps}
+                onChange={(e) => setPrescribedReps(e.target.value)}
+                placeholder="8-12 or 20, 15, 10"
+                className="mt-1 h-10 w-full rounded border border-(--border) bg-(--background) px-2 text-base font-bold normal-case outline-none focus:border-(--accent)"
+              />
+            </label>
+          </div>
+
+          {error && <p className="text-xs text-red-600">{error}</p>}
+
+          <button
+            type="button"
+            onClick={submit}
+            disabled={saving || !pickedId}
+            className="h-11 w-full rounded-lg bg-(--accent) text-sm font-bold text-(--accent-contrast) disabled:opacity-60"
+          >
+            {saving ? "adding…" : "add to session"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlacementOption({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1 text-xs font-medium ${
+        active
+          ? "border-(--accent) bg-(--accent) text-(--accent-contrast)"
+          : "border-(--border) bg-(--surface) text-(--muted)"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function FinishWorkoutPrompt({
+  sessionId,
+  planName,
+  notes,
+  onClose,
+}: {
+  sessionId: string;
+  planName: string | null;
+  notes: string;
+  onClose: () => void;
+}) {
+  const [pending, setPending] = useState<string | null>(null);
+  const [newName, setNewName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async (mode: "keep" | "save" | "fork") => {
+    setError(null);
+    setPending(mode);
+    try {
+      if (mode === "save") await saveExtrasToCurrentPhase(sessionId);
+      if (mode === "fork") await saveExtrasAsNewPhase(sessionId, newName);
+      await finishSession(sessionId, notes);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "couldn't finish");
+      setPending(null);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div className="safe-bottom max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-(--background) p-4 shadow-2xl sm:rounded-2xl">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-bold">finish workout</h2>
+            <p className="text-xs text-(--muted)">
+              you added or changed exercises. what should we do with the
+              modifications?
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="close"
+            className="text-2xl leading-none text-(--muted) hover:text-(--foreground)"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="mt-3 space-y-2">
+          <button
+            type="button"
+            onClick={() => run("keep")}
+            disabled={!!pending}
+            className="flex w-full flex-col items-start gap-0.5 rounded-lg border border-(--border) bg-(--surface) p-3 text-left hover:border-(--accent) disabled:opacity-60"
+          >
+            <span className="text-sm font-bold">
+              keep for this session only
+            </span>
+            <span className="text-xs text-(--muted)">
+              the added exercises stay logged, but the phase is untouched.
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => run("save")}
+            disabled={!!pending}
+            className="flex w-full flex-col items-start gap-0.5 rounded-lg border border-(--border) bg-(--surface) p-3 text-left hover:border-(--accent) disabled:opacity-60"
+          >
+            <span className="text-sm font-bold">
+              save to {planName ?? "this phase"}
+            </span>
+            <span className="text-xs text-(--muted)">
+              adds the new exercises to today&rsquo;s plan day permanently.
+              next time you do this day, they&rsquo;ll be there.
+            </span>
+          </button>
+
+          <div className="space-y-2 rounded-lg border border-(--border) bg-(--surface) p-3">
+            <div className="text-sm font-bold">save as new phase version</div>
+            <p className="text-xs text-(--muted)">
+              duplicates {planName ?? "the current phase"} with the mods
+              applied and switches your active phase to the copy. the
+              original stays clean.
+            </p>
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder={
+                planName
+                  ? `${planName} · modified`
+                  : "name for the new phase"
+              }
+              className="h-10 w-full rounded border border-(--border) bg-(--background) px-2 text-sm outline-none focus:border-(--accent)"
+            />
+            <button
+              type="button"
+              onClick={() => run("fork")}
+              disabled={!!pending}
+              className="h-10 w-full rounded-md bg-(--accent) text-sm font-bold text-(--accent-contrast) disabled:opacity-60"
+            >
+              {pending === "fork" ? "saving…" : "save as new phase"}
+            </button>
+          </div>
+
+          {error && <p className="text-xs text-red-600">{error}</p>}
+        </div>
+      </div>
     </div>
   );
 }
