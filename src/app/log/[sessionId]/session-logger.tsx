@@ -329,7 +329,7 @@ function ProgressHeader({
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-(--border)">
         <div
-          className="h-full bg-(--accent-3) transition-all"
+          className="progress-fill h-full transition-all"
           style={{ width: `${pct}%` }}
         />
       </div>

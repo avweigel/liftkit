@@ -244,8 +244,13 @@ function TodayCard({
   const label = formatDayLabel(day.day_number, day.name);
   const exerciseCount = day.plan_day_exercises.length;
   return (
-    <section className="rounded-2xl border-2 border-(--accent) bg-(--accent-soft) p-5 sm:p-6">
-      <div className="space-y-1">
+    <section className="accent-wash relative overflow-hidden rounded-2xl border border-(--accent)/40 bg-(--surface) p-5 sm:p-6">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full opacity-30 blur-3xl"
+        style={{ background: "var(--accent)" }}
+      />
+      <div className="relative space-y-1">
         <div className="text-xs font-bold uppercase tracking-wider text-(--accent)">
           today · {label.weekday}
         </div>
@@ -256,7 +261,9 @@ function TodayCard({
           {exerciseCount} exercise{exerciseCount === 1 ? "" : "s"} planned
         </p>
       </div>
-      <StartTodayButton dayId={day.id} />
+      <div className="relative">
+        <StartTodayButton dayId={day.id} />
+      </div>
     </section>
   );
 }

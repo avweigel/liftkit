@@ -155,9 +155,9 @@ function PlanGrid({
           <li key={p.id}>
             <Link
               href={`/plans/${p.id}`}
-              className={`group block h-full rounded-xl border p-4 transition ${
+              className={`group relative block h-full overflow-hidden rounded-xl border p-4 transition ${
                 isActive
-                  ? "border-(--accent) bg-(--accent-soft)"
+                  ? "accent-wash border-(--accent)/40 bg-(--surface)"
                   : "border-(--border) bg-(--surface) hover:border-(--accent)"
               }`}
             >

@@ -136,3 +136,81 @@ select {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* primary buttons and link-buttons get a subtle top highlight and a
+   soft accent-tinted shadow for depth. sizes under a button threshold
+   (pills, dots, small chevrons) aren't affected because they live in
+   <span> not button/a. */
+button.bg-\(--accent\),
+a.bg-\(--accent\),
+button.bg-\(--accent-2\),
+a.bg-\(--accent-2\),
+button.bg-\(--accent-3\),
+a.bg-\(--accent-3\) {
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.12) 0%,
+    transparent 55%
+  );
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 6px 16px color-mix(in oklab, var(--accent), transparent 78%);
+}
+
+button.bg-\(--accent-2\),
+a.bg-\(--accent-2\) {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 6px 16px color-mix(in oklab, var(--accent-2), transparent 78%);
+}
+
+button.bg-\(--accent-3\),
+a.bg-\(--accent-3\) {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 6px 16px color-mix(in oklab, var(--accent-3), transparent 78%);
+}
+
+/* rainbow: layer a diagonal two-color gradient across adjacent slots
+   on top of the depth highlight. each button type cycles through a
+   different pair so the page reads as playful-but-cohesive. */
+[data-accent="rainbow"] button.bg-\(--accent\),
+[data-accent="rainbow"] a.bg-\(--accent\) {
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, transparent 55%),
+    linear-gradient(135deg, var(--accent) 10%, var(--accent-2) 95%);
+}
+
+[data-accent="rainbow"] button.bg-\(--accent-2\),
+[data-accent="rainbow"] a.bg-\(--accent-2\) {
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, transparent 55%),
+    linear-gradient(135deg, var(--accent-2) 10%, var(--accent-3) 95%);
+}
+
+[data-accent="rainbow"] button.bg-\(--accent-3\),
+[data-accent="rainbow"] a.bg-\(--accent-3\) {
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, transparent 55%),
+    linear-gradient(135deg, var(--accent-3) 10%, var(--accent) 95%);
+}
+
+/* tinted surface — used by "today" card and active-plan card to give
+   them a soft accent wash without being loud. */
+.accent-wash {
+  background-image: linear-gradient(
+    180deg,
+    var(--accent-soft) 0%,
+    transparent 70%
+  );
+}
+
+/* progress bar gets a subtle left-to-right sheen so the fill reads
+   as active rather than flat. */
+.progress-fill {
+  background-image: linear-gradient(
+    90deg,
+    var(--accent-3) 0%,
+    color-mix(in oklab, var(--accent-3), white 18%) 100%
+  );
+}
