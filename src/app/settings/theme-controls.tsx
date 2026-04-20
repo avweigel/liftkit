@@ -231,20 +231,34 @@ export function ThemeControls() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-(--border) bg-(--surface) p-4">
+      <section className="space-y-3 rounded-xl border border-(--border) bg-(--surface) p-4">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-(--muted)">
           preview
         </h3>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             className="h-11 rounded-lg bg-(--accent) px-5 text-sm font-bold text-(--accent-contrast)"
           >
-            primary action
+            start phase
           </button>
           <button
             type="button"
-            className="h-11 rounded-lg border border-(--border) bg-(--background) px-4 text-sm font-medium"
+            className="h-11 rounded-lg bg-(--accent-2) px-5 text-sm font-bold text-(--accent-2-contrast)"
+          >
+            log set ✓
+          </button>
+          <button
+            type="button"
+            className="h-11 rounded-lg bg-(--accent-3) px-5 text-sm font-bold text-(--accent-3-contrast)"
+          >
+            finish workout
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className="h-9 rounded-lg border border-(--border) bg-(--background) px-4 text-sm font-medium"
           >
             secondary
           </button>
@@ -255,6 +269,17 @@ export function ThemeControls() {
             finished
           </span>
         </div>
+        <div className="flex items-center gap-2 text-xs text-(--muted)">
+          <span className="text-(--muted)">progress bar</span>
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-(--border)">
+            <div className="h-full w-1/2 bg-(--accent-3)" />
+          </div>
+        </div>
+        <p className="text-[11px] text-(--muted)">
+          solid themes use one color for everything. rainbow splits into
+          three harmonizing hues so the logger feels varied without being
+          chaotic.
+        </p>
       </section>
 
       <p className="text-xs text-(--muted)">

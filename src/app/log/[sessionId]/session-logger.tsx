@@ -265,7 +265,7 @@ export function SessionLogger({
               type="button"
               onClick={finish}
               disabled={pending}
-              className="h-12 flex-1 rounded-xl bg-(--accent) text-base font-semibold text-(--accent-contrast) shadow-sm active:scale-[0.99] disabled:opacity-60"
+              className="h-12 flex-1 rounded-xl bg-(--accent-3) text-base font-semibold text-(--accent-3-contrast) shadow-sm active:scale-[0.99] disabled:opacity-60"
             >
               {pending ? "finishing…" : "finish workout"}
             </button>
@@ -329,7 +329,7 @@ function ProgressHeader({
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-(--border)">
         <div
-          className="h-full bg-(--accent) transition-all"
+          className="h-full bg-(--accent-3) transition-all"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -656,7 +656,7 @@ function LoggedRow({
         compact ? "text-sm" : "text-base"
       }`}
     >
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-(--accent) text-xs font-bold text-(--accent-contrast)">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-(--accent-2) text-xs font-bold text-(--accent-2-contrast)">
         ✓
       </span>
       <span className="text-xs text-(--muted) tabular-nums">
@@ -745,7 +745,7 @@ function QuickLogRow({
         type="button"
         onClick={handleQuick}
         disabled={pending || finished || reps === null}
-        className={`flex shrink-0 items-center justify-center rounded-md bg-(--accent) font-bold text-(--accent-contrast) active:scale-95 disabled:opacity-60 ${
+        className={`flex shrink-0 items-center justify-center rounded-md bg-(--accent-2) font-bold text-(--accent-2-contrast) active:scale-95 disabled:opacity-60 ${
           compact ? "h-9 w-10 text-base" : "h-10 w-12 text-lg"
         }`}
         aria-label="log with these values"
@@ -854,7 +854,7 @@ function SetEditor({
           type="button"
           onClick={submit}
           disabled={saving || finished}
-          className="h-9 flex-1 rounded-md bg-(--accent) text-sm font-semibold text-(--accent-contrast) active:scale-[0.99] disabled:opacity-60"
+          className="h-9 flex-1 rounded-md bg-(--accent-2) text-sm font-semibold text-(--accent-2-contrast) active:scale-[0.99] disabled:opacity-60"
         >
           {saving ? "saving…" : "log set"}
         </button>
