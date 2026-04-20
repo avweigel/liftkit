@@ -32,7 +32,12 @@ type SessionData = {
       prescribed_weight: number | null;
       rest_seconds: number | null;
       notes: string | null;
-      exercise: { id: string; name: string; primary_muscle: string } | null;
+      exercise: {
+        id: string;
+        name: string;
+        primary_muscle: string;
+        equipment: string;
+      } | null;
     }>;
   } | null;
 };
@@ -79,7 +84,7 @@ export default async function LogSessionPage({ params }: Props) {
           plan_day_exercises (
             id, order_index, prescribed_sets, prescribed_reps,
             prescribed_weight, rest_seconds, notes,
-            exercise:exercises ( id, name, primary_muscle )
+            exercise:exercises ( id, name, primary_muscle, equipment )
           )
         )
       `,
@@ -152,6 +157,7 @@ export default async function LogSessionPage({ params }: Props) {
         order_index: pde.order_index,
         exercise_id: pde.exercise?.id ?? "",
         name: pde.exercise?.name ?? "(deleted)",
+        equipment: pde.exercise?.equipment ?? null,
         prescribed_sets: pde.prescribed_sets,
         prescribed_reps: pde.prescribed_reps,
         prescribed_weight: pde.prescribed_weight,

@@ -10,6 +10,7 @@ import {
 } from "@/lib/actions/sessions";
 import { groupIntoSupersets, parseSetCode } from "@/lib/set-code";
 import { formatRxReps, repTargetForSet } from "@/lib/display/reps";
+import { weightConvention } from "@/lib/display/weight-convention";
 
 type LastSessionSet = {
   set_number: number;
@@ -22,6 +23,7 @@ type Exercise = {
   order_index: number;
   exercise_id: string;
   name: string;
+  equipment: string | null;
   prescribed_sets: number;
   prescribed_reps: string;
   prescribed_weight: number | null;
@@ -425,6 +427,7 @@ function ExerciseHeader({
 }) {
   const { cleanNotes } = parseSetCode(exercise.notes);
   const rx = buildRx(exercise);
+  const conv = weightConvention(exercise.name, exercise.equipment);
   return (
     <header className="space-y-1">
       <Link
@@ -435,12 +438,24 @@ function ExerciseHeader({
       >
         {exercise.name}
       </Link>
-      <div
-        className={`inline-block max-w-full truncate rounded-md bg-(--accent-soft) px-1.5 py-0.5 font-semibold text-(--accent) tabular-nums ${
-          compact ? "text-[11px]" : "text-sm"
-        }`}
-      >
-        {rx}
+      <div className="flex flex-wrap items-center gap-1">
+        <div
+          className={`inline-block max-w-full truncate rounded-md bg-(--accent-soft) px-1.5 py-0.5 font-semibold text-(--accent) tabular-nums ${
+            compact ? "text-[11px]" : "text-sm"
+          }`}
+        >
+          {rx}
+        </div>
+        {conv && (
+          <span
+            className={`rounded border border-(--border) px-1.5 py-0.5 font-medium text-(--muted) ${
+              compact ? "text-[10px]" : "text-[11px]"
+            }`}
+            title={conv.summary}
+          >
+            wt = {conv.hint}
+          </span>
+        )}
       </div>
       {exercise.last_session && (
         <div className={compact ? "text-[10px]" : "text-xs"}>
@@ -498,6 +513,7 @@ function SetList({
   const [expandedSetNumber, setExpandedSetNumber] = useState<number | null>(
     null,
   );
+  const weightConv = weightConvention(exercise.name, exercise.equipment);
 
   const maxSet = Math.max(
     exercise.prescribed_sets,
@@ -556,6 +572,7 @@ function SetList({
                 finished={finished}
                 showDelete={!!r.logged}
                 compact={compact}
+                weightConv={weightConv}
                 onSave={async (state) => {
                   await onUpsert({
                     id: r.logged?.id ?? null,
@@ -764,6 +781,7 @@ function SetEditor({
   finished,
   showDelete = false,
   compact = false,
+  weightConv = null,
   onSave,
   onCancel,
   onDelete,
@@ -775,6 +793,7 @@ function SetEditor({
   finished: boolean;
   showDelete?: boolean;
   compact?: boolean;
+  weightConv?: ReturnType<typeof weightConvention> | null;
   onSave: (state: {
     weight: number | null;
     reps: number;
@@ -831,14 +850,17 @@ function SetEditor({
       </div>
 
       <div className={compact ? "space-y-1.5" : "grid grid-cols-2 gap-2"}>
-        <Stepper
-          label="weight"
-          value={weight}
-          onChange={setWeight}
-          step={5}
-          allowEmpty
-          disabled={finished}
-        />
+        <div className="space-y-1">
+          <Stepper
+            label="weight"
+            value={weight}
+            onChange={setWeight}
+            step={5}
+            allowEmpty
+            disabled={finished}
+          />
+          <WeightSplitHint value={weight} conv={weightConv} />
+        </div>
         <Stepper
           label="reps"
           value={reps}
@@ -948,6 +970,44 @@ function Stepper({
           +
         </button>
       </div>
+    </div>
+  );
+}
+
+function WeightSplitHint({
+  value,
+  conv,
+}: {
+  value: string;
+  conv: ReturnType<typeof weightConvention> | null;
+}) {
+  if (!conv) return null;
+  const trimmed = value.trim();
+  const num = trimmed === "" ? null : Number(trimmed);
+  const hasNum = num !== null && Number.isFinite(num) && num > 0;
+
+  if (!hasNum) {
+    return (
+      <div className="text-[11px] text-(--muted)">{conv.hint}</div>
+    );
+  }
+
+  if (conv.mode === "total" && conv.equipment === "dumbbell") {
+    const per = conv.perSide(num!);
+    const perLabel = Number.isInteger(per) ? per : per.toFixed(1);
+    return (
+      <div className="text-[11px] text-(--muted) tabular-nums">
+        <span className="font-semibold text-(--foreground)/70">
+          {num} total
+        </span>{" "}
+        · {perLabel} × 2 dbs
+      </div>
+    );
+  }
+
+  return (
+    <div className="text-[11px] text-(--muted) tabular-nums">
+      {num} {conv.equipment === "dumbbell" ? "lb per db" : "lb"}
     </div>
   );
 }

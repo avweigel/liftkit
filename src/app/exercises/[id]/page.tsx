@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { findCanonical } from "@/lib/exercise-normalize";
+import { weightConvention } from "@/lib/display/weight-convention";
 import { ProgressChart, type ChartPoint } from "./progress-chart";
 
 type Props = { params: Promise<{ id: string }> };
@@ -94,6 +95,18 @@ export default async function ExerciseDetailPage({ params }: Props) {
                 {description}
               </p>
             ) : null;
+          })()}
+          {(() => {
+            const conv = weightConvention(exercise.name, exercise.equipment);
+            if (!conv) return null;
+            return (
+              <p className="mt-3 rounded-lg border border-(--border) bg-(--surface) p-2 text-xs text-(--muted)">
+                <span className="font-semibold text-(--foreground)">
+                  weight convention
+                </span>
+                : {conv.summary}
+              </p>
+            );
           })()}
         </div>
       </header>
