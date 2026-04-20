@@ -71,14 +71,17 @@
   --accent-contrast: light-dark(#ffffff, #2e0735);
   --accent-soft: light-dark(#fdf4ff, #581c5e);
 }
+/* rainbow base slots: chosen to sit in the middle of each button's
+   gradient arc so pills and borders stay cohesive with the buttons.
+   button gradients are overridden below with hardcoded rainbow arcs. */
 [data-accent="rainbow"] {
-  --accent: light-dark(#7c3aed, #c084fc);
-  --accent-contrast: light-dark(#ffffff, #1a0b2e);
-  --accent-soft: light-dark(#f5f3ff, #2e1065);
-  --accent-2: light-dark(#0d9488, #5eead4);
-  --accent-2-contrast: light-dark(#ffffff, #042725);
-  --accent-3: light-dark(#e11d48, #fb7185);
-  --accent-3-contrast: light-dark(#ffffff, #1a0409);
+  --accent: light-dark(#f97316, #fb923c);
+  --accent-contrast: light-dark(#ffffff, #1a0d04);
+  --accent-soft: light-dark(#fff7ed, #291205);
+  --accent-2: light-dark(#0891b2, #22d3ee);
+  --accent-2-contrast: light-dark(#ffffff, #052731);
+  --accent-3: light-dark(#7c3aed, #c084fc);
+  --accent-3-contrast: light-dark(#ffffff, #1a0b2e);
 }
 
 /* synthwave-style electric triad */
@@ -192,21 +195,21 @@ select {
   scrollbar-width: none;
 }
 
-/* primary buttons and link-buttons get a subtle top highlight and a
-   soft accent-tinted shadow for depth. sizes under a button threshold
-   (pills, dots, small chevrons) aren't affected because they live in
-   <span> not button/a. */
+/* primary buttons and link-buttons get a diagonal 3-stop gradient
+   (lighter → base → darker of the same hue via color-mix) plus a soft
+   accent-tinted shadow. solid themes gain visible gradient sheen;
+   multi themes get overridden below to span across slots. small
+   elements live in <span> so they aren't affected. */
 button.bg-\(--accent\),
-a.bg-\(--accent\),
-button.bg-\(--accent-2\),
-a.bg-\(--accent-2\),
-button.bg-\(--accent-3\),
-a.bg-\(--accent-3\) {
-  background-image: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.12) 0%,
-    transparent 55%
-  );
+a.bg-\(--accent\) {
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, transparent 55%),
+    linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--accent), white 18%) 0%,
+      var(--accent) 50%,
+      color-mix(in oklab, var(--accent), black 18%) 100%
+    );
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.18) inset,
     0 6px 16px color-mix(in oklab, var(--accent), transparent 78%);
@@ -214,6 +217,14 @@ a.bg-\(--accent-3\) {
 
 button.bg-\(--accent-2\),
 a.bg-\(--accent-2\) {
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, transparent 55%),
+    linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--accent-2), white 18%) 0%,
+      var(--accent-2) 50%,
+      color-mix(in oklab, var(--accent-2), black 18%) 100%
+    );
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.18) inset,
     0 6px 16px color-mix(in oklab, var(--accent-2), transparent 78%);
@@ -221,33 +232,123 @@ a.bg-\(--accent-2\) {
 
 button.bg-\(--accent-3\),
 a.bg-\(--accent-3\) {
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, transparent 55%),
+    linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--accent-3), white 18%) 0%,
+      var(--accent-3) 50%,
+      color-mix(in oklab, var(--accent-3), black 18%) 100%
+    );
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.18) inset,
     0 6px 16px color-mix(in oklab, var(--accent-3), transparent 78%);
 }
 
-/* rainbow: layer a diagonal two-color gradient across adjacent slots
-   on top of the depth highlight. each button type cycles through a
-   different pair so the page reads as playful-but-cohesive. */
+/* multi-slot palettes (non-rainbow): each button spans across the
+   three slots at different rotations so the gradient varies by button
+   role. accent cycles: main → logging → progress → main. */
+:is(
+  [data-accent="vibrant"],
+  [data-accent="pastel"],
+  [data-accent="earthy"],
+  [data-accent="sunset"],
+  [data-accent="ocean"]
+)
+  button.bg-\(--accent\),
+:is(
+  [data-accent="vibrant"],
+  [data-accent="pastel"],
+  [data-accent="earthy"],
+  [data-accent="sunset"],
+  [data-accent="ocean"]
+)
+  a.bg-\(--accent\) {
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 55%),
+    linear-gradient(
+      135deg,
+      var(--accent) 0%,
+      var(--accent-2) 55%,
+      var(--accent-3) 100%
+    );
+}
+
+:is(
+  [data-accent="vibrant"],
+  [data-accent="pastel"],
+  [data-accent="earthy"],
+  [data-accent="sunset"],
+  [data-accent="ocean"]
+)
+  button.bg-\(--accent-2\),
+:is(
+  [data-accent="vibrant"],
+  [data-accent="pastel"],
+  [data-accent="earthy"],
+  [data-accent="sunset"],
+  [data-accent="ocean"]
+)
+  a.bg-\(--accent-2\) {
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 55%),
+    linear-gradient(
+      135deg,
+      var(--accent-2) 0%,
+      var(--accent-3) 55%,
+      var(--accent) 100%
+    );
+}
+
+:is(
+  [data-accent="vibrant"],
+  [data-accent="pastel"],
+  [data-accent="earthy"],
+  [data-accent="sunset"],
+  [data-accent="ocean"]
+)
+  button.bg-\(--accent-3\),
+:is(
+  [data-accent="vibrant"],
+  [data-accent="pastel"],
+  [data-accent="earthy"],
+  [data-accent="sunset"],
+  [data-accent="ocean"]
+)
+  a.bg-\(--accent-3\) {
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 55%),
+    linear-gradient(
+      135deg,
+      var(--accent-3) 0%,
+      var(--accent) 55%,
+      var(--accent-2) 100%
+    );
+}
+
+/* rainbow: each button type paints a different rainbow arc, using
+   hardcoded saturated hues so it reads as a full spectrum across the
+   app. primary buttons → warm arc (red/orange/yellow); log buttons →
+   green/cyan/blue; session-close buttons → blue/violet/magenta. */
 [data-accent="rainbow"] button.bg-\(--accent\),
 [data-accent="rainbow"] a.bg-\(--accent\) {
   background-image:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, transparent 55%),
-    linear-gradient(135deg, var(--accent) 10%, var(--accent-2) 95%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 55%),
+    linear-gradient(135deg, #dc2626 0%, #f97316 50%, #eab308 100%);
 }
 
 [data-accent="rainbow"] button.bg-\(--accent-2\),
 [data-accent="rainbow"] a.bg-\(--accent-2\) {
   background-image:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, transparent 55%),
-    linear-gradient(135deg, var(--accent-2) 10%, var(--accent-3) 95%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 55%),
+    linear-gradient(135deg, #16a34a 0%, #06b6d4 50%, #2563eb 100%);
 }
 
 [data-accent="rainbow"] button.bg-\(--accent-3\),
 [data-accent="rainbow"] a.bg-\(--accent-3\) {
   background-image:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, transparent 55%),
-    linear-gradient(135deg, var(--accent-3) 10%, var(--accent) 95%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 55%),
+    linear-gradient(135deg, #2563eb 0%, #8b5cf6 50%, #ec4899 100%);
 }
 
 /* tinted surface — used by "today" card and active-plan card to give
