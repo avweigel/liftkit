@@ -14,7 +14,7 @@ const ABBREVIATIONS: Array<[RegExp, string]> = [
   [/\bOH\b/gi, "Overhead"],
   [/\bScap\b/gi, "Scapular"],
   [/\bV[-\s]?bar\b/gi, "V-Bar"],
-  [/\bP[-\s]?Bar\b/gi, "Parallette"],
+  [/\bP[-\s]?Bar\b/gi, "Parallel Bar"],
 ];
 
 const SIDE_SUFFIX =

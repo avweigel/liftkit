@@ -2,6 +2,10 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatDayLabel } from "@/lib/display/format-day";
 import {
+  DismissibleHint,
+  HINT_KEYS,
+} from "@/components/dismissible-hint";
+import {
   StartOtherDayButton,
   StartTodayButton,
 } from "./dashboard-start-button";
@@ -109,15 +113,18 @@ export async function Dashboard({ userId, email }: Props) {
       {activePlan ? (
         <>
           <ActivePhaseBlock plan={activePlan} />
-          <p className="text-xs text-(--muted)">
-            tip: &ldquo;today&rsquo;s workout&rdquo; auto-selects the day of
-            the week from your active phase (monday = day 1, saturday = day
-            6). use the list below to train a different day. switch phases at{" "}
-            <Link href="/plans" className="underline">
-              plans
-            </Link>
-            .
-          </p>
+          <DismissibleHint storageKey={HINT_KEYS.dashboardTip}>
+            <p className="pr-8 text-xs text-(--muted)">
+              tip: &ldquo;today&rsquo;s workout&rdquo; auto-selects the day of
+              the week from your active phase (monday = day 1, saturday = day
+              6). use the list below to train a different day. switch phases
+              at{" "}
+              <Link href="/plans" className="underline">
+                plans
+              </Link>
+              .
+            </p>
+          </DismissibleHint>
         </>
       ) : (
         <PickPhaseCard hasAnyPlan={(planCount ?? 0) > 0} />

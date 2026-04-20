@@ -11,6 +11,10 @@ import {
 import { groupIntoSupersets, parseSetCode } from "@/lib/set-code";
 import { formatRxReps, repTargetForSet } from "@/lib/display/reps";
 import { weightConvention } from "@/lib/display/weight-convention";
+import {
+  DismissibleHint,
+  HINT_KEYS,
+} from "@/components/dismissible-hint";
 
 type LastSessionSet = {
   set_number: number;
@@ -186,23 +190,25 @@ export function SessionLogger({
       )}
 
       {!finished && sets.length === 0 && exercises.length > 0 && (
-        <div className="rounded-lg border border-(--accent)/30 bg-(--accent-soft) p-3 text-xs text-(--foreground)/80">
-          <div className="font-bold text-(--accent)">how to log</div>
-          <ul className="mt-1 space-y-0.5">
-            <li>
-              tap the big{" "}
-              <span className="font-bold text-(--accent)">✓</span> to log a
-              set with the pre-filled weight × reps.
-            </li>
-            <li>tap the numbers to adjust first, then log.</li>
-            <li>tap a logged row to edit or delete it.</li>
-            <li>
-              when you&rsquo;re done for the day, tap{" "}
-              <span className="font-semibold">finish workout</span> at the
-              bottom.
-            </li>
-          </ul>
-        </div>
+        <DismissibleHint storageKey={HINT_KEYS.loggerHowTo}>
+          <div className="rounded-lg border border-(--accent)/30 bg-(--accent-soft) p-3 pr-9 text-xs text-(--foreground)/80">
+            <div className="font-bold text-(--accent)">how to log</div>
+            <ul className="mt-1 space-y-0.5">
+              <li>
+                tap the big{" "}
+                <span className="font-bold text-(--accent)">✓</span> to log a
+                set with the pre-filled weight × reps.
+              </li>
+              <li>tap the numbers to adjust first, then log.</li>
+              <li>tap a logged row to edit or delete it.</li>
+              <li>
+                when you&rsquo;re done for the day, tap{" "}
+                <span className="font-semibold">finish workout</span> at the
+                bottom.
+              </li>
+            </ul>
+          </div>
+        </DismissibleHint>
       )}
 
       <div className="space-y-4">

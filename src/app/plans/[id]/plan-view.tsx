@@ -13,6 +13,10 @@ import {
 } from "@/lib/actions/plans";
 import { startSession } from "@/lib/actions/sessions";
 import { formatDayLabel } from "@/lib/display/format-day";
+import {
+  DismissibleHint,
+  HINT_KEYS,
+} from "@/components/dismissible-hint";
 import type { Exercise, PlanDetail, PlanDay, PlanDayExerciseRow } from "./types";
 
 type Props = {
@@ -108,11 +112,13 @@ export function PlanView({ plan, library, canEdit, isActive }: Props) {
                   ? "✓ on this phase — tap to switch off"
                   : "start this phase (6-8 weeks)"}
             </button>
-            <p className="text-xs text-(--muted)">
-              {isActive
-                ? "today's workout on the home page pulls from this phase. you can switch any time — your logged workouts stay."
-                : "makes this your active phase. the home page will auto-select today's workout based on the day of the week, so you don't pick a plan each session."}
-            </p>
+            <DismissibleHint storageKey={HINT_KEYS.planDetailStart}>
+              <p className="pr-8 text-xs text-(--muted)">
+                {isActive
+                  ? "today's workout on the home page pulls from this phase. you can switch any time — your logged workouts stay."
+                  : "makes this your active phase. the home page will auto-select today's workout based on the day of the week, so you don't pick a plan each session."}
+              </p>
+            </DismissibleHint>
           </div>
         )}
         {plan.source_url && (

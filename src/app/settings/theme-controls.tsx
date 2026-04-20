@@ -350,10 +350,52 @@ export function ThemeControls() {
         </p>
       </section>
 
+      <HintsSection />
+
       <p className="text-xs text-(--muted)">
         saved on this device only. switching devices will start fresh
         defaults.
       </p>
     </div>
+  );
+}
+
+function HintsSection() {
+  const [done, setDone] = useState(false);
+
+  const resetAll = () => {
+    try {
+      const keys: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("liftkit:hint:")) keys.push(k);
+      }
+      for (const k of keys) localStorage.removeItem(k);
+    } catch {
+      /* ignore */
+    }
+    setDone(true);
+    setTimeout(() => setDone(false), 2000);
+  };
+
+  return (
+    <section className="space-y-2">
+      <div>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-(--muted)">
+          hints
+        </h2>
+        <p className="text-xs text-(--muted)">
+          after you dismiss an onboarding tip, it stays hidden on this
+          device. tap below to bring them all back.
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={resetAll}
+        className="h-10 rounded-lg border border-(--border) bg-(--background) px-4 text-sm font-medium"
+      >
+        {done ? "✓ hints reset" : "show all hints again"}
+      </button>
+    </section>
   );
 }
