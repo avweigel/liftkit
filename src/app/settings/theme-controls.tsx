@@ -13,7 +13,12 @@ type Accent =
   | "teal"
   | "emerald"
   | "slate"
-  | "rainbow";
+  | "rainbow"
+  | "vibrant"
+  | "pastel"
+  | "earthy"
+  | "sunset"
+  | "ocean";
 
 const MODES: Array<{ value: ThemeMode; label: string; hint: string }> = [
   { value: "system", label: "system", hint: "follow your device" },
@@ -25,71 +30,128 @@ type AccentPreset = {
   value: Accent;
   label: string;
   group: "warm" | "cool" | "neutral" | "multi";
-  swatch: { light: string; dark: string } | "rainbow";
+  hint?: string;
+  swatch:
+    | { kind: "solid"; light: string; dark: string }
+    | { kind: "triad"; colors: [string, string, string] }
+    | { kind: "rainbow" };
 };
 
 const ACCENTS: AccentPreset[] = [
+  // solid — warm
   {
     value: "amber",
     label: "amber",
     group: "warm",
-    swatch: { light: "#ea580c", dark: "#fb923c" },
+    swatch: { kind: "solid", light: "#ea580c", dark: "#fb923c" },
   },
   {
     value: "crimson",
     label: "crimson",
     group: "warm",
-    swatch: { light: "#dc2626", dark: "#f87171" },
+    swatch: { kind: "solid", light: "#dc2626", dark: "#f87171" },
   },
   {
     value: "rose",
     label: "rose",
     group: "warm",
-    swatch: { light: "#e11d48", dark: "#fb7185" },
+    swatch: { kind: "solid", light: "#e11d48", dark: "#fb7185" },
   },
   {
     value: "fuchsia",
     label: "fuchsia",
     group: "warm",
-    swatch: { light: "#c026d3", dark: "#e879f9" },
+    swatch: { kind: "solid", light: "#c026d3", dark: "#e879f9" },
   },
+  // solid — cool
   {
     value: "indigo",
     label: "indigo",
     group: "cool",
-    swatch: { light: "#4f46e5", dark: "#a5b4fc" },
+    swatch: { kind: "solid", light: "#4f46e5", dark: "#a5b4fc" },
   },
   {
     value: "sky",
     label: "sky",
     group: "cool",
-    swatch: { light: "#0284c7", dark: "#7dd3fc" },
+    swatch: { kind: "solid", light: "#0284c7", dark: "#7dd3fc" },
   },
   {
     value: "teal",
     label: "teal",
     group: "cool",
-    swatch: { light: "#0d9488", dark: "#2dd4bf" },
+    swatch: { kind: "solid", light: "#0d9488", dark: "#2dd4bf" },
   },
   {
     value: "emerald",
     label: "emerald",
     group: "cool",
-    swatch: { light: "#059669", dark: "#34d399" },
+    swatch: { kind: "solid", light: "#059669", dark: "#34d399" },
   },
+  // solid — neutral
   {
     value: "slate",
     label: "slate",
     group: "neutral",
-    swatch: { light: "#334155", dark: "#cbd5e1" },
+    swatch: { kind: "solid", light: "#334155", dark: "#cbd5e1" },
   },
+  // multi
   {
     value: "rainbow",
     label: "rainbow",
     group: "multi",
-    swatch: "rainbow",
+    hint: "violet + teal + rose",
+    swatch: { kind: "rainbow" },
+  },
+  {
+    value: "vibrant",
+    label: "vibrant",
+    group: "multi",
+    hint: "electric synthwave",
+    swatch: { kind: "triad", colors: ["#ec4899", "#2563eb", "#06b6d4"] },
+  },
+  {
+    value: "pastel",
+    label: "pastel",
+    group: "multi",
+    hint: "soft + airy",
+    swatch: { kind: "triad", colors: ["#c4b5fd", "#86efac", "#fbcfe8"] },
+  },
+  {
+    value: "earthy",
+    label: "earthy",
+    group: "multi",
+    hint: "moss, mustard, clay",
+    swatch: { kind: "triad", colors: ["#65a30d", "#ca8a04", "#c2410c"] },
+  },
+  {
+    value: "sunset",
+    label: "sunset",
+    group: "multi",
+    hint: "warm sky",
+    swatch: { kind: "triad", colors: ["#f97316", "#e11d48", "#7e22ce"] },
+  },
+  {
+    value: "ocean",
+    label: "ocean",
+    group: "multi",
+    hint: "deep water",
+    swatch: { kind: "triad", colors: ["#1e40af", "#0d9488", "#06b6d4"] },
   },
 ];
+
+function swatchBg(
+  swatch: AccentPreset["swatch"],
+): string {
+  if (swatch.kind === "rainbow") {
+    return "conic-gradient(from 180deg, #ef4444, #f97316, #eab308, #22c55e, #06b6d4, #8b5cf6, #ec4899, #ef4444)";
+  }
+  if (swatch.kind === "triad") {
+    const [a, b, c] = swatch.colors;
+    return `conic-gradient(from 220deg, ${a} 0deg, ${a} 120deg, ${b} 120deg, ${b} 240deg, ${c} 240deg, ${c} 360deg)`;
+  }
+  return `linear-gradient(135deg, ${swatch.light} 0%, ${swatch.light} 50%, ${swatch.dark} 50%, ${swatch.dark} 100%)`;
+}
 
 export function ThemeControls() {
   const [mode, setMode] = useState<ThemeMode>("system");
@@ -192,43 +254,49 @@ export function ThemeControls() {
             colors the buttons, active state, and progress elements.
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {ACCENTS.map((a) => {
-            const active = accent === a.value;
-            return (
-              <button
-                key={a.value}
-                type="button"
-                onClick={() => applyAccent(a.value)}
-                className={`flex items-center gap-3 rounded-lg border p-3 text-left transition ${
-                  active
-                    ? "border-(--accent) bg-(--accent-soft)"
-                    : "border-(--border) bg-(--surface) hover:border-(--accent)"
-                }`}
-              >
-                <span
-                  className="h-8 w-8 shrink-0 rounded-full"
-                  style={{
-                    background:
-                      a.swatch === "rainbow"
-                        ? "conic-gradient(from 180deg, #ef4444, #f97316, #eab308, #22c55e, #06b6d4, #8b5cf6, #ec4899, #ef4444)"
-                        : `linear-gradient(135deg, ${a.swatch.light} 0%, ${a.swatch.light} 50%, ${a.swatch.dark} 50%, ${a.swatch.dark} 100%)`,
-                  }}
-                />
-                <span className="min-w-0">
-                  <span
-                    className={`block text-sm font-bold capitalize ${active ? "text-(--accent)" : ""}`}
-                  >
-                    {a.label}
-                  </span>
-                  <span className="block text-[11px] text-(--muted) capitalize">
-                    {a.group}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        {(["warm", "cool", "neutral", "multi"] as const).map((group) => {
+          const items = ACCENTS.filter((a) => a.group === group);
+          if (items.length === 0) return null;
+          return (
+            <div key={group} className="space-y-1.5">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-(--muted)">
+                {group === "multi" ? "multi-color palettes" : group}
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {items.map((a) => {
+                  const active = accent === a.value;
+                  return (
+                    <button
+                      key={a.value}
+                      type="button"
+                      onClick={() => applyAccent(a.value)}
+                      className={`flex items-center gap-3 rounded-lg border p-3 text-left transition ${
+                        active
+                          ? "border-(--accent) bg-(--accent-soft)"
+                          : "border-(--border) bg-(--surface) hover:border-(--accent)"
+                      }`}
+                    >
+                      <span
+                        className="h-8 w-8 shrink-0 rounded-full"
+                        style={{ background: swatchBg(a.swatch) }}
+                      />
+                      <span className="min-w-0">
+                        <span
+                          className={`block text-sm font-bold capitalize ${active ? "text-(--accent)" : ""}`}
+                        >
+                          {a.label}
+                        </span>
+                        <span className="block truncate text-[11px] text-(--muted)">
+                          {a.hint ?? a.group}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </section>
 
       <section className="space-y-3 rounded-xl border border-(--border) bg-(--surface) p-4">
