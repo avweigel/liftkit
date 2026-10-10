@@ -18,6 +18,13 @@ import { groupIntoSupersets, parseSetCode } from "@/lib/set-code";
 import { formatRxReps, repTargetForSet } from "@/lib/display/reps";
 import { weightConvention } from "@/lib/display/weight-convention";
 import {
+  snapWeight,
+  stepWeight,
+  weightKind,
+  type WeightKind,
+} from "@/lib/display/weight-steps";
+import { pairSides } from "@/lib/side";
+import {
   DismissibleHint,
   HINT_KEYS,
 } from "@/components/dismissible-hint";
@@ -206,6 +213,58 @@ export function SessionLogger({
     return id;
   };
 
+  // left/right pairs, keyed by exercise_id. rows that collapsed onto one
+  // exercise_id can't be told apart, so those are skipped.
+  const { leaderToFollower, followerToLeader } = useMemo(() => {
+    const pairs = pairSides(
+      exercises.map((e) => ({ id: e.id, name: e.name, order_index: e.order_index })),
+    );
+    const rowById = new Map(exercises.map((e) => [e.id, e]));
+    const l2f = new Map<string, string>();
+    const f2l = new Map<string, string>();
+    for (const pair of new Set(pairs.values())) {
+      const leader = rowById.get(pair.leaderId)?.exercise_id;
+      const follower = rowById.get(pair.followerId)?.exercise_id;
+      if (!leader || !follower || leader === follower) continue;
+      l2f.set(leader, follower);
+      f2l.set(follower, leader);
+    }
+    return { leaderToFollower: l2f, followerToLeader: f2l };
+  }, [exercises]);
+
+  const carryFor = (exerciseId: string): SessionSet[] | null => {
+    const leader = followerToLeader.get(exerciseId);
+    return leader ? sets.filter((s) => s.exercise_id === leader) : null;
+  };
+
+  // changing the first side's weight drags the second side along, as long
+  // as the second side was logged at the old weight (i.e. it was carried).
+  const upsertSynced = async (exerciseId: string, set: UpsertPayload) => {
+    const before =
+      sets.find(
+        (s) => s.exercise_id === exerciseId && s.set_number === set.set_number,
+      )?.weight ?? null;
+    const id = await upsert(exerciseId, set);
+    const followerId = leaderToFollower.get(exerciseId);
+    if (followerId && before !== null && set.weight !== before) {
+      const twin = sets.find(
+        (s) => s.exercise_id === followerId && s.set_number === set.set_number,
+      );
+      if (twin && twin.weight === before) {
+        await upsert(followerId, {
+          id: twin.id,
+          set_number: twin.set_number,
+          weight: set.weight,
+          reps: twin.reps,
+          rpe: twin.rpe,
+          is_warmup: twin.is_warmup,
+          notes: twin.notes,
+        });
+      }
+    }
+    return id;
+  };
+
   const del = async (setId: string) => {
     await deleteSessionSet(sessionId, setId);
     setSets((prev) => prev.filter((s) => s.id !== setId));
@@ -284,7 +343,8 @@ export function SessionLogger({
                 sets={sets
                   .filter((s) => s.exercise_id === item._ex.exercise_id)
                   .sort((a, b) => a.set_number - b.set_number)}
-                onUpsert={(set) => upsert(item._ex.exercise_id, set)}
+                onUpsert={(set) => upsertSynced(item._ex.exercise_id, set)}
+                carrySets={carryFor(item._ex.exercise_id)}
                 onDelete={del}
                 onRemoveExtra={
                   item._ex.is_extra && item._ex.extra_id
@@ -308,7 +368,8 @@ export function SessionLogger({
                     .sort((a, b) => a.set_number - b.set_number),
                 ]),
               )}
-              onUpsert={upsert}
+              onUpsert={upsertSynced}
+              carryFor={carryFor}
               onDelete={del}
               onRemoveExtra={async (extraId) => {
                 await removeSessionExtra(extraId, sessionId);
@@ -451,6 +512,7 @@ function ProgressHeader({
 function SoloExerciseCard({
   exercise,
   sets,
+  carrySets,
   onUpsert,
   onDelete,
   onRemoveExtra,
@@ -458,6 +520,7 @@ function SoloExerciseCard({
 }: {
   exercise: Exercise;
   sets: SessionSet[];
+  carrySets: SessionSet[] | null;
   onUpsert: (set: UpsertPayload) => Promise<string>;
   onDelete: (setId: string) => Promise<void>;
   onRemoveExtra?: () => Promise<void>;
@@ -472,6 +535,7 @@ function SoloExerciseCard({
       <SetList
         exercise={exercise}
         sets={sets}
+        carrySets={carrySets}
         onUpsert={onUpsert}
         onDelete={onDelete}
         finished={finished}
@@ -486,6 +550,7 @@ function SupersetBlock({
   letter,
   exercises,
   setsByExercise,
+  carryFor,
   onUpsert,
   onDelete,
   onRemoveExtra,
@@ -494,6 +559,7 @@ function SupersetBlock({
   letter: string;
   exercises: Exercise[];
   setsByExercise: Record<string, SessionSet[]>;
+  carryFor: (exerciseId: string) => SessionSet[] | null;
   onUpsert: (exerciseId: string, set: UpsertPayload) => Promise<string>;
   onDelete: (setId: string) => Promise<void>;
   onRemoveExtra?: (extraId: string) => Promise<void>;
@@ -528,6 +594,7 @@ function SupersetBlock({
             <SetList
               exercise={ex}
               sets={setsByExercise[ex.exercise_id] ?? []}
+              carrySets={carryFor(ex.exercise_id)}
               onUpsert={(set) => onUpsert(ex.exercise_id, set)}
               onDelete={onDelete}
               finished={finished}
@@ -645,6 +712,7 @@ type UpsertPayload = {
 function SetList({
   exercise,
   sets,
+  carrySets = null,
   onUpsert,
   onDelete,
   finished,
@@ -652,6 +720,7 @@ function SetList({
 }: {
   exercise: Exercise;
   sets: SessionSet[];
+  carrySets?: SessionSet[] | null;
   onUpsert: (set: UpsertPayload) => Promise<string>;
   onDelete: (setId: string) => Promise<void>;
   finished: boolean;
@@ -661,6 +730,7 @@ function SetList({
     null,
   );
   const weightConv = weightConvention(exercise.name, exercise.equipment);
+  const kind = weightKind(exercise.name, exercise.equipment);
 
   // warmups don't count toward the prescribed working-set goal, so
   // reserve an extra row for each warmup already logged.
@@ -698,8 +768,16 @@ function SetList({
     // 2. scale previous working set's weight via epley 1rm if target reps differ
     // 3. fallback to previous working set's weight as-is
     // 4. fallback to prescribed_weight
+    // the other side's weight for this set wins over everything: you use
+    // the same dumbbell on both sides.
+    const carried =
+      carrySets?.find((s) => s.set_number === n && !s.is_warmup)?.weight ??
+      null;
+
     let weight: number | null;
-    if (sameSetLast?.weight != null) {
+    if (carried != null) {
+      weight = carried;
+    } else if (sameSetLast?.weight != null) {
       weight = sameSetLast.weight;
     } else if (
       prevInSession?.weight != null &&
@@ -711,8 +789,7 @@ function SetList({
       // scale weight inversely with rep target using epley reciprocal
       const oneRM = prevInSession.weight * (1 + prevInSession.reps / 30);
       const raw = oneRM / (1 + target.value / 30);
-      const rounded = Math.max(0, Math.round(raw / 5) * 5);
-      weight = rounded;
+      weight = snapWeight(kind, raw);
     } else {
       weight =
         prevInSession?.weight ?? exercise.prescribed_weight;
@@ -745,6 +822,7 @@ function SetList({
                 showDelete={!!r.logged}
                 compact={compact}
                 weightConv={weightConv}
+                weightKind={kind}
                 onSave={async (state) => {
                   await onUpsert({
                     id: r.logged?.id ?? null,
@@ -954,6 +1032,7 @@ function SetEditor({
   showDelete = false,
   compact = false,
   weightConv = null,
+  weightKind: kind = "other",
   onSave,
   onCancel,
   onDelete,
@@ -966,6 +1045,7 @@ function SetEditor({
   showDelete?: boolean;
   compact?: boolean;
   weightConv?: ReturnType<typeof weightConvention> | null;
+  weightKind?: WeightKind;
   onSave: (state: {
     weight: number | null;
     reps: number;
@@ -1028,6 +1108,7 @@ function SetEditor({
             value={weight}
             onChange={setWeight}
             step={5}
+            nextValue={(cur, dir) => stepWeight(kind, cur, dir)}
             allowEmpty
             disabled={finished}
           />
@@ -1082,6 +1163,7 @@ function Stepper({
   value,
   onChange,
   step,
+  nextValue,
   integer = false,
   allowEmpty = false,
   disabled = false,
@@ -1090,6 +1172,7 @@ function Stepper({
   value: string;
   onChange: (v: string) => void;
   step: number;
+  nextValue?: (current: number | null, dir: 1 | -1) => number | null;
   integer?: boolean;
   allowEmpty?: boolean;
   disabled?: boolean;
@@ -1098,6 +1181,15 @@ function Stepper({
   const hasValue = value.trim() !== "" && Number.isFinite(current);
 
   const bump = (dir: 1 | -1) => {
+    if (nextValue) {
+      const next = nextValue(hasValue ? current : null, dir);
+      if (next === null) {
+        if (allowEmpty) onChange("");
+        return;
+      }
+      onChange(String(next));
+      return;
+    }
     const base = hasValue ? current : 0;
     const next = base + dir * step;
     if (next < 0 && !allowEmpty) return;

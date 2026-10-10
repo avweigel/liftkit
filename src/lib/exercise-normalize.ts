@@ -32,7 +32,10 @@ export function normalizeName(raw: string): string {
   const side = sideMatch
     ? (sideMatch[1] || sideMatch[2] || sideMatch[3]).toUpperCase()
     : null;
-  if (sideMatch) s = s.replace(sideMatch[0], "");
+  if (sideMatch) {
+    const at = sideMatch.index ?? 0;
+    s = s.slice(0, at) + s.slice(at + sideMatch[0].length);
+  }
 
   for (const [re, to] of ABBREVIATIONS) s = s.replace(re, to);
   s = s.replace(/\s+/g, " ").trim();

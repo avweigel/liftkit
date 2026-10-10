@@ -5,6 +5,7 @@ import {
   REQUIRED_COLUMNS,
 } from "@/lib/schemas/plan-import";
 import { similarity, slugify } from "@/lib/fuzzy";
+import { splitSide } from "@/lib/side";
 
 export type ParsedRow = PlanImportRow & { row_index: number };
 
@@ -75,7 +76,12 @@ export function matchExercises(
     let best: { ref: ExerciseRef; score: number } | null = null;
     const scored: Array<ExerciseRef & { score: number }> = [];
 
+    const rawSide = splitSide(name).side;
     for (const ex of library) {
+      // "Tricep Kickback - L" must never fuzzy-match plain "Tricep Kickback":
+      // left, right and both-sides rows would end up sharing one exercise
+      // and one set of logs.
+      if (splitSide(ex.name).side !== rawSide) continue;
       const s = Math.max(similarity(slug, ex.slug), similarity(name.toLowerCase(), ex.name.toLowerCase()));
       scored.push({ ...ex, score: s });
       if (!best || s > best.score) best = { ref: ex, score: s };

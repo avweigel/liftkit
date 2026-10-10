@@ -60,9 +60,12 @@ function isSingleSideUpper(name: string): boolean {
   // explicit single-leg → not an arm movement
   if (/single[\s-]?leg|single[\s-]?side[\s-]?leg/i.test(name)) return false;
   if (/\bsingle[\s-]?arm\b|\bs\s*a\b/i.test(name)) return true;
-  // leg-pattern keywords: side markers apply to a leg, not an arm
+  // leg-pattern keywords: side markers apply to a leg, not an arm.
+  // "kickback" is a leg move only when it isn't a tricep kickback.
+  const legKickback = /\bkickbacks?\b/i.test(name) && !/\btri(cep|ceps)?\b/i.test(name);
   if (
-    /\b(leg|lunge|squat|rdl|deadlift|calf|pistol|bulgarian|step[\s-]?up|glute bridge|kickback|hip thrust)\b/i.test(
+    legKickback ||
+    /\b(leg|lunge|squat|rdl|deadlift|calf|pistol|bulgarian|step[\s-]?up|glute bridge|hip thrust)\b/i.test(
       name,
     )
   ) {
