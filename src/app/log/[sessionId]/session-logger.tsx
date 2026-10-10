@@ -756,12 +756,15 @@ function SetList({
 
     // with no history, no other side and no earlier set, an empty weight
     // would quietly log bodyweight on a barbell. make the lifter pick one.
+    // an old bodyweight entry only counts as an answer for moves that
+    // aren't obviously loaded (a barbell or dumbbell name or equipment)
+    const loaded =
+      kind !== "other" ||
+      ["barbell", "dumbbell", "kettlebell", "cable"].includes(exercise.equipment ?? "");
     const weightKnown =
       weight != null ||
-      carried != null ||
-      !!sameSetLast ||
-      !!prevInSession ||
-      isBodyweight(exercise.name, exercise.equipment);
+      isBodyweight(exercise.name, exercise.equipment) ||
+      (!loaded && (!!sameSetLast || !!prevInSession));
 
     return { weight, reps, weightKnown };
   };
@@ -954,11 +957,15 @@ function QuickLogRow({
   onQuickLog: () => Promise<void>;
 }) {
   const [pending, setPending] = useState(false);
+  const [failed, setFailed] = useState(false);
   const handleQuick = async () => {
     if (reps === null || !weightKnown) return onExpand();
     setPending(true);
+    setFailed(false);
     try {
       await onQuickLog();
+    } catch {
+      setFailed(true);
     } finally {
       setPending(false);
     }
@@ -997,9 +1004,13 @@ function QuickLogRow({
             <span className="num text-[24px] leading-none">{reps}</span>
           </span>
         )}
-        {showTarget && targetText && (
+        {failed ? (
+          <span className="block text-[12px] font-semibold text-(--danger)">
+            Didn&rsquo;t save. Check your connection and tap again.
+          </span>
+        ) : showTarget && targetText ? (
           <span className="block text-[12px] text-(--muted)">Target {targetText}</span>
-        )}
+        ) : null}
       </button>
       <button
         type="button"
@@ -1141,7 +1152,9 @@ function SetEditor({
               setTimeout(() => setConfirmDelete(false), 3000);
               return;
             }
-            void onDelete();
+            onDelete().catch(() =>
+              setError("Couldn't delete the set. Check your connection and try again."),
+            );
           }}
           className={`h-9 w-full rounded-lg text-[13px] font-semibold ${confirmDelete ? "text-(--danger)" : "text-(--muted)"}`}
         >

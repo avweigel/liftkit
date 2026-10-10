@@ -218,7 +218,7 @@ export async function Dashboard({ userId }: Props) {
         )}
       </header>
 
-      {openSession && openSession.id !== todaySession?.id && (
+      {openSession && openSession.id !== todaySession?.id && openSession.id !== core?.openToday?.id && (
         <Link
           href={`/log/${openSession.id}`}
           className="card flex items-center justify-between gap-3 border-(--accent-line) p-4"
@@ -564,6 +564,7 @@ type CoreInfo = {
   suggested: { id: string; name: string };
   other: { id: string; name: string } | null;
   doneToday: string | null;
+  openToday: { id: string; name: string } | null;
   reason: string;
 };
 
@@ -590,7 +591,7 @@ async function loadCore(
 
   const { data: last } = await supabase
     .from("workout_sessions")
-    .select("plan_day_id, started_at")
+    .select("id, plan_day_id, started_at, finished_at")
     .eq("user_id", userId)
     .in(
       "plan_day_id",
@@ -602,10 +603,11 @@ async function loadCore(
 
   const nameOf = (d: (typeof days)[number]) => d.name ?? `Day ${d.day_number}`;
   const lastDay = last ? days.find((d) => d.id === last.plan_day_id) : null;
-  const doneToday =
-    last && lastDay && localToday(new Date(last.started_at)).iso === todayIso
-      ? nameOf(lastDay)
-      : null;
+  const startedToday =
+    !!last && !!lastDay && localToday(new Date(last.started_at)).iso === todayIso;
+  const doneToday = startedToday && last?.finished_at ? nameOf(lastDay!) : null;
+  const openToday =
+    startedToday && !last?.finished_at ? { id: last!.id as string, name: nameOf(lastDay!) } : null;
 
   // the first day (A) never loads the adductors, so it's the safe pick on
   // heavy leg days. otherwise alternate from whatever you did last.
@@ -626,11 +628,25 @@ async function loadCore(
     suggested: { id: pick.id, name: nameOf(pick) },
     other: other ? { id: other.id, name: nameOf(other) } : null,
     doneToday,
+    openToday,
     reason,
   };
 }
 
 function CoreCard({ core }: { core: CoreInfo }) {
+  if (core.openToday) {
+    return (
+      <section className="card flex items-center justify-between gap-3 p-4">
+        <div>
+          <div className="display text-[20px]">{core.openToday.name}</div>
+          <div className="text-[13px] text-(--muted)">In progress</div>
+        </div>
+        <Link href={`/log/${core.openToday.id}`} className="btn btn-primary btn-sm">
+          Continue
+        </Link>
+      </section>
+    );
+  }
   if (core.doneToday) {
     return (
       <section className="card flex items-center justify-between gap-3 p-4">

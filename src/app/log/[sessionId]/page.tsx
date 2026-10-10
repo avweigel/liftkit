@@ -273,7 +273,7 @@ export default async function LogSessionPage({ params }: Props) {
       exercise_id: ex.id,
       name: ex.name,
       equipment: ex.equipment ?? "other",
-      prescribed_sets: (sets ?? []).filter((s) => s.exercise_id === ex.id).length,
+      prescribed_sets: (sets ?? []).filter((s) => s.exercise_id === ex.id && !s.is_warmup).length,
       prescribed_reps: "",
       prescribed_weight: null,
       rest_seconds: null,
