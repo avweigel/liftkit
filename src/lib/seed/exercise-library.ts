@@ -215,7 +215,7 @@ export const CANONICAL_LIBRARY: CanonicalExercise[] = [
     primary_muscle: "hamstrings",
     equipment: "barbell",
     description:
-      "pick a loaded bar off the floor. posterior chain primary — hamstrings, glutes, erectors. hips and shoulders rise together.",
+      "pick a loaded bar off the floor. posterior chain primary: hamstrings, glutes, erectors. hips and shoulders rise together.",
     aliases: ["bb deadlift", "conventional dl", "straight-leg dl"],
   },
   {
@@ -883,7 +883,7 @@ export const CANONICAL_LIBRARY: CanonicalExercise[] = [
     primary_muscle: "triceps",
     equipment: "dumbbell",
     description:
-      "bent-over tricep extension with a dumbbell. peak contraction at full elbow lockout. variants specify left vs right or both arms — the library keeps them distinct so you can log each separately.",
+      "bent-over tricep extension with a dumbbell. peak contraction at full elbow lockout. variants specify left vs right or both arms, and the library keeps them distinct so you can log each separately.",
     aliases: [
       "tricep kickback",
       "tricep kickbacks",

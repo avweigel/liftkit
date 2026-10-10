@@ -8,64 +8,48 @@ type Props = {
   finished: boolean;
 };
 
+// lives at the bottom of the workout, away from the sets you tap
 export function SessionActions({ sessionId, finished }: Props) {
   const [pending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
 
-  const onReopen = () => {
-    startTransition(async () => {
-      await reopenSession(sessionId);
-    });
-  };
-
-  const onDelete = () => {
-    if (!confirming) {
-      setConfirming(true);
-      return;
-    }
-    startTransition(async () => {
-      await deleteSession(sessionId);
-    });
-  };
-
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <section className="space-y-2 pt-2">
       {finished && (
-        <>
-          <span className="inline-flex items-center rounded-full bg-(--ok)/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-(--ok)">
-            finished
-          </span>
-          <button
-            type="button"
-            onClick={onReopen}
-            disabled={pending}
-            className="h-8 rounded-md border border-(--border) bg-(--background) px-3 text-xs font-medium text-(--muted) disabled:opacity-60"
-          >
-            {pending ? "…" : "reopen"}
-          </button>
-        </>
+        <button
+          type="button"
+          onClick={() =>
+            startTransition(async () => {
+              await reopenSession(sessionId);
+            })
+          }
+          disabled={pending}
+          className="btn btn-secondary btn-block"
+        >
+          Reopen to keep logging
+        </button>
       )}
       <button
         type="button"
-        onClick={onDelete}
+        onClick={() => {
+          if (!confirming) {
+            setConfirming(true);
+            setTimeout(() => setConfirming(false), 4000);
+            return;
+          }
+          startTransition(async () => {
+            await deleteSession(sessionId);
+          });
+        }}
         disabled={pending}
-        className={`h-8 rounded-md px-3 text-xs font-medium disabled:opacity-60 ${
-          confirming
-            ? "bg-red-600 text-white"
-            : "border border-red-300 text-red-600 dark:border-red-900 dark:text-red-400"
-        }`}
+        className={`btn btn-block ${confirming ? "bg-(--danger) text-white" : "btn-danger"}`}
       >
-        {pending ? "deleting…" : confirming ? "tap to confirm" : "delete"}
+        {pending && confirming
+          ? "Deleting…"
+          : confirming
+            ? "Tap again to delete this workout"
+            : "Delete workout"}
       </button>
-      {confirming && !pending && (
-        <button
-          type="button"
-          onClick={() => setConfirming(false)}
-          className="text-xs text-(--muted) underline"
-        >
-          cancel
-        </button>
-      )}
-    </div>
+    </section>
   );
 }

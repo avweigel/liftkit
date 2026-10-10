@@ -3,51 +3,40 @@
 import { useTransition } from "react";
 import { startSession } from "@/lib/actions/sessions";
 
-export function StartTodayButton({ dayId }: { dayId: string }) {
-  const [pending, startTransition] = useTransition();
-  const onClick = () => {
-    startTransition(async () => {
-      await startSession(dayId);
-    });
-  };
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={pending}
-      className="mt-4 h-12 w-full rounded-xl bg-(--accent) text-base font-bold text-(--accent-contrast) shadow-sm active:scale-[0.99] disabled:opacity-60"
-    >
-      {pending ? "starting…" : "start today's workout →"}
-    </button>
-  );
-}
-
-export function StartOtherDayButton({
+export function StartDayButton({
   dayId,
   label,
+  block = false,
+  variant = "primary",
 }: {
   dayId: string;
   label: string;
+  block?: boolean;
+  variant?: "primary" | "secondary";
 }) {
   const [pending, startTransition] = useTransition();
-  const onClick = () => {
-    startTransition(async () => {
-      await startSession(dayId);
-    });
-  };
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() =>
+        startTransition(async () => {
+          await startSession(dayId);
+        })
+      }
       disabled={pending}
-      className="text-xs font-semibold text-(--accent) disabled:opacity-60"
+      className={`btn ${variant === "primary" ? "btn-primary" : "btn-secondary"} ${block ? "btn-block" : ""}`}
     >
-      {pending ? "…" : label}
+      {pending ? "Starting…" : label}
     </button>
   );
 }
 
-export function StartDayButton({
+// kept for older call sites: the main "start today" button
+export function StartTodayButton({ dayId }: { dayId: string }) {
+  return <StartDayButton dayId={dayId} label="Start workout" block />;
+}
+
+export function StartOtherDayButton({
   dayId,
   label,
 }: {
@@ -64,9 +53,9 @@ export function StartDayButton({
         })
       }
       disabled={pending}
-      className="h-11 rounded-xl bg-(--accent) px-5 text-sm font-bold text-(--accent-contrast) shadow-sm active:scale-[0.99] disabled:opacity-60"
+      className="btn btn-ghost btn-sm"
     >
-      {pending ? "starting…" : label}
+      {pending ? "Starting…" : label}
     </button>
   );
 }

@@ -1,27 +1,37 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import { PageHeader, SectionTitle } from "@/components/page-header";
+import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeControls } from "./theme-controls";
 
 export const metadata: Metadata = {
-  title: "settings · liftkit",
+  title: "Settings | LiftKit",
 };
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 space-y-6 px-3 py-5 sm:px-6 sm:py-10">
-      <header className="space-y-1">
-        <Link
-          href="/"
-          className="inline-flex items-center text-sm text-(--muted) hover:text-(--foreground)"
-        >
-          ← home
-        </Link>
-        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-          settings
-        </h1>
-      </header>
+    <main className="mx-auto w-full max-w-lg flex-1 space-y-8 px-4 pt-4 pb-tabbar">
+      <PageHeader title="Settings" />
 
       <ThemeControls />
+
+      {user && (
+        <section className="space-y-3">
+          <SectionTitle>Account</SectionTitle>
+          <div className="card space-y-4 p-4">
+            <div className="min-w-0">
+              <div className="label">Signed in as</div>
+              <div className="mt-0.5 truncate text-[16px]">{user.email}</div>
+            </div>
+            <SignOutButton />
+          </div>
+        </section>
+      )}
     </main>
   );
 }

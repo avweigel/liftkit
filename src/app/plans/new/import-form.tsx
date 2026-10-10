@@ -74,7 +74,7 @@ export function ImportForm() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "import failed");
+        setError(data.error ?? "Import failed. Check the link or CSV and try again.");
         setPending(false);
         return;
       }
@@ -85,7 +85,7 @@ export function ImportForm() {
         router.push(`/plans/${data.plan_id}`);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "import failed");
+      setError(e instanceof Error ? e.message : "Import failed. Try again.");
     } finally {
       setPending(false);
     }
@@ -93,68 +93,83 @@ export function ImportForm() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-4 rounded-lg border border-zinc-200 p-5 dark:border-zinc-800">
+      <div className="card space-y-5 p-4">
         <label className="block space-y-1.5">
-          <span className="text-sm">plan name</span>
+          <span className="label">Plan name</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. 5/3/1 spring cycle"
-            className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:focus:border-zinc-100"
+            placeholder="For example, 5/3/1 spring cycle"
+            className={inputCls}
           />
         </label>
 
-        <div className="flex gap-2 text-sm">
-          <button
-            type="button"
+        <div
+          role="tablist"
+          aria-label="Import source"
+          className="grid grid-cols-2 gap-1 rounded-[14px] bg-(--surface-2) p-1"
+        >
+          <SourceTab
+            selected={source === "url"}
             onClick={() => setSource("url")}
-            className={`rounded-md px-3 py-1.5 ${source === "url" ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900" : "border border-zinc-300 dark:border-zinc-700"}`}
           >
-            sheet url
-          </button>
-          <button
-            type="button"
+            Sheet link
+          </SourceTab>
+          <SourceTab
+            selected={source === "csv"}
             onClick={() => setSource("csv")}
-            className={`rounded-md px-3 py-1.5 ${source === "csv" ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900" : "border border-zinc-300 dark:border-zinc-700"}`}
           >
-            paste csv
-          </button>
+            Paste CSV
+          </SourceTab>
         </div>
 
         {source === "url" ? (
           <label className="block space-y-1.5">
-            <span className="text-sm">google sheet url</span>
+            <span className="label">Google Sheet link</span>
             <input
               value={sourceUrl}
               onChange={(e) => setSourceUrl(e.target.value)}
               placeholder="https://docs.google.com/spreadsheets/d/..."
-              className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:focus:border-zinc-100"
+              inputMode="url"
+              className={inputCls}
             />
-            <span className="block text-xs text-zinc-500">
-              sheet must be shared as &quot;anyone with the link can view.&quot;
+            <span className="block text-[13px] text-(--muted)">
+              Share the sheet as &ldquo;Anyone with the link can view&rdquo;
+              first.
             </span>
           </label>
         ) : (
           <label className="block space-y-1.5">
-            <span className="text-sm">csv</span>
+            <span className="label">CSV</span>
             <textarea
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
               rows={8}
               placeholder={`week,day,day_name,exercise,sets,reps,weight,rest_sec,notes\n1,1,Push,Bench Press,3,5,135,180,`}
-              className="w-full resize-y rounded-lg border border-zinc-300 bg-white p-3 font-mono text-xs outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:focus:border-zinc-100"
+              className="w-full resize-y rounded-xl border border-(--border) bg-(--background) p-3 font-mono text-[13px] outline-none focus:border-(--accent)"
             />
           </label>
         )}
 
-        <div className="flex flex-wrap items-center gap-3">
+        <details className="group rounded-xl bg-(--surface-2) px-3">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center text-[14px] font-medium [&::-webkit-details-marker]:hidden">
+            Which columns does the sheet need?
+          </summary>
+          <p className="pb-3 text-[13px] text-(--muted)">
+            One row per exercise with these columns: week, day, day_name,
+            exercise, sets, reps, weight, rest_sec, notes. Weight, rest and
+            notes can be blank.
+          </p>
+        </details>
+
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => runImport("preview")}
             disabled={pending || name.trim().length === 0}
-            className="inline-flex h-11 items-center rounded-lg bg-zinc-900 px-5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="btn btn-primary flex-1"
           >
-            {pending && !preview ? "fetching…" : "preview"}
+            {pending && !preview ? "Loading preview…" : "Preview plan"}
           </button>
           {preview && (
             <button
@@ -163,14 +178,14 @@ export function ImportForm() {
                 setPreview(null);
                 setResolutions({});
               }}
-              className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+              className="btn btn-secondary"
             >
-              reset preview
+              Clear preview
             </button>
           )}
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-[14px] text-(--danger)">{error}</p>}
       </div>
 
       {preview && (
@@ -185,6 +200,35 @@ export function ImportForm() {
     </div>
   );
 }
+
+function SourceTab({
+  selected,
+  onClick,
+  children,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      onClick={onClick}
+      className={`h-11 rounded-[11px] text-[15px] font-semibold transition-colors duration-150 ${
+        selected
+          ? "bg-(--surface) text-(--foreground)"
+          : "text-(--muted)"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+const inputCls =
+  "block h-11 w-full rounded-xl border border-(--border) bg-(--background) px-3 text-[16px] outline-none focus:border-(--accent)";
 
 function PreviewView({
   preview,
@@ -210,67 +254,72 @@ function PreviewView({
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <span>
-          <strong>{preview.match_summary.matched}</strong> matched /{" "}
-          <strong>{preview.match_summary.unmatched}</strong> unmatched /{" "}
-          {preview.match_summary.total_rows} rows
+      <div className="card flex flex-wrap gap-1.5 p-4">
+        <span className="chip chip-ok">
+          <span className="num">{preview.match_summary.matched}</span> matched
+        </span>
+        {preview.match_summary.unmatched > 0 && (
+          <span className="chip chip-accent">
+            <span className="num">{preview.match_summary.unmatched}</span> new
+            names
+          </span>
+        )}
+        <span className="chip">
+          <span className="num">{preview.match_summary.total_rows}</span> rows
         </span>
         {willCreate > 0 && (
-          <span className="text-zinc-500">
+          <p className="mt-1 w-full text-[13px] text-(--muted)">
             {willCreate} new exercise{willCreate === 1 ? "" : "s"} will be
-            created
-          </span>
+            added to your library.
+          </p>
         )}
       </div>
 
       {preview.row_errors.length > 0 && (
-        <details className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-900 dark:bg-amber-950/30">
-          <summary className="cursor-pointer font-medium text-amber-800 dark:text-amber-200">
-            {preview.row_errors.length} row{" "}
-            {preview.row_errors.length === 1 ? "was" : "were"} skipped
+        <details className="card px-4">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center text-[15px] font-medium text-(--danger) [&::-webkit-details-marker]:hidden">
+            {preview.row_errors.length} row
+            {preview.row_errors.length === 1 ? " was" : "s were"} skipped
           </summary>
-          <ul className="mt-2 space-y-1 text-xs text-amber-800 dark:text-amber-200">
+          <ul className="space-y-1 pb-3 text-[13px] text-(--muted)">
             {preview.row_errors.map((e) => (
               <li key={e.row_index}>
-                row {e.row_index + 2}: {e.message}
+                Row <span className="num">{e.row_index + 2}</span>: {e.message}
               </li>
             ))}
           </ul>
         </details>
       )}
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         {preview.weeks.map((w) => (
-          <section
-            key={w.week_number}
-            className="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
-          >
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
-              week {w.week_number}
+          <section key={w.week_number} className="card space-y-4 p-4">
+            <h3 className="display text-[20px]">
+              {w.name || `Week ${w.week_number}`}
             </h3>
             {w.days.map((d) => (
               <div key={d.day_number} className="space-y-2">
-                <div className="text-sm font-medium">
-                  day {d.day_number}
-                  {d.name ? ` · ${d.name}` : ""}
+                <div className="flex items-baseline gap-2">
+                  <span className="label">
+                    Day <span className="num">{d.day_number}</span>
+                  </span>
+                  {d.name && (
+                    <span className="text-[15px] font-semibold">{d.name}</span>
+                  )}
                 </div>
-                <ul className="space-y-2 text-sm">
+                <ul className="divide-y divide-(--border) overflow-hidden rounded-xl bg-(--surface-2)">
                   {d.exercises.map((ex) => (
-                    <li
-                      key={ex.row_index}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded border border-zinc-200 px-3 py-2 dark:border-zinc-800"
-                    >
-                      <div className="min-w-0">
-                        <div className="truncate">
-                          <span className="font-medium">{ex.raw_name}</span>
-                          <span className="ml-2 text-xs text-zinc-500">
-                            {ex.prescribed_sets}×{ex.prescribed_reps}
-                            {ex.prescribed_weight !== null
-                              ? ` @ ${ex.prescribed_weight}`
-                              : ""}
-                          </span>
-                        </div>
+                    <li key={ex.row_index} className="space-y-1.5 px-3 py-2.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="min-w-0 text-[15px] font-medium">
+                          {ex.raw_name}
+                        </span>
+                        <span className="num shrink-0 text-[15px]">
+                          {ex.prescribed_sets} &times; {ex.prescribed_reps}
+                          {ex.prescribed_weight !== null
+                            ? ` @ ${ex.prescribed_weight}`
+                            : ""}
+                        </span>
                       </div>
                       <UnmatchedPicker
                         ex={ex}
@@ -291,19 +340,19 @@ function PreviewView({
         ))}
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="space-y-2">
         <button
           type="button"
           onClick={onConfirm}
           disabled={pending}
-          className="inline-flex h-11 items-center rounded-lg bg-zinc-900 px-5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+          className="btn btn-primary btn-block"
         >
-          {pending ? "saving…" : "save plan"}
+          {pending ? "Saving…" : "Save plan"}
         </button>
         {unmatched.length > 0 && (
-          <span className="text-xs text-zinc-500">
-            unmatched names will be added to your exercise library
-          </span>
+          <p className="text-center text-[13px] text-(--muted)">
+            New names are added to your exercise library.
+          </p>
         )}
       </div>
     </div>
@@ -321,10 +370,15 @@ function UnmatchedPicker({
 }) {
   if (ex.matched_exercise_id && resolution === undefined) {
     return (
-      <span className="text-xs text-zinc-500">
-        matched: {ex.matched_exercise_name}
-        {ex.score < 1 ? ` (${Math.round(ex.score * 100)}%)` : ""}
-      </span>
+      <p className="text-[13px] text-(--muted)">
+        Matched to {ex.matched_exercise_name}
+        {ex.score < 1 ? (
+          <>
+            {" "}
+            (<span className="num">{Math.round(ex.score * 100)}%</span>)
+          </>
+        ) : null}
+      </p>
     );
   }
   const value =
@@ -336,12 +390,13 @@ function UnmatchedPicker({
         const v = e.target.value;
         onChange(v === "__new" ? null : v);
       }}
-      className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+      aria-label={`Exercise for ${ex.raw_name}`}
+      className="block h-11 w-full rounded-xl border border-(--border) bg-(--surface) px-3 text-[16px] outline-none focus:border-(--accent)"
     >
-      <option value="__new">create new: {ex.raw_name}</option>
+      <option value="__new">Create new: {ex.raw_name}</option>
       {ex.suggestions.map((s) => (
         <option key={s.id} value={s.id}>
-          use {s.name} ({Math.round(s.score * 100)}%)
+          Use {s.name} ({Math.round(s.score * 100)}%)
         </option>
       ))}
     </select>

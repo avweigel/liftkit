@@ -18,196 +18,205 @@ type Logged = {
 export function TonightCardio({
   suggestions,
   logged,
-  todayLabel,
   tomorrowLabel,
   hardThisWeek,
   maxHard,
 }: {
   suggestions: CardioSuggestion[];
   logged: Logged[];
-  todayLabel: string;
   tomorrowLabel: string;
   hardThisWeek: number;
   maxHard: number;
 }) {
+  const best = suggestions.find((s) => s.recommended) ?? suggestions[0];
+  const rest = suggestions.filter((s) => s !== best);
   const [open, setOpen] = useState<CardioKind | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   return (
-    <section className="space-y-2 rounded-2xl border border-(--border) bg-(--surface) p-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-(--muted)">
-          tonight&rsquo;s cardio
-        </h2>
-        <span className="text-[11px] text-(--muted) tabular-nums">
-          hard this week: {hardThisWeek} of {maxHard}
-        </span>
-      </div>
-      <p className="text-xs text-(--muted)">
-        this morning: <span className="text-(--foreground)">{todayLabel}</span>{" "}
-        · tomorrow: <span className="text-(--foreground)">{tomorrowLabel}</span>
-      </p>
-
+    <section className="card space-y-3 p-4">
       {logged.length > 0 && (
-        <ul className="space-y-1">
+        <ul className="space-y-1.5">
           {logged.map((l) => (
             <LoggedCardioRow key={l.id} entry={l} />
           ))}
         </ul>
       )}
 
-      <ul className="space-y-1.5">
-        {suggestions.map((s) => {
-          const t = CARDIO_TYPES[s.kind];
-          const isOpen = open === s.kind;
-          return (
-            <li
-              key={s.kind}
-              className={`rounded-lg border px-3 py-2 ${
-                s.recommended
-                  ? "border-(--accent) bg-(--accent-soft)"
-                  : "border-(--border) bg-(--background)"
-              } ${s.blocked ? "opacity-55" : ""}`}
-            >
-              <button
-                type="button"
-                onClick={() => setOpen(isOpen ? null : s.kind)}
-                className="w-full text-left"
-                aria-expanded={isOpen}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">{t.title}</span>
-                  {s.recommended && (
-                    <span className="rounded-full bg-(--accent)/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-(--accent)">
-                      best tonight
-                    </span>
-                  )}
-                  {s.blocked && (
-                    <span className="rounded-full bg-(--border) px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-(--muted)">
-                      not tonight
-                    </span>
-                  )}
-                </div>
-                <p className="mt-0.5 text-xs text-(--muted)">{s.reason}</p>
-              </button>
-              {isOpen && (
-                <CardioLogForm
-                  kind={s.kind}
-                  defaultMinutes={t.minutes}
-                  onDone={() => setOpen(null)}
-                />
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      {logged.length === 0 && best && (
+        <div className="space-y-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="display text-[20px]">{CARDIO_TYPES[best.kind].title}</h3>
+              <span className="chip chip-accent">Best tonight</span>
+            </div>
+            <p className="mt-0.5 text-[14px] text-(--muted)">{best.reason}</p>
+          </div>
+          {open === best.kind ? (
+            <CardioLogForm kind={best.kind} onDone={() => setOpen(null)} onCancel={() => setOpen(null)} />
+          ) : (
+            <button type="button" onClick={() => setOpen(best.kind)} className="btn btn-secondary btn-block">
+              Log {CARDIO_TYPES[best.kind].title.toLowerCase()}
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-2 text-[13px] text-(--muted)">
+        <span>
+          Hard sessions this week{" "}
+          <span className="num text-[15px] text-(--foreground)">
+            {hardThisWeek}/{maxHard}
+          </span>
+        </span>
+        <span>Tomorrow: {tomorrowLabel}</span>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowAll((v) => !v)}
+        aria-expanded={showAll}
+        className="flex w-full items-center justify-between border-t border-(--border) pt-3 text-[14px] font-semibold text-(--accent)"
+      >
+        {logged.length > 0 ? "Log something else" : "Other options"}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${showAll ? "rotate-180" : ""}`} aria-hidden>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      {showAll && (
+        <ul className="space-y-1.5">
+          {(logged.length > 0 ? suggestions : rest).map((s) => {
+            const t = CARDIO_TYPES[s.kind];
+            const isOpen = open === s.kind;
+            return (
+              <li key={s.kind} className={`rounded-xl bg-(--surface-2) px-3 py-2.5 ${s.blocked ? "opacity-60" : ""}`}>
+                <button
+                  type="button"
+                  onClick={() => setOpen(isOpen ? null : s.kind)}
+                  className="w-full text-left"
+                  aria-expanded={isOpen}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">{t.title}</span>
+                    {s.blocked && <span className="chip">Not tonight</span>}
+                  </div>
+                  <p className="mt-0.5 text-[13px] text-(--muted)">{s.reason}</p>
+                </button>
+                {isOpen && (
+                  <div className="mt-2">
+                    <CardioLogForm kind={s.kind} onDone={() => { setOpen(null); setShowAll(false); }} onCancel={() => setOpen(null)} />
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }
 
 function CardioLogForm({
   kind,
-  defaultMinutes,
   onDone,
+  onCancel,
 }: {
   kind: CardioKind;
-  defaultMinutes: number;
   onDone: () => void;
+  onCancel: () => void;
 }) {
   const t = CARDIO_TYPES[kind];
-  const [minutes, setMinutes] = useState(String(defaultMinutes));
+  const [minutes, setMinutes] = useState(t.minutes);
   const [place, setPlace] = useState<"outside" | "gym">("outside");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const save = () => {
     setError(null);
-    const m = minutes.trim() === "" ? null : Number(minutes);
-    if (m !== null && (!Number.isInteger(m) || m <= 0)) {
-      setError("enter whole minutes");
-      return;
-    }
     startTransition(async () => {
       try {
-        await logCardio({ kind, minutes: m, place });
+        await logCardio({ kind, minutes, place });
         onDone();
       } catch (e) {
-        setError(e instanceof Error ? e.message : "save failed");
+        setError(e instanceof Error ? e.message : "Couldn't save. Try again.");
       }
     });
   };
 
   return (
-    <div className="mt-2 space-y-2 border-t border-(--border) pt-2 text-xs">
-      <p className="text-(--foreground)/80">{t.what}</p>
-      <p className="text-(--muted)">
-        outside: {t.outside} · gym: {t.gym}
-      </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-1.5">
-          <span className="text-(--muted)">min</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={minutes}
-            onChange={(e) => setMinutes(e.target.value)}
-            className="h-9 w-16 rounded-md border border-(--border) bg-(--background) text-center font-bold tabular-nums outline-none focus:border-(--accent)"
-            style={{ fontSize: "16px" }}
-          />
-        </label>
+    <div className="space-y-3 rounded-xl bg-(--background) p-3">
+      <p className="text-[14px]">{t.what}</p>
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-(--surface-2) p-1">
         {(["outside", "gym"] as const).map((p) => (
           <button
             key={p}
             type="button"
             onClick={() => setPlace(p)}
-            className={`h-9 rounded-md border px-3 font-medium ${
-              place === p
-                ? "border-(--accent) bg-(--accent) text-(--accent-contrast)"
-                : "border-(--border) bg-(--background) text-(--muted)"
+            aria-pressed={place === p}
+            className={`h-10 rounded-lg text-[14px] font-semibold capitalize transition-colors ${
+              place === p ? "bg-(--surface) text-(--foreground) shadow-sm" : "text-(--muted)"
             }`}
           >
-            {p}
+            {p === "outside" ? "Outside" : "Gym"}
           </button>
         ))}
-        <button
-          type="button"
-          onClick={save}
-          disabled={pending}
-          className="ml-auto h-9 rounded-md bg-(--accent-2) px-4 font-semibold text-(--accent-2-contrast) disabled:opacity-60"
-        >
-          {pending ? "saving…" : "log it"}
+      </div>
+      <p className="text-[13px] text-(--muted)">{place === "outside" ? t.outside : t.gym}</p>
+      <div className="flex items-center justify-between">
+        <span className="label">Minutes</span>
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={() => setMinutes((m) => Math.max(5, m - 5))} className="btn btn-secondary btn-sm w-11 px-0" aria-label="5 minutes less">−</button>
+          <span className="num w-12 text-center text-[26px]">{minutes}</span>
+          <button type="button" onClick={() => setMinutes((m) => Math.min(180, m + 5))} className="btn btn-secondary btn-sm w-11 px-0" aria-label="5 minutes more">+</button>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button type="button" onClick={onCancel} className="btn btn-secondary flex-1">
+          Cancel
+        </button>
+        <button type="button" onClick={save} disabled={pending} className="btn btn-primary flex-[2]">
+          {pending ? "Saving…" : "Save"}
         </button>
       </div>
-      {error && <p className="text-red-600">{error}</p>}
+      {error && <p className="text-[13px] text-(--danger)">{error}</p>}
     </div>
   );
 }
 
 function LoggedCardioRow({ entry }: { entry: Logged }) {
   const [pending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
   const t = CARDIO_TYPES[entry.kind];
   return (
-    <li className="flex items-center gap-2 rounded-lg border border-(--border) bg-(--accent-soft)/60 px-3 py-2 text-sm">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-(--accent-2) text-xs font-bold text-(--accent-2-contrast)">
-        ✓
+    <li className="flex min-h-12 items-center gap-3 rounded-xl bg-(--ok-soft) px-3">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-(--ok) text-(--surface)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M5 12.5l4.5 4.5L19 7.5" />
+        </svg>
       </span>
       <span className="font-semibold">{t.title}</span>
-      <span className="text-xs text-(--muted)">
-        {entry.minutes ? `${entry.minutes} min` : ""}
-        {entry.place ? ` · ${entry.place}` : ""}
+      <span className="text-[13px] text-(--muted)">
+        {entry.minutes ? <span className="num text-[15px] text-(--foreground)">{entry.minutes}</span> : null}
+        {entry.minutes ? " min" : ""}
+        {entry.place ? (entry.place === "gym" ? ", gym" : ", outside") : ""}
       </span>
       <button
         type="button"
         disabled={pending}
         onClick={() => {
-          if (!confirm(`remove ${t.title.toLowerCase()} from tonight?`)) return;
+          if (!confirming) {
+            setConfirming(true);
+            setTimeout(() => setConfirming(false), 3000);
+            return;
+          }
           startTransition(async () => {
             await deleteCardio(entry.id);
           });
         }}
-        className="ml-auto text-(--muted) hover:text-red-600 disabled:opacity-60"
-        aria-label="remove this cardio entry"
+        className={`ml-auto h-9 rounded-lg px-2 text-[13px] font-semibold ${confirming ? "text-(--danger)" : "text-(--muted)"}`}
       >
-        ×
+        {confirming ? "Tap to remove" : "Remove"}
       </button>
     </li>
   );

@@ -12,10 +12,15 @@ type Props = {
   sent?: boolean;
 };
 
+function sentenceCase(text: string) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export function LoginForm({ redirectTo, error: initialError, sent }: Props) {
   const supabase = createClient();
   const [pending, setPending] = useState(false);
   const [sentNow, setSentNow] = useState(sent ?? false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(initialError ?? null);
 
   const {
@@ -45,9 +50,10 @@ export function LoginForm({ redirectTo, error: initialError, sent }: Props) {
     });
     setPending(false);
     if (error) {
-      setError(error.message.toLowerCase());
+      setError(sentenceCase(error.message));
       return;
     }
+    setSentTo(email);
     setSentNow(true);
   };
 
@@ -62,40 +68,58 @@ export function LoginForm({ redirectTo, error: initialError, sent }: Props) {
     });
     if (error) {
       setPending(false);
-      setError(error.message.toLowerCase());
+      setError(sentenceCase(error.message));
     }
   };
 
   if (sentNow) {
     return (
-      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-        check your inbox for a sign-in link.
+      <div className="card space-y-4 p-5">
+        <div className="space-y-1">
+          <p className="display text-[20px]">Check your email</p>
+          <p className="text-[15px] text-(--muted)">
+            {sentTo ? (
+              <>
+                We sent a sign-in link to{" "}
+                <span className="font-medium text-(--foreground)">{sentTo}</span>.
+                Open it on this device to continue.
+              </>
+            ) : (
+              "We sent you a sign-in link. Open it on this device to continue."
+            )}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setSentNow(false)}
+          className="btn btn-secondary btn-block"
+        >
+          Use a different email
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
+    <div className="card space-y-5 p-5">
       <button
         type="button"
         onClick={signInWithGoogle}
         disabled={pending}
-        className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white text-sm font-medium text-zinc-900 transition hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900"
+        className="btn btn-secondary btn-block"
       >
-        continue with google
+        Continue with Google
       </button>
 
-      <div className="flex items-center gap-3 text-xs uppercase tracking-wider text-zinc-400">
-        <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
-        or
-        <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+      <div className="flex items-center gap-3">
+        <span className="h-px flex-1 bg-(--border)" />
+        <span className="label">or</span>
+        <span className="h-px flex-1 bg-(--border)" />
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
         <label className="block space-y-1.5">
-          <span className="text-sm text-zinc-700 dark:text-zinc-300">
-            email
-          </span>
+          <span className="label">Email</span>
           <input
             type="email"
             autoComplete="email"
@@ -104,22 +128,24 @@ export function LoginForm({ redirectTo, error: initialError, sent }: Props) {
             disabled={pending}
             placeholder="you@example.com"
             {...register("email")}
-            className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-900 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-100"
+            className="h-12 w-full rounded-[12px] border border-(--border) bg-(--surface-2) px-3.5 text-(--foreground) outline-none transition-colors placeholder:text-(--faint) focus:border-(--accent) disabled:opacity-60"
           />
         </label>
-        {errors.email && (
-          <p className="text-sm text-red-600">{errors.email.message}</p>
+        {errors.email?.message && (
+          <p className="text-[14px] text-(--danger)">
+            {sentenceCase(errors.email.message)}
+          </p>
         )}
         <button
           type="submit"
           disabled={pending}
-          className="h-11 w-full rounded-lg bg-zinc-900 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+          className="btn btn-primary btn-block"
         >
-          {pending ? "sending…" : "send magic link"}
+          {pending ? "Sending link" : "Email me a sign-in link"}
         </button>
       </form>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-[14px] text-(--danger)">{error}</p>}
     </div>
   );
 }

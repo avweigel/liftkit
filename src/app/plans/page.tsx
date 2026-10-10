@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ensurePhasesLoaded } from "@/lib/seed/ensure-phases";
-import { formatDayLabel } from "@/lib/display/format-day";
+import { PageHeader, SectionTitle } from "@/components/page-header";
+import { dayHeading, isCorePlan, isOldPhase } from "./plan-display";
 
 type PlanCard = {
   id: string;
@@ -28,6 +29,13 @@ const SELECT = `
   )
 `;
 
+// "Phase 2" before "Phase 10"
+function byPhaseNumber(a: PlanCard, b: PlanCard): number {
+  const na = Number(a.name.match(/\d+/)?.[0] ?? 0);
+  const nb = Number(b.name.match(/\d+/)?.[0] ?? 0);
+  return na - nb || a.name.localeCompare(b.name);
+}
+
 export default async function PlansPage() {
   const supabase = await createClient();
   const {
@@ -45,7 +53,7 @@ export default async function PlansPage() {
     try {
       await ensurePhasesLoaded(supabase, user!.id);
     } catch {
-      // non-fatal — page will render with whatever state we have
+      // non-fatal: the page renders with whatever state we have
     }
     const reload = await supabase
       .from("workout_plans")
@@ -73,148 +81,189 @@ export default async function PlansPage() {
     ? null
     : ((profileRes.data?.active_plan_id as string | null | undefined) ?? null);
 
+  const minePlans = mine ?? [];
+  const communityPlans = community ?? [];
+  const active =
+    [...minePlans, ...communityPlans].find((p) => p.id === activePlanId) ??
+    null;
+
+  const rest = minePlans.filter((p) => p.id !== active?.id);
+  const current = rest.filter((p) => !isOldPhase(p.name));
+  const phases = rest.filter((p) => isOldPhase(p.name)).sort(byPhaseNumber);
+  const others = communityPlans.filter((p) => p.id !== active?.id);
+
+  const nothingYet = minePlans.length === 0 && !active;
+
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-3 py-5 sm:px-6 sm:py-10">
-      <header className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-            phases
-          </h1>
-          <p className="mt-1 text-sm text-(--muted)">
-            pick one to follow for 6-8 weeks. the one you start becomes your{" "}
-            <span className="font-semibold text-(--foreground)">
-              active phase
-            </span>{" "}
-            and drives today&rsquo;s workout on the home page. phases can be
-            done in any order — they&rsquo;re not sequential.
-          </p>
-        </div>
-        <Link
-          href="/plans/new"
-          className="inline-flex h-10 items-center rounded-lg border border-(--border) bg-(--background) px-3 text-xs font-medium text-(--muted) hover:text-(--foreground)"
-        >
-          import new
-        </Link>
-      </header>
+    <main className="mx-auto w-full max-w-lg flex-1 space-y-6 px-4 pt-4 pb-tabbar">
+      <PageHeader
+        title="Plans"
+        subtitle="Follow one plan for 6 to 8 weeks. Your active plan sets today's workout."
+        action={
+          <Link href="/plans/new" className="btn btn-secondary btn-sm h-11">
+            Import
+          </Link>
+        }
+      />
 
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-(--muted)">
-          my plans
-        </h2>
-        <PlanGrid
-          plans={mine ?? []}
-          activeId={activePlanId}
-          empty="setting up your plans… refresh in a moment."
-        />
-      </section>
-
-      {(community?.length ?? 0) > 0 && (
+      {active && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-(--muted)">
-            community
-          </h2>
-          <PlanGrid plans={community ?? []} activeId={activePlanId} empty="" />
+          <PlanCardView plan={active} isActive />
+        </section>
+      )}
+
+      {nothingYet ? (
+        <p className="card p-6 text-center text-[15px] text-(--muted)">
+          Setting up your plans. Refresh in a moment, or import one from a
+          Google Sheet.
+        </p>
+      ) : (
+        current.length > 0 && (
+          <section className="space-y-3">
+            <SectionTitle>{active ? "Other plans" : "Your plans"}</SectionTitle>
+            <ul className="space-y-3">
+              {current.map((p) => (
+                <li key={p.id}>
+                  <PlanCardView plan={p} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        )
+      )}
+
+      {phases.length > 0 && (
+        <details className="group card overflow-hidden">
+          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 [&::-webkit-details-marker]:hidden">
+            <span className="flex items-center gap-2">
+              <span className="display text-[18px]">Older phases</span>
+              <span className="chip num">{phases.length}</span>
+            </span>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+              className="text-(--muted) transition-transform duration-200 group-open:rotate-180"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </summary>
+          <ul className="space-y-2 border-t border-(--border) bg-(--background) p-3">
+            {phases.map((p) => (
+              <li key={p.id}>
+                <PlanCardView plan={p} compact />
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {others.length > 0 && (
+        <section className="space-y-3">
+          <SectionTitle>Community plans</SectionTitle>
+          <ul className="space-y-3">
+            {others.map((p) => (
+              <li key={p.id}>
+                <PlanCardView plan={p} />
+              </li>
+            ))}
+          </ul>
         </section>
       )}
     </main>
   );
 }
 
-function PlanGrid({
-  plans,
-  activeId,
-  empty,
+function PlanCardView({
+  plan,
+  isActive = false,
+  compact = false,
 }: {
-  plans: PlanCard[];
-  activeId: string | null;
-  empty: string;
+  plan: PlanCard;
+  isActive?: boolean;
+  compact?: boolean;
 }) {
-  if (plans.length === 0) {
-    if (!empty) return null;
-    return (
-      <p className="rounded-lg border border-dashed border-(--border) p-6 text-center text-sm text-(--muted)">
-        {empty}
-      </p>
-    );
-  }
+  const core = isCorePlan(plan.name);
+  const days = plan.plan_weeks
+    .flatMap((w) => w.plan_days)
+    .slice()
+    .sort((a, b) => a.day_number - b.day_number);
+  const exerciseCount = days.reduce(
+    (n, d) => n + (d.plan_day_exercises?.length ?? 0),
+    0,
+  );
+
   return (
-    <ul className="grid gap-3 sm:grid-cols-2">
-      {plans.map((p) => {
-        const days = p.plan_weeks.flatMap((w) => w.plan_days);
-        const dayCount = days.length;
-        const exerciseCount = days.reduce(
-          (n, d) => n + (d.plan_day_exercises?.length ?? 0),
-          0,
-        );
-        const previews = days
-          .slice()
-          .sort((a, b) => a.day_number - b.day_number)
-          .slice(0, 6)
-          .map((d) => formatDayLabel(d.day_number, d.name));
-        const isActive = activeId === p.id;
-        return (
-          <li key={p.id}>
-            <Link
-              href={`/plans/${p.id}`}
-              className={`group relative block h-full overflow-hidden rounded-xl border p-4 transition ${
-                isActive
-                  ? "accent-wash border-(--accent)/40 bg-(--surface)"
-                  : "border-(--border) bg-(--surface) hover:border-(--accent)"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-base font-bold">
-                      {p.name}
-                    </span>
-                    {isActive && (
-                      <span className="shrink-0 rounded-full bg-(--accent) px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-(--accent-contrast)">
-                        active
-                      </span>
-                    )}
-                  </div>
-                  {p.description && (
-                    <p className="mt-0.5 line-clamp-2 text-xs text-(--muted)">
-                      {p.description}
-                    </p>
-                  )}
-                </div>
-                {p.is_public && (
-                  <span className="shrink-0 rounded border border-(--border) px-1.5 text-[10px] uppercase tracking-wider text-(--muted)">
-                    public
-                  </span>
-                )}
-              </div>
+    <Link
+      href={`/plans/${plan.id}`}
+      className={`card block transition-colors duration-150 ${
+        isActive
+          ? "border-(--accent-line) p-5"
+          : "p-4 hover:border-(--accent-line)"
+      }`}
+    >
+      {isActive && (
+        <div className="mb-2">
+          <span className="chip chip-accent">Active plan</span>
+        </div>
+      )}
+      <div className="flex items-start justify-between gap-3">
+        <h3
+          className={`display min-w-0 ${isActive ? "text-[26px]" : "text-[19px]"}`}
+        >
+          {plan.name}
+        </h3>
+        {plan.is_public && <span className="chip shrink-0">Public</span>}
+      </div>
+      {plan.description && !compact && (
+        <p className="mt-1 line-clamp-2 text-[15px] text-(--muted)">
+          {plan.description}
+        </p>
+      )}
 
-              <div className="mt-2 flex items-center gap-2 text-xs text-(--muted)">
-                <span>
-                  {dayCount} day{dayCount === 1 ? "" : "s"}
-                </span>
-                <span>·</span>
-                <span>
-                  {exerciseCount} exercise{exerciseCount === 1 ? "" : "s"}
-                </span>
-              </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        <span className="chip">
+          <span className="num">{days.length}</span>
+          {days.length === 1 ? "day" : "days"}
+        </span>
+        <span className="chip">
+          <span className="num">{exerciseCount}</span>
+          {exerciseCount === 1 ? "exercise" : "exercises"}
+        </span>
+        {core && <span className="chip">Daily A/B</span>}
+      </div>
 
-              {previews.length > 0 && (
-                <ul className="mt-3 space-y-0.5 text-xs">
-                  {previews.map((d, i) => (
-                    <li key={i} className="flex items-baseline gap-2">
-                      <span className="w-10 shrink-0 font-semibold text-(--accent)">
-                        {d.weekdayShort}
-                      </span>
-                      <span className="truncate text-(--foreground)/80">
-                        {d.name}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+      {days.length > 0 && (
+        <ul
+          className={`mt-3 grid gap-x-3 gap-y-1 text-[14px] ${
+            core ? "grid-cols-2" : "grid-cols-[2.75rem_1fr]"
+          }`}
+        >
+          {days.map((d, i) => {
+            const h = dayHeading(d.day_number, d.name, core);
+            return core ? (
+              <li key={i} className="truncate">
+                {h.name}
+              </li>
+            ) : (
+              <li key={i} className="contents">
+                <span
+                  className={`label ${isActive ? "text-(--accent)" : ""}`}
+                >
+                  {h.weekdayShort}
+                </span>
+                <span className="truncate">{h.name}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Link>
   );
 }

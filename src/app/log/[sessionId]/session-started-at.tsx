@@ -25,20 +25,16 @@ export function SessionStartedAt({ sessionId, startedAt, finishedAt }: Props) {
 
   if (editing) {
     return (
-      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-(--muted)">
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <input
           type="datetime-local"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          className="rounded border border-(--border) bg-(--background) px-2 py-1"
+          aria-label="Start time"
+          className="h-11 rounded-xl bg-(--surface-2) px-3 text-[16px] outline-none focus:ring-2 focus:ring-(--accent-line)"
         />
-        <button
-          type="button"
-          onClick={save}
-          disabled={pending}
-          className="rounded bg-(--foreground) px-2 py-1 text-xs font-semibold text-(--background) disabled:opacity-60"
-        >
-          {pending ? "…" : "save"}
+        <button type="button" onClick={save} disabled={pending} className="btn btn-primary btn-sm">
+          {pending ? "Saving…" : "Save"}
         </button>
         <button
           type="button"
@@ -46,38 +42,56 @@ export function SessionStartedAt({ sessionId, startedAt, finishedAt }: Props) {
             setEditing(false);
             setValue(toLocalInput(startedAt));
           }}
-          className="text-xs"
+          className="btn btn-ghost btn-sm text-(--muted)"
         >
-          cancel
+          Cancel
         </button>
       </div>
     );
   }
 
   return (
-    <p className="mt-1 text-xs text-(--muted)">
-      started {format(startedAt)}
-      {finishedAt ? ` · finished ${format(finishedAt)}` : ""}
-      {"  "}
+    <p className="text-[14px] text-(--muted)">
+      {finishedAt ? (
+        <>
+          <span className="num text-[16px] text-(--foreground)">{time(startedAt)}</span> to{" "}
+          <span className="num text-[16px] text-(--foreground)">{time(finishedAt)}</span>, {day(startedAt)}
+          <span className="ml-2 inline-flex">
+            <span className="chip chip-ok">
+              <span className="num text-[13px]">{minutesBetween(startedAt, finishedAt)}</span> min
+            </span>
+          </span>
+        </>
+      ) : (
+        <>
+          Started <span className="num text-[16px] text-(--foreground)">{time(startedAt)}</span>, {day(startedAt)}
+        </>
+      )}
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="ml-1 underline hover:text-(--foreground)"
+        className="ml-2 font-semibold text-(--accent)"
       >
-        edit
+        Change
       </button>
     </p>
   );
 }
 
-function format(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
+function time(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
+function day(iso: string) {
+  return new Date(iso).toLocaleDateString("en-GB", {
     weekday: "short",
-    month: "short",
     day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
+    month: "short",
   });
+}
+
+function minutesBetween(a: string, b: string) {
+  return Math.max(1, Math.round((Date.parse(b) - Date.parse(a)) / 60000));
 }
 
 function toLocalInput(iso: string): string {

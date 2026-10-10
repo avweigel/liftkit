@@ -18,13 +18,14 @@ export function DismissibleHint({
   const [show, setShow] = useState<boolean | null>(null);
 
   useEffect(() => {
+    let dismissed = false;
     try {
-      const dismissed =
-        localStorage.getItem(KEY_PREFIX + storageKey) === "1";
-      setShow(!dismissed);
+      dismissed = localStorage.getItem(KEY_PREFIX + storageKey) === "1";
     } catch {
-      setShow(true);
+      /* storage blocked: show the hint */
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShow(!dismissed);
   }, [storageKey]);
 
   const dismiss = () => {
@@ -44,10 +45,21 @@ export function DismissibleHint({
       <button
         type="button"
         onClick={dismiss}
-        aria-label="dismiss hint"
-        className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none text-(--muted) hover:bg-(--border) hover:text-(--foreground)"
+        aria-label="Dismiss hint"
+        className="absolute top-0 right-0 flex h-11 w-11 items-center justify-center rounded-full text-(--muted) transition-colors hover:text-(--foreground) active:bg-(--surface-2)"
       >
-        ×
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          aria-hidden
+        >
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
       </button>
     </div>
   );

@@ -29,10 +29,6 @@ import {
   type DayKind,
   type WarmupOption,
 } from "@/lib/program/day-profile";
-import {
-  DismissibleHint,
-  HINT_KEYS,
-} from "@/components/dismissible-hint";
 
 type LastSessionSet = {
   set_number: number;
@@ -106,7 +102,7 @@ export function SessionLogger({
 }: Props) {
   const [sets, setSets] = useState<SessionSet[]>(initialSets);
   const [notes, setNotes] = useState(initialNotes);
-  const [restOn, setRestOn] = useState(false);
+  const [restOn, setRestOn] = useState(true);
   const [restSecondsLeft, setRestSecondsLeft] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -133,7 +129,7 @@ export function SessionLogger({
   // exercise (e.g. an old import where "Tricep Kickback - L/R/bilateral"
   // all mapped to one library entry) share the same sets in the logger,
   // so counting 3 × prescribed is misleading. take the max prescribed
-  // per exercise_id instead — that's how many unique sets you can log.
+  // per exercise_id instead, since that's how many unique sets you can log.
   const totalSets = useMemo(() => {
     const maxByExerciseId = new Map<string, number>();
     for (const ex of exercises) {
@@ -299,43 +295,19 @@ export function SessionLogger({
   };
 
   return (
-    <div className="space-y-3 pb-28">
-      <div className="sticky top-0 z-10 -mx-3 bg-(--background)/92 px-3 pt-1 pb-1 backdrop-blur sm:-mx-6 sm:px-6">
-        <ProgressHeader
-          done={workingSetsLogged}
-          total={totalSets}
-          restOn={restOn}
-          onToggleRest={() => setRestOn((v) => !v)}
-          finished={finished}
-        />
-      </div>
+    <div className="space-y-5">
+      <ProgressHeader
+        done={workingSetsLogged}
+        total={totalSets}
+        restOn={restOn}
+        onToggleRest={() => setRestOn((v) => !v)}
+        finished={finished}
+      />
 
       {exercises.length === 0 && (
-        <p className="rounded-lg border border-dashed border-(--border) p-6 text-center text-sm text-(--muted)">
-          no exercises on this day.
+        <p className="card p-6 text-center text-[15px] text-(--muted)">
+          Nothing planned for this day yet. Add an exercise to start logging.
         </p>
-      )}
-
-      {!finished && sets.length === 0 && exercises.length > 0 && (
-        <DismissibleHint storageKey={HINT_KEYS.loggerHowTo}>
-          <div className="rounded-lg border border-(--accent)/30 bg-(--accent-soft) p-3 pr-9 text-xs text-(--foreground)/80">
-            <div className="font-bold text-(--accent)">how to log</div>
-            <ul className="mt-1 space-y-0.5">
-              <li>
-                tap the big{" "}
-                <span className="font-bold text-(--accent)">✓</span> to log a
-                set with the pre-filled weight × reps.
-              </li>
-              <li>tap the numbers to adjust first, then log.</li>
-              <li>tap a logged row to edit or delete it.</li>
-              <li>
-                when you&rsquo;re done for the day, tap{" "}
-                <span className="font-semibold">finish workout</span> at the
-                bottom.
-              </li>
-            </ul>
-          </div>
-        </DismissibleHint>
       )}
 
       {warmup && !finished && <WarmupCard warmup={warmup} />}
@@ -360,7 +332,7 @@ export function SessionLogger({
                     ? () => removeSessionExtra(item._ex.extra_id!, sessionId)
                     : undefined
                 }
-                finished={false}
+                finished={finished}
               />
             );
           }
@@ -383,7 +355,7 @@ export function SessionLogger({
               onRemoveExtra={async (extraId) => {
                 await removeSessionExtra(extraId, sessionId);
               }}
-              finished={false}
+              finished={finished}
             />
           );
         })}
@@ -392,39 +364,37 @@ export function SessionLogger({
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
-            className="h-11 w-full rounded-xl border-2 border-dashed border-(--border) text-sm font-medium text-(--muted) hover:border-(--accent) hover:text-(--accent)"
+            className="btn btn-secondary btn-block"
           >
-            + add exercise to this session
+            Add an exercise
           </button>
         )}
       </div>
 
-      <div className="space-y-1 rounded-xl border border-(--border) bg-(--surface) p-3">
-        <label className="block space-y-1 text-xs">
-          <span className="text-(--muted)">session notes</span>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            onBlur={() => {
-              if (finished) updateSession(sessionId, { notes });
-            }}
-            rows={2}
-            placeholder="how it felt, weight jumps, anything to remember"
-            className="w-full resize-y rounded border border-(--border) bg-(--background) px-2 py-1 text-sm outline-none focus:border-(--accent)"
-          />
-        </label>
-      </div>
+      <label className="card block space-y-2 p-4">
+        <span className="label">Notes</span>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          onBlur={() => {
+            if (finished) updateSession(sessionId, { notes });
+          }}
+          rows={2}
+          placeholder="How it felt, weights to change next time"
+          className="w-full resize-y rounded-xl bg-(--surface-2) px-3 py-2 text-[15px] outline-none placeholder:text-(--faint) focus:ring-2 focus:ring-(--accent-line)"
+        />
+      </label>
 
       {!finished && (
-        <div className="safe-bottom fixed bottom-0 left-0 right-0 z-20 border-t border-(--border) bg-(--background)/95 backdrop-blur">
-          <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 pt-3 sm:px-6">
+        <div className="safe-bottom fixed inset-x-0 bottom-0 z-20 border-t border-(--border) bg-(--background)/94 backdrop-blur-md">
+          <div className="mx-auto flex max-w-lg items-center gap-3 px-4 pt-3">
             <button
               type="button"
               onClick={onFinishTap}
               disabled={pending}
-              className="h-12 flex-1 rounded-xl bg-(--accent-3) text-base font-semibold text-(--accent-3-contrast) shadow-sm active:scale-[0.99] disabled:opacity-60"
+              className="btn btn-primary btn-block"
             >
-              {pending ? "finishing…" : "finish workout"}
+              {pending ? "Finishing…" : "Finish workout"}
             </button>
           </div>
         </div>
@@ -456,10 +426,13 @@ export function SessionLogger({
         <button
           type="button"
           onClick={() => setRestSecondsLeft(null)}
-          className="fixed bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full bg-(--foreground) px-5 py-2 text-sm font-semibold text-(--background) shadow-lg tabular-nums"
-          style={{ bottom: "calc(env(safe-area-inset-bottom) + 5rem)" }}
+          aria-label="Skip rest"
+          className="fixed left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-(--foreground) py-2 pr-4 pl-3 text-(--background) shadow-lg"
+          style={{ bottom: "calc(env(safe-area-inset-bottom) + 5.5rem)" }}
         >
-          rest · {formatRest(restSecondsLeft)}
+          <span className="text-[13px] font-semibold opacity-70">Rest</span>
+          <span className="num text-[22px] leading-none">{formatRest(restSecondsLeft)}</span>
+          <span className="text-[12px] font-semibold opacity-70">Skip</span>
         </button>
       )}
     </div>
@@ -481,34 +454,28 @@ function ProgressHeader({
 }) {
   const pct = total === 0 ? 0 : Math.min(100, (done / total) * 100);
   return (
-    <div className="space-y-2 rounded-xl border border-(--border) bg-(--surface) p-3">
-      <div className="flex items-end justify-between gap-2">
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-(--muted)">
-            progress
-          </div>
-          <div className="text-xl font-semibold tabular-nums">
-            {done}
-            <span className="text-(--muted)"> / {total}</span>
-          </div>
+    <div className="sticky top-0 z-10 -mx-4 bg-(--background)/94 px-4 pt-[max(env(safe-area-inset-top),0.5rem)] pb-3 backdrop-blur-md">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-baseline gap-1.5">
+          <span className="num text-[26px] leading-none">{done}</span>
+          <span className="text-[14px] text-(--muted)">
+            of <span className="num text-[16px]">{total}</span> sets
+          </span>
         </div>
         {!finished && (
-          <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-(--muted)">
-            <span>rest timer</span>
-            <span
-              onClick={onToggleRest}
-              className={`relative inline-block h-5 w-9 rounded-full transition ${restOn ? "bg-(--accent)" : "bg-(--border)"}`}
-            >
-              <span
-                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${restOn ? "left-[18px]" : "left-0.5"}`}
-              />
-            </span>
-          </label>
+          <button
+            type="button"
+            onClick={onToggleRest}
+            aria-pressed={restOn}
+            className={`chip h-8 px-3 text-[13px] ${restOn ? "chip-accent" : ""}`}
+          >
+            Rest timer {restOn ? "on" : "off"}
+          </button>
         )}
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-(--border)">
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-(--surface-2)">
         <div
-          className="progress-fill h-full transition-all"
+          className={`h-full rounded-full transition-[width] duration-300 ${pct >= 100 ? "bg-(--ok)" : "bg-(--accent)"}`}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -535,10 +502,12 @@ function SoloExerciseCard({
   onRemoveExtra?: () => Promise<void>;
   finished: boolean;
 }) {
+  const letter = parseSetCode(exercise.notes).code?.letter ?? null;
   return (
-    <section className="space-y-2.5 rounded-xl border border-(--border) bg-(--background) p-3">
+    <section className="card space-y-3 p-4">
       <ExerciseHeader
         exercise={exercise}
+        badge={letter}
         onRemoveExtra={onRemoveExtra}
       />
       <SetList
@@ -553,7 +522,7 @@ function SoloExerciseCard({
   );
 }
 
-// ----- Superset block: N exercises side-by-side -----
+// ----- Superset block: exercises stacked, done back to back -----
 
 function SupersetBlock({
   letter,
@@ -574,26 +543,22 @@ function SupersetBlock({
   onRemoveExtra?: (extraId: string) => Promise<void>;
   finished: boolean;
 }) {
-  const cols = Math.min(exercises.length, 2);
   return (
-    <section className="space-y-2 rounded-xl border-2 border-(--accent)/30 bg-(--background) p-2">
-      <div className="flex items-center gap-1.5 px-1 text-[11px] font-bold uppercase tracking-wider text-(--accent)">
-        <span className="inline-block h-1.5 w-1.5 rounded-full bg-(--accent)" />
-        superset {letter}
+    <section className="card overflow-hidden">
+      <div className="flex items-center gap-2 px-4 pt-4">
+        <span className="display flex h-7 w-7 items-center justify-center rounded-lg bg-(--accent-soft) text-[16px] text-(--accent)">
+          {letter}
+        </span>
+        <span className="label">
+          Superset, {exercises.length} exercises back to back
+        </span>
       </div>
-
-      <div
-        className="grid gap-1.5"
-        style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
-      >
-        {exercises.map((ex) => (
-          <div
-            key={ex.id}
-            className="space-y-2 rounded-lg bg-(--surface) p-1.5"
-          >
+      <div className="divide-y divide-(--border)">
+        {exercises.map((ex, i) => (
+          <div key={ex.id} className="space-y-3 p-4">
             <ExerciseHeader
               exercise={ex}
-              compact
+              badge={`${letter}${i + 1}`}
               onRemoveExtra={
                 ex.is_extra && ex.extra_id && onRemoveExtra
                   ? () => onRemoveExtra(ex.extra_id!)
@@ -607,7 +572,6 @@ function SupersetBlock({
               onUpsert={(set) => onUpsert(ex.exercise_id, set)}
               onDelete={onDelete}
               finished={finished}
-              compact
             />
           </div>
         ))}
@@ -618,94 +582,80 @@ function SupersetBlock({
 
 function ExerciseHeader({
   exercise,
-  compact = false,
+  badge,
   onRemoveExtra,
 }: {
   exercise: Exercise;
-  compact?: boolean;
+  badge: string | null;
   onRemoveExtra?: () => Promise<void> | void;
 }) {
   const { cleanNotes } = parseSetCode(exercise.notes);
-  const rx = buildRx(exercise);
   const conv = weightConvention(exercise.name, exercise.equipment);
+  const reps = formatRxReps(exercise.prescribed_reps);
   return (
-    <header className="space-y-1">
-      <div className="flex items-start justify-between gap-2">
-        <Link
-          href={`/exercises/${exercise.exercise_id}`}
-          className={`block flex-1 font-bold leading-tight line-clamp-2 hover:underline ${
-            compact ? "text-[13px]" : "text-base sm:text-lg"
-          }`}
-        >
-          {exercise.name}
-        </Link>
-        {exercise.is_extra && (
-          <span
-            className={`shrink-0 rounded border border-(--accent)/50 px-1.5 py-0 font-semibold text-(--accent) ${compact ? "text-[9px]" : "text-[10px]"} uppercase tracking-wider`}
+    <header className="space-y-1.5">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <Link
+            href={`/exercises/${exercise.exercise_id}`}
+            className="display block text-[21px] hover:underline"
           >
-            added
-          </span>
-        )}
+            {exercise.name}
+          </Link>
+        </div>
+        {exercise.is_extra && <span className="chip shrink-0">Added</span>}
         {onRemoveExtra && (
           <button
             type="button"
             onClick={() => {
-              if (!confirm(`remove ${exercise.name} from this session?`))
-                return;
+              if (!confirm(`Remove ${exercise.name} from this workout?`)) return;
               void onRemoveExtra();
             }}
-            aria-label="remove this added exercise"
-            className="shrink-0 text-(--muted) hover:text-red-600"
+            className="btn btn-ghost btn-sm text-(--muted)"
           >
-            ×
+            Remove
           </button>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-1">
-        <div
-          className={`inline-block max-w-full truncate rounded-md bg-(--accent-soft) px-1.5 py-0.5 font-semibold text-(--accent) tabular-nums ${
-            compact ? "text-[11px]" : "text-sm"
-          }`}
-        >
-          {rx}
-        </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {badge && badge.length > 1 && (
+          <span className="chip chip-accent num text-[13px]">{badge}</span>
+        )}
+        <span className="chip">
+          <span className="num text-[14px] text-(--foreground)">
+            {exercise.prescribed_sets} × {reps}
+          </span>
+          {exercise.prescribed_weight != null && (
+            <span className="num text-[14px] text-(--foreground)">
+              @ {exercise.prescribed_weight}
+            </span>
+          )}
+        </span>
+        {exercise.rest_seconds != null && exercise.rest_seconds > 0 && (
+          <span className="chip">
+            rest <span className="num text-[14px]">{exercise.rest_seconds}</span> s
+          </span>
+        )}
         {conv && (
-          <span
-            className={`rounded border border-(--border) px-1.5 py-0.5 font-medium text-(--muted) ${
-              compact ? "text-[10px]" : "text-[11px]"
-            }`}
-            title={conv.summary}
-          >
-            wt = {conv.hint}
+          <span className="text-[12px] text-(--muted)" title={conv.summary}>
+            {conv.mode === "single" ? "Weight per dumbbell" : conv.equipment === "dumbbell" ? "Weight is both dumbbells" : "Weight of the kettlebell"}
           </span>
         )}
       </div>
+      {cleanNotes && <p className="text-[14px] text-(--muted)">{cleanNotes}</p>}
       {exercise.last_session && (
-        <div className={compact ? "text-[10px]" : "text-xs"}>
-          <div className="text-(--muted)">
-            last {relativeDays(exercise.last_session.logged_at)}
-          </div>
-          <div className="flex flex-wrap gap-x-2 tabular-nums text-(--foreground)/70">
-            {exercise.last_session.sets.map((s, i) => (
-              <span key={i}>
-                {s.weight ?? "bw"}×{s.reps}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-      {cleanNotes && !compact && (
-        <p className="text-xs text-(--muted)">{cleanNotes}</p>
+        <p className="text-[13px] text-(--muted)">
+          Last time, {relativeDays(exercise.last_session.logged_at)}:{" "}
+          {exercise.last_session.sets.map((s, i) => (
+            <span key={i} className="num text-[15px] text-(--foreground)">
+              {i > 0 ? ", " : ""}
+              {s.weight ?? "BW"}×{s.reps}
+            </span>
+          ))}
+        </p>
       )}
     </header>
   );
-}
-
-function buildRx(ex: Exercise): string {
-  const reps = formatRxReps(ex.prescribed_reps);
-  const base = `${ex.prescribed_sets} × ${reps}`;
-  if (ex.prescribed_weight != null) return `${base} @ ${ex.prescribed_weight}`;
-  return base;
 }
 
 type UpsertPayload = {
@@ -725,7 +675,6 @@ function SetList({
   onUpsert,
   onDelete,
   finished,
-  compact = false,
 }: {
   exercise: Exercise;
   sets: SessionSet[];
@@ -733,7 +682,6 @@ function SetList({
   onUpsert: (set: UpsertPayload) => Promise<string>;
   onDelete: (setId: string) => Promise<void>;
   finished: boolean;
-  compact?: boolean;
 }) {
   const [expandedSetNumber, setExpandedSetNumber] = useState<number | null>(
     null,
@@ -765,24 +713,20 @@ function SetList({
     n: number,
   ): { weight: number | null; reps: number | null } => {
     const target = repTargetForSet(exercise.prescribed_reps, n);
-    // previous working set in this session (skip warmups for weight scaling)
     const prevInSession =
       [...sets]
         .filter((s) => !s.is_warmup)
         .sort((a, b) => b.set_number - a.set_number)[0] ?? null;
     const sameSetLast = lastForSet(n);
 
-    // weight priority:
-    // 1. same-set-number from last session (most accurate — you did exactly this)
-    // 2. scale previous working set's weight via epley 1rm if target reps differ
-    // 3. fallback to previous working set's weight as-is
-    // 4. fallback to prescribed_weight
     // the other side's weight for this set wins over everything: you use
     // the same dumbbell on both sides.
     const carried =
       carrySets?.find((s) => s.set_number === n && !s.is_warmup)?.weight ??
       null;
 
+    // weight priority: other side, same set last session, previous set
+    // scaled to the new rep target, previous set as is, prescribed.
     let weight: number | null;
     if (carried != null) {
       weight = carried;
@@ -795,27 +739,40 @@ function SetList({
       target.perSet &&
       target.value !== prevInSession.reps
     ) {
-      // scale weight inversely with rep target using epley reciprocal
       const oneRM = prevInSession.weight * (1 + prevInSession.reps / 30);
       const raw = oneRM / (1 + target.value / 30);
       weight = snapWeight(kind, raw);
     } else {
-      weight =
-        prevInSession?.weight ?? exercise.prescribed_weight;
+      weight = prevInSession?.weight ?? exercise.prescribed_weight;
     }
 
-    // reps priority: same set last time > per-set target > previous set
     const reps =
-      sameSetLast?.reps ??
-      target.value ??
-      prevInSession?.reps ??
-      null;
+      sameSetLast?.reps ?? target.value ?? prevInSession?.reps ?? null;
 
     return { weight, reps };
   };
 
+  if (finished) {
+    const logged = rows.filter((r) => r.logged);
+    if (logged.length === 0) {
+      return <p className="text-[14px] text-(--faint)">Not logged</p>;
+    }
+    return (
+      <ul className="space-y-1.5">
+        {logged.map((r) => (
+          <li key={r.n}>
+            <LoggedRow set={r.logged!} onEdit={() => {}} readOnly />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  // the first unlogged set is the one you're on: give it the spotlight
+  const nextUp = rows.find((r) => !r.logged)?.n ?? null;
+
   return (
-    <ul className="space-y-1">
+    <ul className="space-y-1.5">
       {rows.map((r) => {
         const isExpanded = expandedSetNumber === r.n;
         if (isExpanded) {
@@ -829,7 +786,6 @@ function SetList({
                 initialIsWarmup={r.logged?.is_warmup ?? false}
                 finished={finished}
                 showDelete={!!r.logged}
-                compact={compact}
                 weightConv={weightConv}
                 weightKind={kind}
                 onSave={async (state) => {
@@ -862,8 +818,7 @@ function SetList({
             <li key={r.n}>
               <LoggedRow
                 set={r.logged}
-                onEdit={() => !finished && setExpandedSetNumber(r.n)}
-                compact={compact}
+                onEdit={() => setExpandedSetNumber(r.n)}
               />
             </li>
           );
@@ -878,8 +833,7 @@ function SetList({
               reps={suggest.reps}
               targetText={target.text}
               showTarget={target.perSet}
-              finished={finished}
-              compact={compact}
+              current={r.n === nextUp}
               onExpand={() => setExpandedSetNumber(r.n)}
               onQuickLog={async () => {
                 if (suggest.reps === null) {
@@ -900,54 +854,65 @@ function SetList({
           </li>
         );
       })}
-      {!finished && (
-        <li>
-          <button
-            type="button"
-            onClick={() => setExpandedSetNumber(maxSet + 1)}
-            className="h-7 w-full rounded border border-dashed border-(--border) text-[11px] text-(--muted) hover:border-(--accent) hover:text-(--accent)"
-          >
-            + add set
-          </button>
-        </li>
-      )}
+      <li>
+        <button
+          type="button"
+          onClick={() => setExpandedSetNumber(maxSet + 1)}
+          className="h-10 w-full rounded-xl text-[14px] font-semibold text-(--muted) hover:bg-(--surface-2) hover:text-(--foreground)"
+        >
+          Add a set
+        </button>
+      </li>
     </ul>
+  );
+}
+
+function CheckGlyph({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
   );
 }
 
 function LoggedRow({
   set,
   onEdit,
-  compact,
+  readOnly = false,
 }: {
   set: SessionSet;
   onEdit: () => void;
-  compact: boolean;
+  readOnly?: boolean;
 }) {
+  const body = (
+    <>
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--ok) text-(--surface)">
+        <CheckGlyph />
+      </span>
+      <span className="num w-5 text-[15px] text-(--muted)">{set.set_number}</span>
+      {set.is_warmup && <span className="chip">Warm-up</span>}
+      <span className="ml-auto flex items-baseline gap-1">
+        <span className="num text-[24px] leading-none">{set.weight ?? "BW"}</span>
+        <span className="text-[14px] text-(--muted)">×</span>
+        <span className="num text-[24px] leading-none">{set.reps}</span>
+      </span>
+    </>
+  );
+  if (readOnly) {
+    return (
+      <div className="flex min-h-12 items-center gap-3 rounded-xl bg-(--ok-soft) px-3">
+        {body}
+      </div>
+    );
+  }
   return (
     <button
       type="button"
       onClick={onEdit}
-      className={`flex min-h-10 w-full items-center gap-2 rounded-md border border-(--border) bg-(--accent-soft)/60 px-2 text-left ${
-        compact ? "text-sm" : "text-base"
-      }`}
+      aria-label={`Set ${set.set_number} logged, ${set.weight ?? "bodyweight"} by ${set.reps}. Tap to edit.`}
+      className="flex min-h-12 w-full items-center gap-3 rounded-xl bg-(--ok-soft) px-3 text-left"
     >
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-(--accent-2) text-xs font-bold text-(--accent-2-contrast)">
-        ✓
-      </span>
-      <span className="text-xs text-(--muted) tabular-nums">
-        {set.set_number}
-        {set.is_warmup && (
-          <span className="ml-1 rounded bg-(--border) px-1 text-[9px] uppercase tracking-wider">
-            wu
-          </span>
-        )}
-      </span>
-      <span className="ml-auto font-bold tabular-nums">
-        {set.weight ?? "bw"}
-        <span className="mx-0.5 text-(--muted)">×</span>
-        {set.reps}
-      </span>
+      {body}
     </button>
   );
 }
@@ -958,8 +923,7 @@ function QuickLogRow({
   reps,
   targetText,
   showTarget,
-  finished,
-  compact,
+  current,
   onExpand,
   onQuickLog,
 }: {
@@ -968,14 +932,11 @@ function QuickLogRow({
   reps: number | null;
   targetText: string;
   showTarget: boolean;
-  finished: boolean;
-  compact: boolean;
+  current: boolean;
   onExpand: () => void;
   onQuickLog: () => Promise<void>;
 }) {
   const [pending, setPending] = useState(false);
-  const display =
-    reps === null ? "tap to log" : `${weight ?? "bw"} × ${reps}`;
   const handleQuick = async () => {
     if (reps === null) return onExpand();
     setPending(true);
@@ -986,47 +947,47 @@ function QuickLogRow({
     }
   };
   return (
-    <div className="flex min-h-11 items-center gap-2 rounded-md border border-(--border) px-1.5">
+    <div
+      className={`flex min-h-14 items-center gap-3 rounded-xl pl-3 pr-1.5 ${
+        current ? "bg-(--surface-2) ring-1 ring-(--accent-line)" : "bg-(--surface-2)/60"
+      }`}
+    >
+      <span
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 ${
+          current ? "border-(--accent)" : "border-(--border)"
+        }`}
+      >
+        <span className={`num text-[14px] ${current ? "text-(--accent)" : "text-(--muted)"}`}>{setNumber}</span>
+      </span>
       <button
         type="button"
         onClick={onExpand}
-        disabled={finished}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-(--border) text-xs text-(--muted) hover:border-(--accent) hover:text-(--accent) disabled:opacity-60"
-        aria-label={`edit set ${setNumber}`}
+        aria-label={`Edit set ${setNumber}`}
+        className="min-w-0 flex-1 py-1.5 text-left"
       >
-        {setNumber}
-      </button>
-      <button
-        type="button"
-        onClick={onExpand}
-        disabled={finished}
-        className="min-w-0 flex-1 text-left disabled:opacity-60"
-      >
-        <div
-          className={`truncate font-semibold tabular-nums text-(--foreground) ${
-            compact ? "text-sm" : "text-base"
-          }`}
-        >
-          {display}
-        </div>
+        {reps === null ? (
+          <span className="text-[15px] font-semibold text-(--muted)">Tap to enter</span>
+        ) : (
+          <span className={`flex items-baseline gap-1 ${current ? "" : "text-(--muted)"}`}>
+            <span className="num text-[24px] leading-none">{weight ?? "BW"}</span>
+            <span className="text-[14px] text-(--muted)">×</span>
+            <span className="num text-[24px] leading-none">{reps}</span>
+          </span>
+        )}
         {showTarget && targetText && (
-          <div
-            className={`text-(--muted) ${compact ? "text-[10px]" : "text-[11px]"}`}
-          >
-            target {targetText}
-          </div>
+          <span className="block text-[12px] text-(--muted)">Target {targetText}</span>
         )}
       </button>
       <button
         type="button"
         onClick={handleQuick}
-        disabled={pending || finished || reps === null}
-        className={`flex shrink-0 items-center justify-center rounded-md bg-(--accent-2) font-bold text-(--accent-2-contrast) active:scale-95 disabled:opacity-60 ${
-          compact ? "h-9 w-10 text-base" : "h-10 w-12 text-lg"
+        disabled={pending || reps === null}
+        aria-label={`Log set ${setNumber} as shown`}
+        className={`flex h-11 w-14 shrink-0 items-center justify-center rounded-[12px] transition active:scale-95 disabled:opacity-50 ${
+          current ? "bg-(--accent) text-(--accent-contrast)" : "bg-(--surface) text-(--muted)"
         }`}
-        aria-label="log with these values"
       >
-        {pending ? "…" : "✓"}
+        {pending ? <span className="text-[13px] font-semibold">…</span> : <CheckGlyph size={20} />}
       </button>
     </div>
   );
@@ -1039,7 +1000,6 @@ function SetEditor({
   initialIsWarmup,
   finished,
   showDelete = false,
-  compact = false,
   weightConv = null,
   weightKind: kind = "other",
   onSave,
@@ -1052,7 +1012,6 @@ function SetEditor({
   initialIsWarmup: boolean;
   finished: boolean;
   showDelete?: boolean;
-  compact?: boolean;
   weightConv?: ReturnType<typeof weightConvention> | null;
   weightKind?: WeightKind;
   onSave: (state: {
@@ -1071,60 +1030,60 @@ function SetEditor({
   );
   const [isWarmup, setIsWarmup] = useState(initialIsWarmup);
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
     setError(null);
     const weightNum = weight.trim() === "" ? null : Number(weight);
     const repsNum = Number(reps);
-    if (!Number.isInteger(repsNum) || repsNum < 0) {
-      setError("enter reps");
+    if (reps.trim() === "" || !Number.isInteger(repsNum) || repsNum < 0) {
+      setError("Enter the reps you did.");
       return;
     }
     if (weightNum !== null && !Number.isFinite(weightNum)) {
-      setError("invalid weight");
+      setError("Weight needs to be a number, or leave it empty for bodyweight.");
       return;
     }
     setSaving(true);
     try {
       await onSave({ weight: weightNum, reps: repsNum, is_warmup: isWarmup });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "save failed");
+      setError(e instanceof Error ? e.message : "Couldn't save. Try again.");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="rounded-lg border-2 border-(--accent) bg-(--accent-soft) p-2">
-      <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-(--muted)">
-        <span>set {setNumber}</span>
-        <label className="flex items-center gap-1.5 normal-case text-xs font-normal">
-          <input
-            type="checkbox"
-            checked={isWarmup}
-            onChange={(e) => setIsWarmup(e.target.checked)}
-            className="h-4 w-4 accent-(--accent)"
-          />
-          warmup
-        </label>
+    <div className="space-y-3 rounded-xl bg-(--accent-soft) p-3 ring-1 ring-(--accent-line)">
+      <div className="flex items-center justify-between">
+        <span className="text-[14px] font-semibold">
+          Set <span className="num text-[16px]">{setNumber}</span>
+        </span>
+        <button
+          type="button"
+          onClick={() => setIsWarmup((v) => !v)}
+          aria-pressed={isWarmup}
+          className={`chip h-8 px-3 text-[13px] ${isWarmup ? "chip-accent" : ""}`}
+        >
+          Warm-up set
+        </button>
       </div>
 
-      <div className={compact ? "space-y-1.5" : "grid grid-cols-2 gap-2"}>
-        <div className="space-y-1">
-          <Stepper
-            label="weight"
-            value={weight}
-            onChange={setWeight}
-            step={5}
-            nextValue={(cur, dir) => stepWeight(kind, cur, dir)}
-            allowEmpty
-            disabled={finished}
-          />
-          <WeightSplitHint value={weight} conv={weightConv} />
-        </div>
+      <div className="space-y-2">
         <Stepper
-          label="reps"
+          label="Weight"
+          value={weight}
+          onChange={setWeight}
+          step={5}
+          nextValue={(cur, dir) => stepWeight(kind, cur, dir)}
+          allowEmpty
+          disabled={finished}
+        />
+        <WeightSplitHint value={weight} conv={weightConv} />
+        <Stepper
+          label="Reps"
           value={reps}
           onChange={setReps}
           step={1}
@@ -1133,36 +1092,39 @@ function SetEditor({
         />
       </div>
 
-      <div className="mt-2 flex gap-1.5">
+      {error && <p className="text-[13px] text-(--danger)">{error}</p>}
+
+      <div className="flex gap-2">
+        {onCancel && (
+          <button type="button" onClick={onCancel} className="btn btn-secondary flex-1">
+            Cancel
+          </button>
+        )}
         <button
           type="button"
           onClick={submit}
           disabled={saving || finished}
-          className="h-9 flex-1 rounded-md bg-(--accent-2) text-sm font-semibold text-(--accent-2-contrast) active:scale-[0.99] disabled:opacity-60"
+          className="btn btn-primary flex-[2]"
         >
-          {saving ? "saving…" : "log set"}
+          {saving ? "Saving…" : "Log set"}
         </button>
-        {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="h-9 rounded-md border border-(--border) bg-(--background) px-2.5 text-xs text-(--muted)"
-          >
-            cancel
-          </button>
-        )}
-        {showDelete && onDelete && (
-          <button
-            type="button"
-            onClick={onDelete}
-            className="h-9 rounded-md border border-(--border) bg-(--background) px-2.5 text-xs text-red-600 dark:text-red-400"
-            aria-label="delete set"
-          >
-            ✕
-          </button>
-        )}
       </div>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {showDelete && onDelete && (
+        <button
+          type="button"
+          onClick={() => {
+            if (!confirmDelete) {
+              setConfirmDelete(true);
+              setTimeout(() => setConfirmDelete(false), 3000);
+              return;
+            }
+            void onDelete();
+          }}
+          className={`h-9 w-full rounded-lg text-[13px] font-semibold ${confirmDelete ? "text-(--danger)" : "text-(--muted)"}`}
+        >
+          {confirmDelete ? "Tap again to delete this set" : "Delete set"}
+        </button>
+      )}
     </div>
   );
 }
@@ -1210,16 +1172,16 @@ function Stepper({
 
   return (
     <div className="flex items-center gap-2">
-      <span className="w-11 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-(--muted)">
+      <span className="w-14 shrink-0 text-[14px] font-semibold text-(--muted)">
         {label}
       </span>
-      <div className="grid min-w-0 flex-1 grid-cols-[auto,1fr,auto] items-stretch rounded-md border border-(--border) bg-(--background)">
+      <div className="grid min-w-0 flex-1 grid-cols-[3.25rem_1fr_3.25rem] items-stretch overflow-hidden rounded-xl bg-(--surface)">
         <button
           type="button"
           onClick={() => bump(-1)}
           disabled={disabled}
-          className="flex h-11 w-11 items-center justify-center rounded-l-md text-xl font-semibold text-(--muted) active:bg-(--accent-soft) disabled:opacity-40"
-          aria-label={`decrease ${label}`}
+          className="flex h-13 items-center justify-center text-[24px] font-medium text-(--muted) active:bg-(--surface-2) disabled:opacity-40"
+          aria-label={`Less ${label.toLowerCase()}`}
         >
           −
         </button>
@@ -1229,16 +1191,17 @@ function Stepper({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
-          placeholder={allowEmpty ? "bw" : "0"}
-          className="h-11 w-full border-x border-(--border) bg-transparent text-center font-bold tabular-nums outline-none focus:bg-(--background) disabled:opacity-60"
-          style={{ fontSize: "18px" }}
+          placeholder={allowEmpty ? "BW" : "0"}
+          aria-label={label}
+          className="num h-13 w-full bg-transparent text-center outline-none placeholder:text-(--faint) disabled:opacity-60"
+          style={{ fontSize: "28px" }}
         />
         <button
           type="button"
           onClick={() => bump(+1)}
           disabled={disabled}
-          className="flex h-11 w-11 items-center justify-center rounded-r-md text-xl font-semibold text-(--muted) active:bg-(--accent-soft) disabled:opacity-40"
-          aria-label={`increase ${label}`}
+          className="flex h-13 items-center justify-center text-[24px] font-medium text-(--muted) active:bg-(--surface-2) disabled:opacity-40"
+          aria-label={`More ${label.toLowerCase()}`}
         >
           +
         </button>
@@ -1258,31 +1221,18 @@ function WeightSplitHint({
   const trimmed = value.trim();
   const num = trimmed === "" ? null : Number(trimmed);
   const hasNum = num !== null && Number.isFinite(num) && num > 0;
-
-  if (!hasNum) {
-    return (
-      <div className="text-[11px] text-(--muted)">{conv.hint}</div>
-    );
-  }
+  if (!hasNum) return null;
 
   if (conv.mode === "total" && conv.equipment === "dumbbell") {
     const per = conv.perSide(num!);
     const perLabel = Number.isInteger(per) ? per : per.toFixed(1);
     return (
-      <div className="text-[11px] text-(--muted) tabular-nums">
-        <span className="font-semibold text-(--foreground)/70">
-          {num} total
-        </span>{" "}
-        · {perLabel} × 2 dbs
-      </div>
+      <p className="pl-16 text-[13px] text-(--muted)">
+        Two dumbbells of <span className="num text-[15px] text-(--foreground)">{perLabel}</span>
+      </p>
     );
   }
-
-  return (
-    <div className="text-[11px] text-(--muted) tabular-nums">
-      {num} {conv.equipment === "dumbbell" ? "lb per db" : "lb"}
-    </div>
-  );
+  return null;
 }
 
 // ----- Add exercise picker + finish prompt -----
@@ -1313,8 +1263,8 @@ function AddExercisePicker({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const existing = new Set(existingExerciseIds);
   const results = useMemo(() => {
+    const existing = new Set(existingExerciseIds);
     const q = query.trim().toLowerCase();
     return library
       .filter((l) => !existing.has(l.id))
@@ -1322,7 +1272,7 @@ function AddExercisePicker({
         q === "" ? true : l.name.toLowerCase().includes(q),
       )
       .slice(0, 20);
-  }, [library, query, existingExerciseIds.join(",")]);
+  }, [library, query, existingExerciseIds]);
 
   const nextLetter = (() => {
     const used = new Set(activeSupersetCodes.map((c) => c.toUpperCase()));
@@ -1335,17 +1285,17 @@ function AddExercisePicker({
 
   const submit = async () => {
     if (!pickedId) {
-      setError("pick an exercise first");
+      setError("Pick an exercise first.");
       return;
     }
     const setsNum = Number(prescribedSets);
     if (!Number.isInteger(setsNum) || setsNum < 1) {
-      setError("sets must be a positive integer");
+      setError("Sets needs to be a whole number, 1 or more.");
       return;
     }
     const reps = prescribedReps.trim();
     if (!reps) {
-      setError("reps required");
+      setError("Enter the reps, like 8-12.");
       return;
     }
 
@@ -1363,28 +1313,28 @@ function AddExercisePicker({
         prescribed_reps: reps,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "couldn't add exercise");
+      setError(e instanceof Error ? e.message : "Couldn't add the exercise. Try again.");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
-      <div className="safe-bottom max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-(--background) p-4 shadow-2xl sm:rounded-2xl">
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-4">
+      <div className="safe-bottom max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-[24px] bg-(--surface) p-5 shadow-2xl sm:rounded-[24px]">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h2 className="text-lg font-bold">add exercise</h2>
-            <p className="text-xs text-(--muted)">
-              add to this session only. at the end, you can optionally save
-              the changes to your phase.
+            <h2 className="display text-[26px]">Add an exercise</h2>
+            <p className="text-[14px] text-(--muted)">
+              It&rsquo;s added to this workout only. When you finish, you can
+              choose to keep it in your plan.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="close"
-            className="text-2xl leading-none text-(--muted) hover:text-(--foreground)"
+            aria-label="Close"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--surface-2) text-xl leading-none text-(--muted) hover:text-(--foreground)"
           >
             ×
           </button>
@@ -1396,14 +1346,14 @@ function AddExercisePicker({
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="search exercise name…"
-            className="h-11 w-full rounded-lg border border-(--border) bg-(--background) px-3 text-sm outline-none focus:border-(--accent)"
+            placeholder="Search exercises"
+            className="h-12 w-full rounded-xl bg-(--surface-2) px-4 text-[16px] outline-none placeholder:text-(--faint) focus:ring-2 focus:ring-(--accent-line)"
           />
 
-          <div className="max-h-48 divide-y divide-(--border) overflow-y-auto rounded-lg border border-(--border) bg-(--surface)">
+          <div className="max-h-56 divide-y divide-(--border) overflow-y-auto rounded-xl bg-(--surface-2)">
             {results.length === 0 ? (
-              <p className="px-3 py-4 text-center text-xs text-(--muted)">
-                no match. try another term.
+              <p className="px-3 py-4 text-center text-[14px] text-(--muted)">
+                No matches. Try a shorter search.
               </p>
             ) : (
               results.map((l) => (
@@ -1411,37 +1361,37 @@ function AddExercisePicker({
                   key={l.id}
                   type="button"
                   onClick={() => setPickedId(l.id)}
-                  className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm ${
+                  className={`flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-[15px] ${
                     pickedId === l.id
                       ? "bg-(--accent-soft) text-(--accent)"
                       : ""
                   }`}
                 >
                   <span className="truncate">{l.name}</span>
-                  <span className="shrink-0 text-[10px] uppercase tracking-wider text-(--muted)">
-                    {l.primary_muscle.replace("_", " ")} · {l.equipment}
-                  </span>
+                  {l.primary_muscle !== "other" && (
+                    <span className="shrink-0 text-[12px] text-(--muted)">
+                      {l.primary_muscle.replace("_", " ")}
+                    </span>
+                  )}
                 </button>
               ))
             )}
           </div>
 
           <div className="space-y-1.5">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-(--muted)">
-              placement
-            </div>
+            <div className="label">Where it goes</div>
             <div className="flex flex-wrap gap-1.5">
               <PlacementOption
                 active={placement === "solo"}
                 onClick={() => setPlacement("solo")}
               >
-                solo
+                On its own
               </PlacementOption>
               <PlacementOption
                 active={placement === "new"}
                 onClick={() => setPlacement("new")}
               >
-                new superset ({nextLetter})
+                New superset {nextLetter}
               </PlacementOption>
               {activeSupersetCodes.map((code) => (
                 <PlacementOption
@@ -1449,44 +1399,44 @@ function AddExercisePicker({
                   active={placement === code}
                   onClick={() => setPlacement(code)}
                 >
-                  add to {code}
+                  Add to superset {code}
                 </PlacementOption>
               ))}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <label className="space-y-1 text-[11px] font-semibold uppercase tracking-wider text-(--muted)">
-              sets
+            <label className="label block space-y-1">
+              Sets
               <input
                 type="text"
                 inputMode="numeric"
                 value={prescribedSets}
                 onChange={(e) => setPrescribedSets(e.target.value)}
-                className="mt-1 h-10 w-full rounded border border-(--border) bg-(--background) px-2 text-base font-bold normal-case tabular-nums outline-none focus:border-(--accent)"
+                className="num mt-1 h-12 w-full rounded-xl bg-(--surface-2) px-3 text-[22px] text-(--foreground) outline-none focus:ring-2 focus:ring-(--accent-line)"
               />
             </label>
-            <label className="space-y-1 text-[11px] font-semibold uppercase tracking-wider text-(--muted)">
-              reps
+            <label className="label block space-y-1">
+              Reps
               <input
                 type="text"
                 value={prescribedReps}
                 onChange={(e) => setPrescribedReps(e.target.value)}
                 placeholder="8-12 or 20, 15, 10"
-                className="mt-1 h-10 w-full rounded border border-(--border) bg-(--background) px-2 text-base font-bold normal-case outline-none focus:border-(--accent)"
+                className="num mt-1 h-12 w-full rounded-xl bg-(--surface-2) px-3 text-[22px] text-(--foreground) outline-none placeholder:text-[15px] placeholder:text-(--faint) focus:ring-2 focus:ring-(--accent-line)"
               />
             </label>
           </div>
 
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {error && <p className="text-[13px] text-(--danger)">{error}</p>}
 
           <button
             type="button"
             onClick={submit}
             disabled={saving || !pickedId}
-            className="h-11 w-full rounded-lg bg-(--accent) text-sm font-bold text-(--accent-contrast) disabled:opacity-60"
+            className="btn btn-primary btn-block"
           >
-            {saving ? "adding…" : "add to session"}
+            {saving ? "Adding…" : "Add to workout"}
           </button>
         </div>
       </div>
@@ -1507,10 +1457,11 @@ function PlacementOption({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full border px-3 py-1 text-xs font-medium ${
+      aria-pressed={active}
+      className={`h-10 rounded-full px-4 text-[14px] font-semibold ${
         active
-          ? "border-(--accent) bg-(--accent) text-(--accent-contrast)"
-          : "border-(--border) bg-(--surface) text-(--muted)"
+          ? "bg-(--accent) text-(--accent-contrast)"
+          : "bg-(--surface-2) text-(--muted)"
       }`}
     >
       {children}
@@ -1541,27 +1492,26 @@ function FinishWorkoutPrompt({
       if (mode === "fork") await saveExtrasAsNewPhase(sessionId, newName);
       await finishSession(sessionId, notes);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "couldn't finish");
+      setError(e instanceof Error ? e.message : "Couldn't finish the workout. Try again.");
       setPending(null);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
-      <div className="safe-bottom max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-(--background) p-4 shadow-2xl sm:rounded-2xl">
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-4">
+      <div className="safe-bottom max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-[24px] bg-(--surface) p-5 shadow-2xl sm:rounded-[24px]">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h2 className="text-lg font-bold">finish workout</h2>
-            <p className="text-xs text-(--muted)">
-              you added or changed exercises. what should we do with the
-              modifications?
+            <h2 className="display text-[26px]">Finish workout</h2>
+            <p className="text-[14px] text-(--muted)">
+              You added exercises today. Keep them for next time?
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="close"
-            className="text-2xl leading-none text-(--muted) hover:text-(--foreground)"
+            aria-label="Close"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--surface-2) text-xl leading-none text-(--muted) hover:text-(--foreground)"
           >
             ×
           </button>
@@ -1572,13 +1522,13 @@ function FinishWorkoutPrompt({
             type="button"
             onClick={() => run("keep")}
             disabled={!!pending}
-            className="flex w-full flex-col items-start gap-0.5 rounded-lg border border-(--border) bg-(--surface) p-3 text-left hover:border-(--accent) disabled:opacity-60"
+            className="flex w-full flex-col items-start gap-0.5 rounded-xl bg-(--surface-2) p-4 text-left ring-(--accent-line) hover:ring-1 disabled:opacity-60"
           >
-            <span className="text-sm font-bold">
-              keep for this session only
+            <span className="text-[16px] font-semibold">
+              Just this workout
             </span>
-            <span className="text-xs text-(--muted)">
-              the added exercises stay logged, but the phase is untouched.
+            <span className="text-[13px] text-(--muted)">
+              Your sets stay logged. The plan doesn&rsquo;t change.
             </span>
           </button>
 
@@ -1586,45 +1536,43 @@ function FinishWorkoutPrompt({
             type="button"
             onClick={() => run("save")}
             disabled={!!pending}
-            className="flex w-full flex-col items-start gap-0.5 rounded-lg border border-(--border) bg-(--surface) p-3 text-left hover:border-(--accent) disabled:opacity-60"
+            className="flex w-full flex-col items-start gap-0.5 rounded-xl bg-(--surface-2) p-4 text-left ring-(--accent-line) hover:ring-1 disabled:opacity-60"
           >
-            <span className="text-sm font-bold">
-              save to {planName ?? "this phase"}
+            <span className="text-[16px] font-semibold">
+              Add to {planName ?? "this plan"}
             </span>
-            <span className="text-xs text-(--muted)">
-              adds the new exercises to today&rsquo;s plan day permanently.
-              next time you do this day, they&rsquo;ll be there.
+            <span className="text-[13px] text-(--muted)">
+              They&rsquo;ll be part of this day from now on.
             </span>
           </button>
 
-          <div className="space-y-2 rounded-lg border border-(--border) bg-(--surface) p-3">
-            <div className="text-sm font-bold">save as new phase version</div>
-            <p className="text-xs text-(--muted)">
-              duplicates {planName ?? "the current phase"} with the mods
-              applied and switches your active phase to the copy. the
-              original stays clean.
+          <div className="space-y-2 rounded-xl bg-(--surface-2) p-4">
+            <div className="text-[16px] font-semibold">Save as a new plan</div>
+            <p className="text-[13px] text-(--muted)">
+              Makes a copy of {planName ?? "this plan"} with today&rsquo;s
+              changes and switches you to it. The original stays as it was.
             </p>
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder={
                 planName
-                  ? `${planName} · modified`
-                  : "name for the new phase"
+                  ? `${planName} (modified)`
+                  : "Name for the new plan"
               }
-              className="h-10 w-full rounded border border-(--border) bg-(--background) px-2 text-sm outline-none focus:border-(--accent)"
+              className="h-12 w-full rounded-xl bg-(--surface) px-3 text-[16px] outline-none placeholder:text-(--faint) focus:ring-2 focus:ring-(--accent-line)"
             />
             <button
               type="button"
               onClick={() => run("fork")}
               disabled={!!pending}
-              className="h-10 w-full rounded-md bg-(--accent) text-sm font-bold text-(--accent-contrast) disabled:opacity-60"
+              className="btn btn-primary btn-block"
             >
-              {pending === "fork" ? "saving…" : "save as new phase"}
+              {pending === "fork" ? "Saving…" : "Save as a new plan"}
             </button>
           </div>
 
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {error && <p className="text-[13px] text-(--danger)">{error}</p>}
         </div>
       </div>
     </div>
@@ -1674,44 +1622,52 @@ function WarmupCard({
     (warmup.options.length === 0 || picked.size >= 2);
 
   return (
-    <section className="space-y-2 rounded-xl border border-(--border) bg-(--surface) p-3">
+    <section className="card overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between text-left"
+        className="flex min-h-14 w-full items-center gap-3 px-4 text-left"
         aria-expanded={open}
       >
-        <span className="text-[11px] font-bold uppercase tracking-wider text-(--accent)">
-          warm-up · about 10 min {complete ? "· done ✓" : ""}
-        </span>
-        <span className="text-xs text-(--muted)">{open ? "hide" : "show"}</span>
+        <span className="display text-[21px]">Warm-up</span>
+        <span className="label">About 10 min</span>
+        {complete && <span className="chip chip-ok">Done</span>}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={`ml-auto text-(--muted) transition-transform ${open ? "rotate-180" : ""}`} aria-hidden>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
       </button>
       {open && (
-        <div className="space-y-2">
-          <ul className="space-y-1">
-            {WARMUP_BASE.map((b) => (
-              <li key={b.id}>
-                <label className="flex items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={done.has(b.id)}
-                    onChange={() => toggle(done, setDone, b.id)}
-                    className="mt-1 h-4 w-4 accent-(--accent)"
-                  />
-                  <span>
-                    <span className="font-semibold">{b.title}</span>
-                    <span className="block text-xs text-(--muted)">{b.detail}</span>
-                  </span>
-                </label>
-              </li>
-            ))}
+        <div className="space-y-4 px-4 pb-4">
+          <ul className="space-y-1.5">
+            {WARMUP_BASE.map((b) => {
+              const on = done.has(b.id);
+              return (
+                <li key={b.id}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(done, setDone, b.id)}
+                    aria-pressed={on}
+                    className={`flex w-full items-start gap-3 rounded-xl p-3 text-left transition-colors ${on ? "bg-(--ok-soft)" : "bg-(--surface-2)"}`}
+                  >
+                    <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${on ? "bg-(--ok) text-(--surface)" : "border-2 border-(--border)"}`}>
+                      {on && <CheckGlyph size={12} />}
+                    </span>
+                    <span>
+                      <span className="block font-semibold">{b.title}</span>
+                      <span className="block text-[13px] text-(--muted)">{b.detail}</span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
           {warmup.options.length > 0 && (
-            <div className="space-y-1">
-              <div className="text-xs text-(--muted)">
-                then pick 2 to 3 · fast but quiet, 30 to 60 s rest
+            <div className="space-y-2">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[15px] font-semibold">Then pick 2 or 3</span>
+                <span className="label">Fast but quiet</span>
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="grid grid-cols-1 gap-1.5">
                 {warmup.options.map((o) => {
                   const on = picked.has(o.id);
                   return (
@@ -1720,23 +1676,24 @@ function WarmupCard({
                       type="button"
                       onClick={() => toggle(picked, setPicked, o.id)}
                       aria-pressed={on}
-                      className={`rounded-lg border px-2.5 py-1.5 text-left text-xs ${
+                      className={`flex min-h-12 items-center justify-between gap-3 rounded-xl px-3 text-left transition-colors ${
                         on
-                          ? "border-(--accent) bg-(--accent-soft) text-(--foreground)"
-                          : "border-(--border) bg-(--background) text-(--muted)"
+                          ? "bg-(--accent-soft) ring-1 ring-(--accent-line)"
+                          : "bg-(--surface-2)"
                       }`}
                     >
-                      <span className="font-semibold">{o.name}</span>
-                      <span className="ml-1 tabular-nums">{o.dose}</span>
+                      <span className={`text-[15px] font-semibold ${on ? "" : "text-(--muted)"}`}>{o.name}</span>
+                      <span className={`num shrink-0 text-[16px] ${on ? "text-(--accent)" : "text-(--muted)"}`}>{o.dose}</span>
                     </button>
                   );
                 })}
               </div>
+              <p className="text-[13px] text-(--muted)">Rest 30 to 60 seconds between sets.</p>
             </div>
           )}
           {warmup.kind === "metcon" && (
-            <p className="text-xs text-(--muted)">
-              low energy? do the easy version: 20 min EMOM, half the reps, no runs.
+            <p className="text-[14px] text-(--muted)">
+              Low on energy? Do the easy version: a 20 minute EMOM with half the reps, and skip the runs.
             </p>
           )}
         </div>

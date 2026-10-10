@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { PageHeader } from "@/components/page-header";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = {
-  title: "sign in · liftkit",
+  title: "Sign in | LiftKit",
 };
 
 type Props = {
@@ -21,25 +22,21 @@ export default async function LoginPage({ searchParams }: Props) {
   if (user) redirect(params.redirectTo || "/");
 
   return (
-    <main className="flex flex-1 items-center justify-center px-6 py-16">
-      <div className="w-full max-w-sm space-y-6">
-        <header className="space-y-2 text-center">
-          <h1 className="text-3xl font-semibold tracking-tight">liftkit</h1>
-          <p className="text-sm text-(--muted)">sign in to log your lifts</p>
-        </header>
+    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pt-4 pb-10">
+      <div className="flex flex-1 flex-col justify-center space-y-8 py-8">
+        <PageHeader
+          eyebrow="LiftKit"
+          title="Sign in"
+          subtitle="Use Google or get a link by email. There is no password to remember."
+        />
         <LoginForm
           redirectTo={params.redirectTo}
           error={params.error}
           sent={params.sent === "1"}
         />
-        <div className="rounded-lg border border-(--border) bg-(--surface) p-3 text-xs text-(--muted)">
-          <div className="font-semibold text-(--foreground)">what happens next</div>
-          <ol className="mt-1 space-y-0.5">
-            <li>1. we load 12 phase workouts into your account.</li>
-            <li>2. pick one to follow for the next 6-8 weeks.</li>
-            <li>3. open the app each day and log today&rsquo;s workout.</li>
-          </ol>
-        </div>
+        <p className="px-1 text-[14px] text-(--muted)">
+          Once you are in, import a plan from a Google Sheet or start a workout without one.
+        </p>
       </div>
     </main>
   );

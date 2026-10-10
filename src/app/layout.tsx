@@ -1,24 +1,33 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Archivo } from "next/font/google";
 import "@/styles/globals.css";
 import { Nav } from "@/components/nav";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const archivo = Archivo({
+  variable: "--font-archivo",
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  axes: ["wdth"],
 });
 
 export const metadata: Metadata = {
-  title: "liftkit",
-  description: "a personal workout tracker",
+  title: "LiftKit",
+  description: "Plan, log and progress your training.",
+  appleWebApp: { capable: true, title: "LiftKit", statusBarStyle: "black-translucent" },
 };
 
-const INIT_THEME = `(function(){try{var t=localStorage.getItem('liftkit:theme');var a=localStorage.getItem('liftkit:accent');if(t&&t!=='system')document.documentElement.dataset.theme=t;if(a&&a!=='amber')document.documentElement.dataset.accent=a;}catch(e){}})();`;
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#eef1f5" },
+    { media: "(prefers-color-scheme: dark)", color: "#0d1520" },
+  ],
+};
+
+// runs before paint so a saved theme never flashes. accents from the old
+// palette list (amber, rainbow, ...) fall back to the default, dawn.
+const INIT_THEME = `(function(){try{var t=localStorage.getItem('liftkit:theme');var a=localStorage.getItem('liftkit:accent');if(t&&t!=='system')document.documentElement.dataset.theme=t;if(a==='fjord'||a==='lingon')document.documentElement.dataset.accent=a;}catch(e){}})();`;
 
 export default function RootLayout({
   children,
@@ -26,15 +35,15 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${archivo.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: INIT_THEME }} />
       </head>
       <body className="flex min-h-full flex-col bg-(--background) text-(--foreground)">
-        <Nav />
         <div className="flex flex-1 flex-col">{children}</div>
+        <Nav />
       </body>
     </html>
   );

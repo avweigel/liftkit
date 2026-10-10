@@ -24,134 +24,145 @@ export function NormalizeButton() {
       const res = await fetch("/api/exercises/normalize", { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "normalize failed");
+        setError(data.error ?? "Clean up failed. Try again.");
         return;
       }
       setResult(data as Result);
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "normalize failed");
+      setError(e instanceof Error ? e.message : "Clean up failed. Try again.");
     } finally {
       setPending(false);
     }
   };
 
   return (
-    <div className="space-y-3 rounded-xl border border-(--border) bg-(--surface) p-4">
+    <div className="card space-y-4 p-4">
       <div>
-        <h2 className="text-sm font-semibold">clean up names</h2>
-        <p className="mt-0.5 text-xs text-(--muted)">
-          expand abbreviations on exercises (db → dumbbell) and plan days
-          (c/t → chest &amp; triceps), merge duplicate exercises into the
-          global library, and add descriptions where the movement is known.
+        <h3 className="text-[15px] font-semibold">Clean up exercise names</h3>
+        <p className="mt-1 text-[14px] text-(--muted)">
+          Expands abbreviations (db becomes dumbbell, c/t becomes chest and
+          triceps), merges duplicates into the shared library and adds
+          descriptions where the movement is known.
         </p>
       </div>
+
       {!result && (
         <button
           type="button"
           onClick={run}
           disabled={pending}
-          className="inline-flex h-10 items-center rounded-lg bg-(--accent) px-4 text-sm font-semibold text-(--accent-contrast) disabled:opacity-60"
+          className="btn btn-secondary btn-block"
         >
-          {pending ? "normalizing…" : "normalize my exercises"}
+          {pending ? "Cleaning up" : "Clean up names"}
         </button>
       )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {error && <p className="text-[14px] text-(--danger)">{error}</p>}
+
       {result && (
-        <div className="space-y-3 text-sm">
-          <div className="flex flex-wrap gap-3 rounded-lg bg-(--background) p-3 text-xs">
-            <span>
-              <strong className="tabular-nums">{result.merged.length}</strong>{" "}
-              merged
-            </span>
-            <span>
-              <strong className="tabular-nums">{result.renamed.length}</strong>{" "}
-              renamed
-            </span>
-            <span>
-              <strong className="tabular-nums">{result.unknowns.length}</strong>{" "}
-              unknown
-            </span>
-            <span>
-              <strong className="tabular-nums">
-                {result.day_renamed.length}
-              </strong>{" "}
-              day names
-            </span>
-            <span className="text-(--muted)">
-              of {result.total} user-owned
-            </span>
+        <div className="space-y-3">
+          <div className="grid grid-cols-4 gap-2">
+            <Stat value={result.merged.length} label="Merged" />
+            <Stat value={result.renamed.length} label="Renamed" />
+            <Stat value={result.unknowns.length} label="Unknown" />
+            <Stat value={result.day_renamed.length} label="Day names" />
           </div>
+          <p className="label">
+            Checked <span className="num">{result.total}</span> custom
+            exercises.
+          </p>
+
           {result.renamed.length > 0 && (
-            <details className="rounded border border-(--border) bg-(--background) p-3 text-xs">
-              <summary className="cursor-pointer font-semibold">
-                exercises renamed ({result.renamed.length})
-              </summary>
-              <ul className="mt-2 space-y-0.5">
-                {result.renamed.map((r) => (
-                  <li key={r.from}>
-                    {r.from} → <strong>{r.to}</strong>
-                  </li>
-                ))}
-              </ul>
-            </details>
+            <Changes title="Exercises renamed" count={result.renamed.length}>
+              {result.renamed.map((r) => (
+                <Change key={r.from} from={r.from} to={r.to} />
+              ))}
+            </Changes>
           )}
           {result.day_renamed.length > 0 && (
-            <details className="rounded border border-(--border) bg-(--background) p-3 text-xs">
-              <summary className="cursor-pointer font-semibold">
-                day names expanded ({result.day_renamed.length})
-              </summary>
-              <ul className="mt-2 space-y-0.5">
-                {result.day_renamed.map((r, i) => (
-                  <li key={`${r.from}-${i}`}>
-                    {r.from} → <strong>{r.to}</strong>
-                  </li>
-                ))}
-              </ul>
-            </details>
+            <Changes title="Day names expanded" count={result.day_renamed.length}>
+              {result.day_renamed.map((r, i) => (
+                <Change key={`${r.from}-${i}`} from={r.from} to={r.to} />
+              ))}
+            </Changes>
           )}
           {result.merged.length > 0 && (
-            <details className="rounded border border-(--border) bg-(--background) p-3 text-xs">
-              <summary className="cursor-pointer font-semibold">
-                merged into global library ({result.merged.length})
-              </summary>
-              <ul className="mt-2 space-y-0.5">
-                {result.merged.map((r) => (
-                  <li key={r.from}>
-                    {r.from} → <strong>{r.into}</strong>
-                  </li>
-                ))}
-              </ul>
-            </details>
+            <Changes title="Merged into the library" count={result.merged.length}>
+              {result.merged.map((r) => (
+                <Change key={r.from} from={r.from} to={r.into} />
+              ))}
+            </Changes>
           )}
           {result.unknowns.length > 0 && (
-            <details
-              className="rounded border border-amber-300 bg-amber-50 p-3 text-xs dark:border-amber-900 dark:bg-amber-950/30"
+            <Changes
+              title="Not recognised"
+              count={result.unknowns.length}
               open
             >
-              <summary className="cursor-pointer font-semibold text-amber-800 dark:text-amber-200">
-                need your help ({result.unknowns.length})
-              </summary>
-              <p className="mt-2 text-amber-800 dark:text-amber-300">
-                we don&apos;t have these in our library yet. tell claude what
-                they are and we&apos;ll add them:
-              </p>
-              <ul className="mt-2 space-y-0.5 text-amber-900 dark:text-amber-100">
-                {result.unknowns.map((u) => (
-                  <li key={u.id}>{u.name}</li>
-                ))}
-              </ul>
-            </details>
+              <li className="pb-1 text-(--muted)">
+                These are not in the library yet. They keep working as
+                custom exercises.
+              </li>
+              {result.unknowns.map((u) => (
+                <li key={u.id}>{u.name}</li>
+              ))}
+            </Changes>
           )}
+
           <button
             type="button"
             onClick={() => setResult(null)}
-            className="text-xs text-(--muted) underline"
+            className="btn btn-ghost btn-sm"
           >
-            close
+            Done
           </button>
         </div>
       )}
     </div>
+  );
+}
+
+function Stat({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="rounded-[12px] bg-(--surface-2) px-2 py-2.5 text-center">
+      <div className="num text-[20px]">{value}</div>
+      <div className="text-[12px] text-(--muted)">{label}</div>
+    </div>
+  );
+}
+
+function Changes({
+  title,
+  count,
+  open,
+  children,
+}: {
+  title: string;
+  count: number;
+  open?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details
+      className="rounded-[12px] bg-(--surface-2) px-3 text-[14px]"
+      open={open}
+    >
+      <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-2 font-medium">
+        {title}
+        <span className="num text-(--muted)">{count}</span>
+      </summary>
+      <ul className="space-y-1 pb-3">{children}</ul>
+    </details>
+  );
+}
+
+function Change({ from, to }: { from: string; to: string }) {
+  return (
+    <li>
+      <span className="text-(--muted)">{from}</span>
+      <span className="text-(--faint)"> becomes </span>
+      <span className="font-medium">{to}</span>
+    </li>
   );
 }

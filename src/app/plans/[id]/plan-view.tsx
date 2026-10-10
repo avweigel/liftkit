@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useTransition } from "react";
+import { ChevronDown, ChevronUp, Plus, X } from "lucide-react";
 import {
   addPlanDayExercise,
   duplicatePlan,
@@ -13,11 +13,10 @@ import {
   updatePlanDayExercise,
 } from "@/lib/actions/plans";
 import { startSession } from "@/lib/actions/sessions";
-import { formatDayLabel } from "@/lib/display/format-day";
-import {
-  DismissibleHint,
-  HINT_KEYS,
-} from "@/components/dismissible-hint";
+import { groupIntoSupersets, type WithSetCode } from "@/lib/set-code";
+import { PageHeader } from "@/components/page-header";
+import { DismissibleHint, HINT_KEYS } from "@/components/dismissible-hint";
+import { dayHeading, isCorePlan } from "../plan-display";
 import type { Exercise, PlanDetail, PlanDay, PlanDayExerciseRow } from "./types";
 
 type Props = {
@@ -29,127 +28,129 @@ type Props = {
 
 export function PlanView({ plan, library, canEdit, isActive }: Props) {
   const [editing, setEditing] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const [activating, startActivate] = useTransition();
+  const [duplicating, startDuplicate] = useTransition();
+  const core = isCorePlan(plan.name);
+
+  const days = plan.plan_weeks.flatMap((w) => w.plan_days);
 
   const onDuplicate = () => {
-    startTransition(async () => {
+    startDuplicate(async () => {
       await duplicatePlan(plan.id);
     });
   };
 
-  const onToggleActive = () => {
-    startTransition(async () => {
-      await setActivePlan(isActive ? null : plan.id);
+  const onSetActive = (next: boolean) => {
+    startActivate(async () => {
+      await setActivePlan(next ? plan.id : null);
     });
   };
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 space-y-5 px-3 py-5 sm:px-6 sm:py-10">
-      <header className="space-y-2">
-        <Link
-          href="/plans"
-          className="text-sm text-(--muted) hover:text-(--foreground)"
-        >
-          ← plans
-        </Link>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">
-                {plan.name}
-              </h1>
-              {isActive && (
-                <span className="rounded-full bg-(--accent) px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-(--accent-contrast)">
-                  active phase
-                </span>
-              )}
-              {plan.is_public && (
-                <span className="rounded border border-(--border) px-1.5 text-[10px] uppercase tracking-wider text-(--muted)">
-                  public
-                </span>
-              )}
-            </div>
-            {plan.description && (
-              <p className="mt-1 text-sm text-(--muted)">
-                {plan.description}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5">
-            {canEdit && (
-              <button
-                type="button"
-                onClick={() => setEditing((v) => !v)}
-                className="inline-flex h-10 items-center rounded-lg border border-(--border) bg-(--background) px-3 text-sm font-medium hover:bg-(--surface)"
-              >
-                {editing ? "done" : "edit"}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onDuplicate}
-              disabled={pending}
-              className="inline-flex h-10 items-center rounded-lg border border-(--border) bg-(--background) px-3 text-sm font-medium hover:bg-(--surface) disabled:opacity-60"
-            >
-              {pending ? "…" : "duplicate"}
-            </button>
-          </div>
+    <main className="mx-auto w-full max-w-lg flex-1 space-y-6 px-4 pt-4 pb-tabbar">
+      <div className="space-y-4">
+        <PageHeader
+          title={plan.name}
+          subtitle={plan.description ?? undefined}
+          back={{ href: "/plans", label: "Plans" }}
+        />
+
+        <div className="flex flex-wrap gap-1.5">
+          {isActive && <span className="chip chip-accent">Active plan</span>}
+          {core && <span className="chip">Daily A/B routine</span>}
+          <span className="chip">
+            <span className="num">{days.length}</span>
+            {days.length === 1 ? "day" : "days"}
+          </span>
+          {plan.is_public && <span className="chip">Public</span>}
         </div>
-        {!editing && (
-          <div className="space-y-1.5">
+
+        {!editing && !isActive && (
+          <div className="space-y-2">
             <button
               type="button"
-              onClick={onToggleActive}
-              disabled={pending}
-              className={`inline-flex h-11 w-full items-center justify-center rounded-lg text-sm font-bold disabled:opacity-60 ${
-                isActive
-                  ? "border border-(--border) bg-(--background) text-(--muted)"
-                  : "bg-(--accent) text-(--accent-contrast) shadow-sm active:scale-[0.99]"
-              }`}
+              onClick={() => onSetActive(true)}
+              disabled={activating}
+              className="btn btn-primary btn-block"
             >
-              {pending
-                ? "…"
-                : isActive
-                  ? "✓ on this phase — tap to switch off"
-                  : "start this phase (6-8 weeks)"}
+              {activating ? "Saving…" : "Set as active plan"}
             </button>
             <DismissibleHint storageKey={HINT_KEYS.planDetailStart}>
-              <p className="pr-8 text-xs text-(--muted)">
-                {isActive
-                  ? "today's workout on the home page pulls from this phase. you can switch any time — your logged workouts stay."
-                  : "makes this your active phase. the home page will auto-select today's workout based on the day of the week, so you don't pick a plan each session."}
+              <p className="pr-9 text-[13px] text-(--muted)">
+                Today&rsquo;s workout on the home page will come from this
+                plan, picked by day of the week. You can switch any time and
+                your logged workouts stay.
               </p>
             </DismissibleHint>
           </div>
         )}
-        {plan.source_url && (
-          <p className="text-xs text-(--muted)">
-            source:{" "}
-            <a
-              href={plan.source_url}
-              target="_blank"
-              rel="noreferrer"
-              className="underline"
+
+        <div className="flex gap-2">
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => setEditing((v) => !v)}
+              className={`btn flex-1 ${editing ? "btn-primary" : "btn-secondary"}`}
             >
-              original sheet
-            </a>
-          </p>
+              {editing ? "Done editing" : "Edit plan"}
+            </button>
+          )}
+          {!editing && (
+            <button
+              type="button"
+              onClick={onDuplicate}
+              disabled={duplicating}
+              className="btn btn-secondary flex-1"
+            >
+              {duplicating ? "Duplicating…" : "Duplicate"}
+            </button>
+          )}
+        </div>
+
+        {plan.source_url && !editing && (
+          <a
+            href={plan.source_url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-11 items-center text-[15px] font-medium text-(--accent)"
+          >
+            Open source sheet
+          </a>
         )}
-      </header>
+      </div>
 
       <div className="space-y-4">
-        {plan.plan_weeks.flatMap((w) =>
-          w.plan_days.map((d) => (
+        {days.length === 0 ? (
+          <p className="card p-6 text-center text-[15px] text-(--muted)">
+            This plan has no days yet. Import a sheet with rows for each day to
+            fill it in.
+          </p>
+        ) : (
+          days.map((d) => (
             <DayCard
               key={d.id}
               planId={plan.id}
               day={d}
+              core={core}
               library={library}
               editing={editing}
             />
-          )),
+          ))
         )}
       </div>
+
+      {isActive && !editing && (
+        <div className="flex justify-center pt-2">
+          <button
+            type="button"
+            onClick={() => onSetActive(false)}
+            disabled={activating}
+            className="btn btn-ghost h-11 text-(--muted)"
+          >
+            {activating ? "Saving…" : "Stop using this plan"}
+          </button>
+        </div>
+      )}
     </main>
   );
 }
@@ -157,17 +158,22 @@ export function PlanView({ plan, library, canEdit, isActive }: Props) {
 function DayCard({
   planId,
   day,
+  core,
   library,
   editing,
 }: {
   planId: string;
   day: PlanDay;
+  core: boolean;
   library: Exercise[];
   editing: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [pastOpen, setPastOpen] = useState(false);
-  const [pastValue, setPastValue] = useState(() => toLocalInputValue(new Date()));
+  const [pastValue, setPastValue] = useState(() =>
+    toLocalInputValue(new Date()),
+  );
+  const heading = dayHeading(day.day_number, day.name, core);
 
   const onRename = (name: string) => {
     if ((name || "") === (day.name || "")) return;
@@ -190,95 +196,61 @@ function DayCard({
   };
 
   return (
-    <section className="space-y-3 rounded-xl border border-(--border) bg-(--background) p-3 sm:p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <section className="card space-y-4 p-4">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-(--accent)">
-            {formatDayLabel(day.day_number, day.name).weekday}
-          </div>
+          {heading.weekday && (
+            <div className="label text-(--accent)">{heading.weekday}</div>
+          )}
           {editing ? (
             <input
               defaultValue={day.name ?? ""}
               onBlur={(e) => onRename(e.target.value)}
-              placeholder="day name"
-              className="mt-1 w-full rounded border border-(--border) bg-(--surface) px-2 py-1 font-semibold outline-none focus:border-(--accent)"
+              placeholder="Day name"
+              aria-label="Day name"
+              className={`${inputCls} mt-1 font-semibold`}
             />
           ) : (
-            <h2 className="mt-0.5 text-lg font-bold leading-tight">
-              {formatDayLabel(day.day_number, day.name).name}
-            </h2>
+            <h2 className="display mt-0.5 text-[22px]">{heading.name}</h2>
           )}
         </div>
         {!editing && (
-          <div className="flex shrink-0 items-stretch gap-1.5">
-            <button
-              type="button"
-              onClick={onStart}
-              disabled={pending}
-              className="inline-flex h-11 items-center rounded-lg bg-(--accent) px-4 text-sm font-bold text-(--accent-contrast) shadow-sm active:scale-[0.99] disabled:opacity-60"
-            >
-              {pending ? "starting…" : "start →"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setPastOpen((v) => !v)}
-              className="inline-flex h-11 items-center rounded-lg border border-(--border) bg-(--background) px-3 text-xs font-medium text-(--muted)"
-              aria-label="log past workout"
-            >
-              past
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onStart}
+            disabled={pending}
+            className="btn btn-primary shrink-0 px-5"
+          >
+            {pending && !pastOpen ? "Starting…" : "Start"}
+          </button>
         )}
       </div>
 
-      {pastOpen && !editing && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-(--border) bg-(--surface) p-2 text-xs">
-          <input
-            type="datetime-local"
-            value={pastValue}
-            onChange={(e) => setPastValue(e.target.value)}
-            className="min-w-0 flex-1 rounded border border-(--border) bg-(--background) px-2 py-1.5"
-          />
-          <button
-            type="button"
-            onClick={onStartPast}
-            disabled={pending}
-            className="h-9 rounded-md bg-(--foreground) px-3 text-xs font-semibold text-(--background) disabled:opacity-60"
-          >
-            {pending ? "…" : "start backdated"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setPastOpen(false)}
-            className="h-9 rounded-md px-2 text-(--muted)"
-          >
-            cancel
-          </button>
-        </div>
-      )}
-
       {day.notes && !editing && (
-        <p className="text-xs text-(--muted)">{day.notes}</p>
+        <p className="text-[14px] text-(--muted)">{day.notes}</p>
       )}
 
       {day.plan_day_exercises.length === 0 ? (
-        <p className="rounded border border-dashed border-(--border) p-4 text-center text-xs text-(--muted)">
-          no exercises
+        <p className="rounded-xl bg-(--surface-2) p-4 text-center text-[14px] text-(--muted)">
+          {editing
+            ? "No exercises yet. Add one below."
+            : "No exercises yet. Tap Edit plan to add some."}
         </p>
-      ) : (
-        <ul className="divide-y divide-(--border) overflow-hidden rounded-lg border border-(--border) bg-(--surface)">
+      ) : editing ? (
+        <ul className="space-y-2">
           {day.plan_day_exercises.map((ex, i) => (
-            <ExerciseRow
+            <ExerciseEditRow
               key={ex.id}
               planId={planId}
               dayId={day.id}
               ex={ex}
-              editing={editing}
               isFirst={i === 0}
               isLast={i === day.plan_day_exercises.length - 1}
             />
           ))}
         </ul>
+      ) : (
+        <ExerciseGroups exercises={day.plan_day_exercises} />
       )}
 
       {editing && (
@@ -291,22 +263,145 @@ function DayCard({
             .filter((id): id is string => !!id)}
         />
       )}
+
+      {!editing &&
+        (pastOpen ? (
+          <div className="space-y-3 rounded-xl bg-(--surface-2) p-3">
+            <label className="block space-y-1.5">
+              <span className="label">When did you train?</span>
+              <input
+                type="datetime-local"
+                value={pastValue}
+                onChange={(e) => setPastValue(e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onStartPast}
+                disabled={pending}
+                className="btn btn-primary flex-1"
+              >
+                {pending ? "Starting…" : "Log this workout"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPastOpen(false)}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setPastOpen(true)}
+            className="btn btn-ghost -ml-2 h-11 text-[14px]"
+          >
+            Log a past workout
+          </button>
+        ))}
     </section>
   );
 }
 
-function ExerciseRow({
+function ExerciseGroups({ exercises }: { exercises: PlanDayExerciseRow[] }) {
+  const groups = groupIntoSupersets(exercises);
+  const anyCodes = groups.some((g) => g.letter);
+
+  return (
+    <ol className="space-y-2">
+      {groups.map((g) => {
+        const superset = g.items.length > 1;
+        return (
+          <li key={g.id} className="flex gap-3">
+            {anyCodes && (
+              <div className="flex w-7 shrink-0 flex-col items-center pt-3">
+                {g.letter && (
+                  <span
+                    className={`num flex h-7 w-7 items-center justify-center rounded-full text-[13px] ${
+                      superset
+                        ? "bg-(--accent-soft) text-(--accent)"
+                        : "bg-(--surface-2) text-(--muted)"
+                    }`}
+                  >
+                    {g.letter}
+                  </span>
+                )}
+                {superset && (
+                  <span
+                    aria-hidden
+                    className="mt-1 mb-3 w-0.5 flex-1 rounded-full bg-(--accent-line)"
+                  />
+                )}
+              </div>
+            )}
+            <div className="min-w-0 flex-1 rounded-xl bg-(--surface-2)">
+              {superset && (
+                <div className="label px-3 pt-2.5">
+                  Superset
+                </div>
+              )}
+              <ul className="divide-y divide-(--border)">
+                {g.items.map((ex) => (
+                  <ExerciseLine key={ex.id} ex={ex} />
+                ))}
+              </ul>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function ExerciseLine({ ex }: { ex: WithSetCode<PlanDayExerciseRow> }) {
+  const rest =
+    ex.rest_seconds !== null && ex.rest_seconds > 0 ? ex.rest_seconds : null;
+  return (
+    <li className="flex items-start justify-between gap-3 px-3 py-2.5">
+      <div className="min-w-0">
+        <div className="text-[15px] font-medium">
+          {ex.exercise?.name ?? "Deleted exercise"}
+        </div>
+        {ex.cleanNotes && (
+          <p className="mt-0.5 text-[13px] text-(--muted)">{ex.cleanNotes}</p>
+        )}
+      </div>
+      <div className="shrink-0 text-right">
+        <div className="num text-[17px]">
+          {ex.prescribed_sets} &times; {ex.prescribed_reps}
+        </div>
+        {(ex.prescribed_weight !== null || rest !== null) && (
+          <div className="text-[12px] text-(--muted)">
+            {ex.prescribed_weight !== null && (
+              <span className="num">@ {ex.prescribed_weight}</span>
+            )}
+            {ex.prescribed_weight !== null && rest !== null && ", "}
+            {rest !== null && (
+              <span>
+                rest <span className="num">{rest}</span> s
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function ExerciseEditRow({
   planId,
   dayId,
   ex,
-  editing,
   isFirst,
   isLast,
 }: {
   planId: string;
   dayId: string;
   ex: PlanDayExerciseRow;
-  editing: boolean;
   isFirst: boolean;
   isLast: boolean;
 }) {
@@ -329,19 +424,19 @@ function ExerciseRow({
     const restNum = rest.trim() === "" ? null : Number(rest);
     const weightNum = weight.trim() === "" ? null : Number(weight);
     if (!Number.isInteger(setsNum) || setsNum < 1) {
-      setError("sets must be a positive integer");
+      setError("Sets must be a whole number of 1 or more.");
       return;
     }
     if (reps.trim() === "") {
-      setError("reps required");
+      setError("Reps can't be empty.");
       return;
     }
     if (weightNum !== null && !Number.isFinite(weightNum)) {
-      setError("invalid weight");
+      setError("Weight must be a number.");
       return;
     }
     if (restNum !== null && (!Number.isInteger(restNum) || restNum < 0)) {
-      setError("rest must be a non-negative integer");
+      setError("Rest must be a whole number of seconds.");
       return;
     }
     startTransition(async () => {
@@ -354,7 +449,7 @@ function ExerciseRow({
           notes: notes.trim() || null,
         });
       } catch (e) {
-        setError(e instanceof Error ? e.message : "save failed");
+        setError(e instanceof Error ? e.message : "Couldn't save. Try again.");
       }
     });
   };
@@ -366,7 +461,8 @@ function ExerciseRow({
   };
 
   const remove = () => {
-    if (!confirm(`remove ${ex.exercise?.name ?? "this exercise"}?`)) return;
+    if (!confirm(`Remove ${ex.exercise?.name ?? "this exercise"} from this day?`))
+      return;
     startTransition(async () => {
       await removePlanDayExercise(ex.id, planId);
     });
@@ -375,7 +471,7 @@ function ExerciseRow({
   const renameVariant = () => {
     const current = ex.exercise?.name ?? "";
     const next = window.prompt(
-      "rename this row to create or use a variant (e.g. add \" (L)\" for left side). this only changes which exercise this plan row points to — the library keeps the original.",
+      'Rename this row to create or use a variant, for example add " (L)" for the left side. Only this plan row changes. The library keeps the original.',
       current,
     );
     if (next === null) return;
@@ -385,45 +481,24 @@ function ExerciseRow({
       try {
         await renamePlanExerciseVariant(ex.id, planId, trimmed);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "rename failed");
+        setError(e instanceof Error ? e.message : "Couldn't rename. Try again.");
       }
     });
   };
 
-  if (!editing) {
-    return (
-      <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
-        <div className="min-w-0">
-          <div className="truncate font-medium">
-            {ex.exercise?.name ?? "(deleted)"}
-          </div>
-          {ex.notes && (
-            <p className="text-xs text-(--muted)">{ex.notes}</p>
-          )}
-        </div>
-        <div className="shrink-0 text-xs text-(--muted) tabular-nums">
-          {ex.prescribed_sets}×{ex.prescribed_reps}
-          {ex.prescribed_weight !== null ? ` @ ${ex.prescribed_weight}` : ""}
-          {ex.rest_seconds !== null ? ` · ${ex.rest_seconds}s` : ""}
-        </div>
-      </li>
-    );
-  }
-
   return (
-    <li className="space-y-2 px-3 py-3 text-sm">
+    <li className="space-y-3 rounded-xl bg-(--surface-2) p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <button
             type="button"
             onClick={renameVariant}
-            className="block w-full truncate text-left font-medium hover:underline"
-            title="tap to rename this row (creates or uses a variant)"
+            className="flex min-h-11 w-full items-center text-left text-[15px] font-medium"
           >
-            {ex.exercise?.name ?? "(deleted)"}
+            {ex.exercise?.name ?? "Deleted exercise"}
           </button>
-          <p className="text-[10px] text-(--muted)">
-            tap name to rename as a variant (e.g. add &ldquo;(L)&rdquo;)
+          <p className="text-[12px] text-(--muted)">
+            Tap the name to rename it as a variant
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -431,86 +506,93 @@ function ExerciseRow({
             type="button"
             onClick={() => move("up")}
             disabled={isFirst || pending}
-            className="h-9 w-9 rounded border border-(--border) text-base disabled:opacity-30"
-            aria-label="move up"
+            className="flex h-11 w-11 items-center justify-center rounded-xl text-(--muted) disabled:opacity-30"
+            aria-label="Move up"
           >
-            ↑
+            <ChevronUp size={20} aria-hidden />
           </button>
           <button
             type="button"
             onClick={() => move("down")}
             disabled={isLast || pending}
-            className="h-9 w-9 rounded border border-(--border) text-base disabled:opacity-30"
-            aria-label="move down"
+            className="flex h-11 w-11 items-center justify-center rounded-xl text-(--muted) disabled:opacity-30"
+            aria-label="Move down"
           >
-            ↓
-          </button>
-          <button
-            type="button"
-            onClick={remove}
-            disabled={pending}
-            className="h-9 rounded border border-red-300 px-2 text-xs text-red-700 disabled:opacity-30 dark:border-red-900 dark:text-red-400"
-          >
-            remove
+            <ChevronDown size={20} aria-hidden />
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Field label="sets">
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Sets">
           <input
             type="text"
             inputMode="numeric"
             value={sets}
             onChange={(e) => setSets(e.target.value)}
             onBlur={save}
-            className={inputCls}
+            className={`${inputCls} num`}
           />
         </Field>
-        <Field label="reps">
+        <Field label="Reps">
           <input
             type="text"
             value={reps}
             onChange={(e) => setReps(e.target.value)}
             onBlur={save}
-            className={inputCls}
+            className={`${inputCls} num`}
           />
         </Field>
-        <Field label="weight">
+        <Field label="Weight">
           <input
             type="text"
             inputMode="decimal"
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
             onBlur={save}
-            placeholder="—"
-            className={inputCls}
+            placeholder="Optional"
+            className={`${inputCls} num`}
           />
         </Field>
-        <Field label="rest (s)">
+        <Field label="Rest (seconds)">
           <input
             type="text"
             inputMode="numeric"
             value={rest}
             onChange={(e) => setRest(e.target.value)}
             onBlur={save}
-            placeholder="—"
-            className={inputCls}
+            placeholder="Optional"
+            className={`${inputCls} num`}
           />
         </Field>
       </div>
 
-      <Field label="notes">
+      <Field label="Notes">
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           onBlur={save}
-          rows={1}
-          className={`${inputCls} resize-y`}
+          rows={2}
+          className={`${inputCls} h-auto resize-y py-2`}
         />
+        <span className="block text-[12px] text-(--muted)">
+          Start with a code like [A1] or [A2] to group exercises into a
+          superset.
+        </span>
       </Field>
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-[13px] text-(--danger)">{error}</p>}
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={remove}
+          disabled={pending}
+          className="btn btn-danger btn-sm h-11"
+        >
+          Remove exercise
+        </button>
+      </div>
     </li>
   );
 }
@@ -555,21 +637,23 @@ function AddExerciseControl({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="h-9 w-full rounded-lg border border-dashed border-zinc-300 text-sm text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900"
+        className="btn btn-secondary btn-block"
       >
-        + add exercise
+        <Plus size={18} aria-hidden />
+        Add exercise
       </button>
     );
   }
 
   return (
-    <div className="space-y-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="space-y-2 rounded-xl bg-(--surface-2) p-3">
       <div className="flex items-center gap-2">
         <input
           autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="search exercises…"
+          placeholder="Search exercises"
+          aria-label="Search exercises"
           className={inputCls}
         />
         <button
@@ -578,14 +662,17 @@ function AddExerciseControl({
             setOpen(false);
             setQuery("");
           }}
-          className="text-xs text-zinc-500"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-(--muted)"
+          aria-label="Cancel"
         >
-          cancel
+          <X size={20} aria-hidden />
         </button>
       </div>
-      <ul className="divide-y divide-zinc-200 rounded border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-950">
+      <ul className="divide-y divide-(--border) overflow-hidden rounded-xl bg-(--surface)">
         {filtered.length === 0 ? (
-          <li className="px-3 py-2 text-xs text-zinc-500">no match</li>
+          <li className="px-3 py-3 text-[14px] text-(--muted)">
+            No exercises match. Try a shorter search.
+          </li>
         ) : (
           filtered.map((e) => (
             <li key={e.id}>
@@ -593,11 +680,11 @@ function AddExerciseControl({
                 type="button"
                 onClick={() => add(e.id)}
                 disabled={pending}
-                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50 disabled:opacity-60 dark:hover:bg-zinc-900"
+                className="flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-[15px] disabled:opacity-60"
               >
                 <span className="truncate">{e.name}</span>
-                <span className="shrink-0 text-xs text-zinc-500">
-                  {e.primary_muscle}
+                <span className="label shrink-0">
+                  {muscleLabel(e.primary_muscle)}
                 </span>
               </button>
             </li>
@@ -616,15 +703,20 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block space-y-1 text-xs">
-      <span className="text-zinc-500">{label}</span>
+    <label className="block space-y-1">
+      <span className="label">{label}</span>
       {children}
     </label>
   );
 }
 
+function muscleLabel(m: string): string {
+  const s = m.replace(/_/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 const inputCls =
-  "block h-10 w-full rounded border border-(--border) bg-(--background) px-2 outline-none focus:border-(--accent)";
+  "block h-11 w-full rounded-xl border border-(--border) bg-(--surface) px-3 text-[16px] outline-none focus:border-(--accent)";
 
 function toLocalInputValue(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");

@@ -1,26 +1,47 @@
 @import "tailwindcss";
 
+/*
+  liftkit design tokens
+  ---------------------
+  a 5 am training journal. the dark theme borrows pre-dawn colours (deep
+  ink blue, never pure black); light is a cool morning fog. one accent,
+  used sparingly: for the thing you should tap next, and for progress.
+  green only ever means done.
+*/
+
 :root {
   color-scheme: light dark;
 
-  --background: light-dark(#ffffff, #0a0a0a);
-  --foreground: light-dark(#0a0a0a, #fafafa);
-  --muted: light-dark(#6e6e6e, #a1a1aa);
-  --surface: light-dark(#fafafa, #161618);
-  --border: light-dark(#e4e4e7, #27272a);
+  --background: light-dark(#eef1f5, #0d1520);
+  --surface: light-dark(#ffffff, #141f2d);
+  --surface-2: light-dark(#e6eaf0, #1b2839);
+  --foreground: light-dark(#111a26, #e9eef4);
+  --muted: light-dark(#5b6879, #8d9bb0);
+  --faint: light-dark(#8d98a8, #5d6c82);
+  --border: light-dark(#dbe1e9, #223246);
 
-  --accent: light-dark(#ea580c, #fb923c);
-  --accent-contrast: light-dark(#ffffff, #18120a);
-  --accent-soft: light-dark(#fff7ed, #2a1709);
+  /* dawn (default accent) */
+  --accent: light-dark(#c25e1c, #ffb067);
+  --accent-contrast: light-dark(#ffffff, #2b1503);
 
-  /* secondary accent slots — default to primary so solid themes look
-     unchanged; rainbow overrides them with complementary hues. */
+  --accent-soft: color-mix(in oklab, var(--accent) 13%, var(--surface));
+  --accent-line: color-mix(in oklab, var(--accent) 45%, var(--border));
+
+  /* older components still reference slots 2 and 3; one accent now */
   --accent-2: var(--accent);
   --accent-2-contrast: var(--accent-contrast);
   --accent-3: var(--accent);
   --accent-3-contrast: var(--accent-contrast);
 
-  --ok: light-dark(#15803d, #4ade80);
+  --ok: light-dark(#1d8752, #6fd49b);
+  --ok-soft: color-mix(in oklab, var(--ok) 14%, var(--surface));
+  --danger: light-dark(#c2334b, #ff8597);
+
+  --radius-card: 20px;
+  --radius-row: 12px;
+  --radius-btn: 14px;
+
+  --tabbar-h: 64px;
 }
 
 [data-theme="light"] {
@@ -30,120 +51,22 @@
   color-scheme: dark;
 }
 
-/* accent presets */
-[data-accent="crimson"] {
-  --accent: light-dark(#dc2626, #f87171);
-  --accent-contrast: light-dark(#ffffff, #190505);
-  --accent-soft: light-dark(#fef2f2, #2c0606);
+[data-accent="fjord"] {
+  --accent: light-dark(#0f6f88, #6cd0e2);
+  --accent-contrast: light-dark(#ffffff, #032229);
 }
-[data-accent="indigo"] {
-  --accent: light-dark(#4f46e5, #a5b4fc);
-  --accent-contrast: light-dark(#ffffff, #0b0a1f);
-  --accent-soft: light-dark(#eef2ff, #1e1b4b);
-}
-[data-accent="teal"] {
-  --accent: light-dark(#0d9488, #2dd4bf);
-  --accent-contrast: light-dark(#ffffff, #042521);
-  --accent-soft: light-dark(#f0fdfa, #0f2925);
-}
-[data-accent="rose"] {
-  --accent: light-dark(#e11d48, #fb7185);
-  --accent-contrast: light-dark(#ffffff, #1c0410);
-  --accent-soft: light-dark(#fff1f2, #2d0a14);
-}
-[data-accent="slate"] {
-  --accent: light-dark(#334155, #cbd5e1);
-  --accent-contrast: light-dark(#ffffff, #0f172a);
-  --accent-soft: light-dark(#f1f5f9, #1e293b);
-}
-[data-accent="emerald"] {
-  --accent: light-dark(#059669, #34d399);
-  --accent-contrast: light-dark(#ffffff, #042818);
-  --accent-soft: light-dark(#ecfdf5, #064e3b);
-}
-[data-accent="sky"] {
-  --accent: light-dark(#0284c7, #7dd3fc);
-  --accent-contrast: light-dark(#ffffff, #082032);
-  --accent-soft: light-dark(#f0f9ff, #0c4a6e);
-}
-[data-accent="fuchsia"] {
-  --accent: light-dark(#c026d3, #e879f9);
-  --accent-contrast: light-dark(#ffffff, #2e0735);
-  --accent-soft: light-dark(#fdf4ff, #581c5e);
-}
-/* rainbow base slots: chosen to sit in the middle of each button's
-   gradient arc so pills and borders stay cohesive with the buttons.
-   button gradients are overridden below with hardcoded rainbow arcs. */
-[data-accent="rainbow"] {
-  --accent: light-dark(#f97316, #fb923c);
-  --accent-contrast: light-dark(#ffffff, #1a0d04);
-  --accent-soft: light-dark(#fff7ed, #291205);
-  --accent-2: light-dark(#0891b2, #22d3ee);
-  --accent-2-contrast: light-dark(#ffffff, #052731);
-  --accent-3: light-dark(#7c3aed, #c084fc);
-  --accent-3-contrast: light-dark(#ffffff, #1a0b2e);
-}
-
-/* synthwave-style electric triad */
-[data-accent="vibrant"] {
-  --accent: light-dark(#ec4899, #f472b6);
-  --accent-contrast: light-dark(#ffffff, #2d0a1f);
-  --accent-soft: light-dark(#fdf2f8, #500724);
-  --accent-2: light-dark(#2563eb, #60a5fa);
-  --accent-2-contrast: light-dark(#ffffff, #0c1433);
-  --accent-3: light-dark(#06b6d4, #22d3ee);
-  --accent-3-contrast: light-dark(#ffffff, #052731);
-}
-
-/* soft, muted tones */
-[data-accent="pastel"] {
-  --accent: light-dark(#a78bfa, #c4b5fd);
-  --accent-contrast: light-dark(#2e1065, #1e1b4b);
-  --accent-soft: light-dark(#f5f3ff, #2e1065);
-  --accent-2: light-dark(#6ee7b7, #86efac);
-  --accent-2-contrast: light-dark(#064e3b, #052e1a);
-  --accent-3: light-dark(#fda4af, #fbcfe8);
-  --accent-3-contrast: light-dark(#881337, #4a0f25);
-}
-
-/* moss, mustard, terracotta */
-[data-accent="earthy"] {
-  --accent: light-dark(#65a30d, #a3e635);
-  --accent-contrast: light-dark(#ffffff, #1a2e05);
-  --accent-soft: light-dark(#f7fee7, #1a2e05);
-  --accent-2: light-dark(#ca8a04, #fbbf24);
-  --accent-2-contrast: light-dark(#ffffff, #2a1e03);
-  --accent-3: light-dark(#c2410c, #fb923c);
-  --accent-3-contrast: light-dark(#ffffff, #2a1004);
-}
-
-/* warm sky: orange, coral, plum */
-[data-accent="sunset"] {
-  --accent: light-dark(#f97316, #fb923c);
-  --accent-contrast: light-dark(#ffffff, #1a0d04);
-  --accent-soft: light-dark(#fff7ed, #291205);
-  --accent-2: light-dark(#e11d48, #fb7185);
-  --accent-2-contrast: light-dark(#ffffff, #1a0409);
-  --accent-3: light-dark(#7e22ce, #c084fc);
-  --accent-3-contrast: light-dark(#ffffff, #1f0d34);
-}
-
-/* cool water: deep blue, teal, cyan */
-[data-accent="ocean"] {
-  --accent: light-dark(#1e40af, #60a5fa);
-  --accent-contrast: light-dark(#ffffff, #0b1530);
-  --accent-soft: light-dark(#eff6ff, #0c1b3d);
-  --accent-2: light-dark(#0d9488, #2dd4bf);
-  --accent-2-contrast: light-dark(#ffffff, #042725);
-  --accent-3: light-dark(#06b6d4, #22d3ee);
-  --accent-3-contrast: light-dark(#ffffff, #052731);
+[data-accent="lingon"] {
+  --accent: light-dark(#b52f56, #ff8fae);
+  --accent-contrast: light-dark(#ffffff, #33061a);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-faint: var(--faint);
   --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-accent-contrast: var(--accent-contrast);
@@ -153,15 +76,21 @@
   --color-accent-3: var(--accent-3);
   --color-accent-3-contrast: var(--accent-3-contrast);
   --color-ok: var(--ok);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-archivo);
+}
+
+html {
+  background: var(--background);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), system-ui, -apple-system, Segoe UI, Roboto,
+  font-family: var(--font-archivo), system-ui, -apple-system, Segoe UI, Roboto,
     sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
   text-size-adjust: 100%;
@@ -183,8 +112,128 @@ select {
   font-size: 16px;
 }
 
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@layer components {
+  /* narrow archivo: headings and the numbers you read from a bench */
+  .display {
+    font-stretch: 78%;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+  }
+  .num {
+    font-stretch: 75%;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.005em;
+  }
+
+  .label {
+    font-size: 13px;
+    font-weight: 550;
+    color: var(--muted);
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 3rem;
+    padding: 0 1.25rem;
+    border-radius: var(--radius-btn);
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition:
+      transform 120ms ease,
+      background-color 150ms ease,
+      opacity 150ms ease;
+    user-select: none;
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  .btn:disabled {
+    opacity: 0.55;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-contrast);
+  }
+  .btn-secondary {
+    background: var(--surface-2);
+    color: var(--foreground);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--accent);
+    padding: 0 0.5rem;
+  }
+  .btn-danger {
+    background: transparent;
+    color: var(--danger);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--danger) 40%, transparent);
+  }
+  .btn-sm {
+    height: 2.25rem;
+    padding: 0 0.875rem;
+    font-size: 14px;
+    border-radius: 11px;
+  }
+  .btn-block {
+    width: 100%;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    height: 1.5rem;
+    padding: 0 0.6rem;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--surface-2);
+    color: var(--muted);
+  }
+  .chip-accent {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .chip-ok {
+    background: var(--ok-soft);
+    color: var(--ok);
+  }
+}
+
 .safe-bottom {
   padding-bottom: max(env(safe-area-inset-bottom), 0.75rem);
+}
+
+/* space so the last thing on a page never sits under the tab bar */
+.pb-tabbar {
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 1.5rem);
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -195,178 +244,10 @@ select {
   scrollbar-width: none;
 }
 
-/* primary buttons and link-buttons get a diagonal 3-stop gradient
-   (lighter → base → darker of the same hue via color-mix) plus a soft
-   accent-tinted shadow. solid themes gain visible gradient sheen;
-   multi themes get overridden below to span across slots. small
-   elements live in <span> so they aren't affected. */
-button.bg-\(--accent\),
-a.bg-\(--accent\) {
-  background-image:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, transparent 55%),
-    linear-gradient(
-      135deg,
-      color-mix(in oklab, var(--accent), white 18%) 0%,
-      var(--accent) 50%,
-      color-mix(in oklab, var(--accent), black 18%) 100%
-    );
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.18) inset,
-    0 6px 16px color-mix(in oklab, var(--accent), transparent 78%);
-}
-
-button.bg-\(--accent-2\),
-a.bg-\(--accent-2\) {
-  background-image:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, transparent 55%),
-    linear-gradient(
-      135deg,
-      color-mix(in oklab, var(--accent-2), white 18%) 0%,
-      var(--accent-2) 50%,
-      color-mix(in oklab, var(--accent-2), black 18%) 100%
-    );
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.18) inset,
-    0 6px 16px color-mix(in oklab, var(--accent-2), transparent 78%);
-}
-
-button.bg-\(--accent-3\),
-a.bg-\(--accent-3\) {
-  background-image:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, transparent 55%),
-    linear-gradient(
-      135deg,
-      color-mix(in oklab, var(--accent-3), white 18%) 0%,
-      var(--accent-3) 50%,
-      color-mix(in oklab, var(--accent-3), black 18%) 100%
-    );
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.18) inset,
-    0 6px 16px color-mix(in oklab, var(--accent-3), transparent 78%);
-}
-
-/* multi-slot palettes (non-rainbow): each button spans across the
-   three slots at different rotations so the gradient varies by button
-   role. accent cycles: main → logging → progress → main. */
-:is(
-  [data-accent="vibrant"],
-  [data-accent="pastel"],
-  [data-accent="earthy"],
-  [data-accent="sunset"],
-  [data-accent="ocean"]
-)
-  button.bg-\(--accent\),
-:is(
-  [data-accent="vibrant"],
-  [data-accent="pastel"],
-  [data-accent="earthy"],
-  [data-accent="sunset"],
-  [data-accent="ocean"]
-)
-  a.bg-\(--accent\) {
-  background-image:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 55%),
-    linear-gradient(
-      135deg,
-      var(--accent) 0%,
-      var(--accent-2) 55%,
-      var(--accent-3) 100%
-    );
-}
-
-:is(
-  [data-accent="vibrant"],
-  [data-accent="pastel"],
-  [data-accent="earthy"],
-  [data-accent="sunset"],
-  [data-accent="ocean"]
-)
-  button.bg-\(--accent-2\),
-:is(
-  [data-accent="vibrant"],
-  [data-accent="pastel"],
-  [data-accent="earthy"],
-  [data-accent="sunset"],
-  [data-accent="ocean"]
-)
-  a.bg-\(--accent-2\) {
-  background-image:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 55%),
-    linear-gradient(
-      135deg,
-      var(--accent-2) 0%,
-      var(--accent-3) 55%,
-      var(--accent) 100%
-    );
-}
-
-:is(
-  [data-accent="vibrant"],
-  [data-accent="pastel"],
-  [data-accent="earthy"],
-  [data-accent="sunset"],
-  [data-accent="ocean"]
-)
-  button.bg-\(--accent-3\),
-:is(
-  [data-accent="vibrant"],
-  [data-accent="pastel"],
-  [data-accent="earthy"],
-  [data-accent="sunset"],
-  [data-accent="ocean"]
-)
-  a.bg-\(--accent-3\) {
-  background-image:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 55%),
-    linear-gradient(
-      135deg,
-      var(--accent-3) 0%,
-      var(--accent) 55%,
-      var(--accent-2) 100%
-    );
-}
-
-/* rainbow: each button type paints a different rainbow arc, using
-   hardcoded saturated hues so it reads as a full spectrum across the
-   app. primary buttons → warm arc (red/orange/yellow); log buttons →
-   green/cyan/blue; session-close buttons → blue/violet/magenta. */
-[data-accent="rainbow"] button.bg-\(--accent\),
-[data-accent="rainbow"] a.bg-\(--accent\) {
-  background-image:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 55%),
-    linear-gradient(135deg, #dc2626 0%, #f97316 50%, #eab308 100%);
-}
-
-[data-accent="rainbow"] button.bg-\(--accent-2\),
-[data-accent="rainbow"] a.bg-\(--accent-2\) {
-  background-image:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 55%),
-    linear-gradient(135deg, #16a34a 0%, #06b6d4 50%, #2563eb 100%);
-}
-
-[data-accent="rainbow"] button.bg-\(--accent-3\),
-[data-accent="rainbow"] a.bg-\(--accent-3\) {
-  background-image:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 55%),
-    linear-gradient(135deg, #2563eb 0%, #8b5cf6 50%, #ec4899 100%);
-}
-
-/* tinted surface — used by "today" card and active-plan card to give
-   them a soft accent wash without being loud. */
+/* legacy helpers kept so older markup stays calm */
 .accent-wash {
-  background-image: linear-gradient(
-    180deg,
-    var(--accent-soft) 0%,
-    transparent 70%
-  );
+  background-image: none;
 }
-
-/* progress bar gets a subtle left-to-right sheen so the fill reads
-   as active rather than flat. */
 .progress-fill {
-  background-image: linear-gradient(
-    90deg,
-    var(--accent-3) 0%,
-    color-mix(in oklab, var(--accent-3), white 18%) 100%
-  );
+  background: var(--accent);
 }

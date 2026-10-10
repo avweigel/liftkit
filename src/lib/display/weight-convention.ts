@@ -1,7 +1,7 @@
 export type WeightConvention = {
   equipment: "dumbbell" | "kettlebell";
   mode: "total" | "single";
-  hint: string; // short label, e.g. "total — both dbs" or "single db"
+  hint: string; // short label, e.g. "total, both dbs" or "single db"
   summary: string; // sentence for descriptions
   perSide: (total: number) => number;
 };
@@ -29,7 +29,7 @@ export function weightConvention(
     return {
       equipment: eq,
       mode: "total",
-      hint: `total — both ${label}s`,
+      hint: `total, both ${label}s`,
       summary: `enter the sum of both dumbbells. a 70 lb log = two 35 lb dbs.`,
       perSide: (w) => w / 2,
     };
