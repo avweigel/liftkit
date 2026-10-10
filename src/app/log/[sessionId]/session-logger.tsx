@@ -624,6 +624,7 @@ function ExerciseHeader({
         {badge && badge.length > 1 && (
           <span className="chip chip-accent num text-[13px]">{badge}</span>
         )}
+        {reps && (
         <span className="chip">
           <span className="num text-[14px] text-(--foreground)">
             {exercise.prescribed_sets} × {reps}
@@ -634,6 +635,7 @@ function ExerciseHeader({
             </span>
           )}
         </span>
+        )}
         {exercise.rest_seconds != null && exercise.rest_seconds > 0 && (
           <span className="chip">
             rest <span className="num text-[14px]">{exercise.rest_seconds}</span> s
