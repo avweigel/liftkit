@@ -2,7 +2,7 @@
 
 A workout tracker built for a phone at 5 am. It runs your training plan, logs every set with one thumb, and shows how your lifts move over time.
 
-Live at **[liftkit-seven.vercel.app](https://liftkit-seven.vercel.app)**.
+Live at **[liftkit-av.vercel.app](https://liftkit-av.vercel.app)**.
 
 ## What it does
 
