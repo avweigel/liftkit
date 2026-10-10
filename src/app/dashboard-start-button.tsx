@@ -46,3 +46,27 @@ export function StartOtherDayButton({
     </button>
   );
 }
+
+export function StartDayButton({
+  dayId,
+  label,
+}: {
+  dayId: string;
+  label: string;
+}) {
+  const [pending, startTransition] = useTransition();
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        startTransition(async () => {
+          await startSession(dayId);
+        })
+      }
+      disabled={pending}
+      className="h-11 rounded-xl bg-(--accent) px-5 text-sm font-bold text-(--accent-contrast) shadow-sm active:scale-[0.99] disabled:opacity-60"
+    >
+      {pending ? "starting…" : label}
+    </button>
+  );
+}

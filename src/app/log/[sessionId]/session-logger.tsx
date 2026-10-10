@@ -25,6 +25,11 @@ import {
 } from "@/lib/display/weight-steps";
 import { pairSides } from "@/lib/side";
 import {
+  WARMUP_BASE,
+  type DayKind,
+  type WarmupOption,
+} from "@/lib/program/day-profile";
+import {
   DismissibleHint,
   HINT_KEYS,
 } from "@/components/dismissible-hint";
@@ -84,6 +89,7 @@ type Props = {
   activeSupersetCodes: string[];
   planName: string | null;
   hasPlanDay: boolean;
+  warmup: { kind: DayKind; options: WarmupOption[] } | null;
 };
 
 export function SessionLogger({
@@ -96,6 +102,7 @@ export function SessionLogger({
   activeSupersetCodes,
   planName,
   hasPlanDay,
+  warmup,
 }: Props) {
   const [sets, setSets] = useState<SessionSet[]>(initialSets);
   const [notes, setNotes] = useState(initialNotes);
@@ -330,6 +337,8 @@ export function SessionLogger({
           </div>
         </DismissibleHint>
       )}
+
+      {warmup && !finished && <WarmupCard warmup={warmup} />}
 
       <div className="space-y-4">
         {groups.map((g) => {
@@ -1636,4 +1645,102 @@ function formatRest(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+// ----- Warm-up picker -----
+
+function WarmupCard({
+  warmup,
+}: {
+  warmup: { kind: DayKind; options: WarmupOption[] };
+}) {
+  const [open, setOpen] = useState(true);
+  const [done, setDone] = useState<Set<string>>(new Set());
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+
+  const toggle = (
+    set: Set<string>,
+    update: (s: Set<string>) => void,
+    id: string,
+  ) => {
+    const next = new Set(set);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    update(next);
+  };
+
+  const complete =
+    done.size === WARMUP_BASE.length &&
+    (warmup.options.length === 0 || picked.size >= 2);
+
+  return (
+    <section className="space-y-2 rounded-xl border border-(--border) bg-(--surface) p-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between text-left"
+        aria-expanded={open}
+      >
+        <span className="text-[11px] font-bold uppercase tracking-wider text-(--accent)">
+          warm-up · about 10 min {complete ? "· done ✓" : ""}
+        </span>
+        <span className="text-xs text-(--muted)">{open ? "hide" : "show"}</span>
+      </button>
+      {open && (
+        <div className="space-y-2">
+          <ul className="space-y-1">
+            {WARMUP_BASE.map((b) => (
+              <li key={b.id}>
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={done.has(b.id)}
+                    onChange={() => toggle(done, setDone, b.id)}
+                    className="mt-1 h-4 w-4 accent-(--accent)"
+                  />
+                  <span>
+                    <span className="font-semibold">{b.title}</span>
+                    <span className="block text-xs text-(--muted)">{b.detail}</span>
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          {warmup.options.length > 0 && (
+            <div className="space-y-1">
+              <div className="text-xs text-(--muted)">
+                then pick 2 to 3 · fast but quiet, 30 to 60 s rest
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {warmup.options.map((o) => {
+                  const on = picked.has(o.id);
+                  return (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => toggle(picked, setPicked, o.id)}
+                      aria-pressed={on}
+                      className={`rounded-lg border px-2.5 py-1.5 text-left text-xs ${
+                        on
+                          ? "border-(--accent) bg-(--accent-soft) text-(--foreground)"
+                          : "border-(--border) bg-(--background) text-(--muted)"
+                      }`}
+                    >
+                      <span className="font-semibold">{o.name}</span>
+                      <span className="ml-1 tabular-nums">{o.dose}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {warmup.kind === "metcon" && (
+            <p className="text-xs text-(--muted)">
+              low energy? do the easy version: 20 min EMOM, half the reps, no runs.
+            </p>
+          )}
+        </div>
+      )}
+    </section>
+  );
 }

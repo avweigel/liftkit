@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatDayLabel } from "@/lib/display/format-day";
@@ -6,10 +7,24 @@ import {
   HINT_KEYS,
 } from "@/components/dismissible-hint";
 import {
+  StartDayButton,
   StartOtherDayButton,
   StartTodayButton,
 } from "./dashboard-start-button";
 import { DashboardSessionDelete } from "./dashboard-session-delete";
+import { TonightCardio } from "./tonight-cardio";
+import {
+  localToday,
+  nextWeekday,
+  weekStart,
+} from "@/lib/local-date";
+import { classifyDay, type DayProfile } from "@/lib/program/day-profile";
+import {
+  HARD_KINDS,
+  MAX_HARD_PER_WEEK,
+  suggestCardio,
+  type CardioKind,
+} from "@/lib/program/cardio";
 
 type SessionRow = {
   id: string;
@@ -34,9 +49,30 @@ type ActivePlan = {
       id: string;
       day_number: number;
       name: string | null;
-      plan_day_exercises: Array<{ id: string }>;
+      plan_day_exercises: Array<{
+        id: string;
+        exercise: { name: string } | null;
+      }>;
     }>;
   }>;
+};
+
+type PlanDay = ActivePlan["plan_weeks"][number]["plan_days"][number];
+
+type CorePlan = {
+  id: string;
+  name: string;
+  plan_weeks: Array<{
+    plan_days: Array<{ id: string; day_number: number; name: string | null }>;
+  }>;
+};
+
+type CardioRow = {
+  id: string;
+  logged_on: string;
+  kind: CardioKind;
+  minutes: number | null;
+  place: "outside" | "gym" | null;
 };
 
 type Props = { userId: string; email: string };
@@ -91,7 +127,7 @@ export async function Dashboard({ userId, email }: Props) {
           plan_weeks (
             plan_days (
               id, day_number, name,
-              plan_day_exercises ( id )
+              plan_day_exercises ( id, exercise:exercises ( name ) )
             )
           )
         `,
@@ -102,14 +138,50 @@ export async function Dashboard({ userId, email }: Props) {
     activePlan = data;
   }
 
-  // Today's plan day for the active plan
-  const dow = new Date().getDay();
-  const todayDayNumber = dow === 0 ? null : dow;
-  const todayDay = activePlan && todayDayNumber != null
-    ? activePlan.plan_weeks
-        .flatMap((w) => w.plan_days)
-        .find((d) => d.day_number === todayDayNumber) ?? null
-    : null;
+  // today in the lifter's time zone; sunday is day 7 so 7-day plans work
+  const local = localToday();
+  const todayDayNumber = local.weekday;
+  const planDays = activePlan
+    ? activePlan.plan_weeks.flatMap((w) => w.plan_days)
+    : [];
+  const todayDay =
+    planDays.find((d) => d.day_number === todayDayNumber) ?? null;
+  const tomorrowDay =
+    planDays.find((d) => d.day_number === nextWeekday(todayDayNumber)) ??
+    null;
+  const profileOf = (d: PlanDay | null): DayProfile | null =>
+    d
+      ? classifyDay(
+          d.name,
+          d.plan_day_exercises
+            .map((x) => x.exercise?.name ?? "")
+            .filter(Boolean),
+        )
+      : null;
+  const todayProfile = profileOf(todayDay);
+  const tomorrowProfile = profileOf(tomorrowDay);
+
+  const { data: cardioRows } = await supabase
+    .from("cardio_logs")
+    .select("id, logged_on, kind, minutes, place")
+    .eq("user_id", userId)
+    .gte("logged_on", weekStart(local))
+    .order("created_at", { ascending: true })
+    .returns<CardioRow[]>();
+  const hardThisWeek = (cardioRows ?? []).filter((r) =>
+    HARD_KINDS.includes(r.kind),
+  ).length;
+  const cardioTonight = (cardioRows ?? []).filter(
+    (r) => r.logged_on === local.iso,
+  );
+  const cardioSuggestions = suggestCardio({
+    today: todayProfile,
+    tomorrow: tomorrowProfile,
+    hardThisWeek,
+    weekday: local.weekday,
+  });
+
+  const core = await loadCore(supabase, userId, local.iso, todayProfile);
 
   // Any session for today's plan day started within the last 18 hours
   let todaySession: {
@@ -144,7 +216,27 @@ export async function Dashboard({ userId, email }: Props) {
 
       {activePlan ? (
         <>
-          <ActivePhaseBlock plan={activePlan} todaySession={todaySession} />
+          <ActivePhaseBlock
+            plan={activePlan}
+            todaySession={todaySession}
+            todayDayNumber={todayDayNumber}
+          >
+            {core && <CoreCard core={core} />}
+            <TonightCardio
+              suggestions={cardioSuggestions}
+              logged={cardioTonight}
+              todayLabel={
+                todayDay ? formatDayLabel(todayDay.day_number, todayDay.name).name : "rest day"
+              }
+              tomorrowLabel={
+                tomorrowDay
+                  ? formatDayLabel(tomorrowDay.day_number, tomorrowDay.name).name
+                  : "rest day"
+              }
+              hardThisWeek={hardThisWeek}
+              maxHard={MAX_HARD_PER_WEEK}
+            />
+          </ActivePhaseBlock>
           <DismissibleHint storageKey={HINT_KEYS.dashboardTip}>
             <p className="pr-8 text-xs text-(--muted)">
               tip: &ldquo;today&rsquo;s workout&rdquo; auto-selects the day of
@@ -217,6 +309,8 @@ export async function Dashboard({ userId, email }: Props) {
 function ActivePhaseBlock({
   plan,
   todaySession,
+  todayDayNumber,
+  children,
 }: {
   plan: ActivePlan;
   todaySession: {
@@ -224,17 +318,14 @@ function ActivePhaseBlock({
     started_at: string;
     finished_at: string | null;
   } | null;
+  todayDayNumber: number;
+  children?: ReactNode;
 }) {
   const days = (plan.plan_weeks ?? [])
     .flatMap((w) => w.plan_days ?? [])
     .sort((a, b) => a.day_number - b.day_number);
 
-  const dow = new Date().getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
-  const todayDayNumber = dow === 0 ? null : dow;
-  const todayDay =
-    todayDayNumber != null
-      ? days.find((d) => d.day_number === todayDayNumber) ?? null
-      : null;
+  const todayDay = days.find((d) => d.day_number === todayDayNumber) ?? null;
   const otherDays = days.filter((d) => d !== todayDay);
 
   return (
@@ -264,6 +355,8 @@ function ActivePhaseBlock({
       ) : (
         <RestDayCard planName={plan.name} />
       )}
+
+      {children}
 
       {otherDays.length > 0 && (
         <div className="space-y-2">
@@ -381,8 +474,8 @@ function RestDayCard({ planName }: { planName: string }) {
       </div>
       <h2 className="mt-1 text-xl font-bold">no workout today</h2>
       <p className="mt-1 text-sm text-(--muted)">
-        {planName} runs monday-saturday. take a rest, or pick another day below
-        if you want to train.
+        {planName} has nothing planned today. take a rest, or pick another
+        day below if you want to train.
       </p>
     </section>
   );
@@ -440,4 +533,106 @@ function formatDate(iso: string) {
     month: "short",
     day: "numeric",
   });
+}
+
+type CoreInfo = {
+  planName: string;
+  suggested: { id: string; name: string };
+  other: { id: string; name: string } | null;
+  doneToday: string | null;
+  reason: string;
+};
+
+async function loadCore(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  todayIso: string,
+  todayProfile: DayProfile | null,
+): Promise<CoreInfo | null> {
+  const { data: plans } = await supabase
+    .from("workout_plans")
+    .select("id, name, plan_weeks ( plan_days ( id, day_number, name ) )")
+    .eq("owner_id", userId)
+    .ilike("name", "core%")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .returns<CorePlan[]>();
+  const plan = plans?.[0];
+  if (!plan) return null;
+  const days = plan.plan_weeks
+    .flatMap((w) => w.plan_days)
+    .sort((a, b) => a.day_number - b.day_number);
+  if (days.length === 0) return null;
+
+  const { data: last } = await supabase
+    .from("workout_sessions")
+    .select("plan_day_id, started_at")
+    .eq("user_id", userId)
+    .in(
+      "plan_day_id",
+      days.map((d) => d.id),
+    )
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const nameOf = (d: (typeof days)[number]) =>
+    formatDayLabel(d.day_number, d.name).name;
+  const lastDay = last ? days.find((d) => d.id === last.plan_day_id) : null;
+  const doneToday =
+    last && lastDay && localToday(new Date(last.started_at)).iso === todayIso
+      ? nameOf(lastDay)
+      : null;
+
+  // the first day (A) never loads the adductors, so it's the safe pick on
+  // heavy leg days. otherwise alternate from whatever you did last.
+  let pick = days[0];
+  let reason = "Alternating from your last core session.";
+  if (todayProfile?.heavyLegs) {
+    reason = "Heavy legs today, so A: no Copenhagens.";
+  } else if (lastDay) {
+    const idx = days.findIndex((d) => d.id === lastDay.id);
+    pick = days[(idx + 1) % days.length];
+  } else {
+    reason = "Start with A.";
+  }
+  const other = days.find((d) => d.id !== pick.id) ?? null;
+
+  return {
+    planName: plan.name,
+    suggested: { id: pick.id, name: nameOf(pick) },
+    other: other ? { id: other.id, name: nameOf(other) } : null,
+    doneToday,
+    reason,
+  };
+}
+
+function CoreCard({ core }: { core: CoreInfo }) {
+  return (
+    <section className="space-y-2 rounded-2xl border border-(--border) bg-(--surface) p-4">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-(--muted)">
+          core today
+        </h2>
+        {core.doneToday && (
+          <span className="rounded-full bg-(--ok)/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-(--ok)">
+            ✓ {core.doneToday} done
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-(--muted)">{core.reason}</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <StartDayButton
+          dayId={core.suggested.id}
+          label={`start ${core.suggested.name.toLowerCase()} →`}
+        />
+        {core.other && (
+          <StartOtherDayButton
+            dayId={core.other.id}
+            label={`or ${core.other.name.toLowerCase()}`}
+          />
+        )}
+      </div>
+    </section>
+  );
 }

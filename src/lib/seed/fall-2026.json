@@ -1,0 +1,828 @@
+{
+  "block1": {
+    "name": "Block 1: Build",
+    "description": "Fall 2026, weeks 1 to 4 (Oct 12 to Nov 8). Big lift first, then single-station supersets. Week 4 is lighter.",
+    "days": [
+      {
+        "name": "Push",
+        "notes": null,
+        "exercises": [
+          {
+            "set_code": "A1",
+            "name": "Bench Press",
+            "equipment": "barbell",
+            "muscle": "chest",
+            "sets": 4,
+            "reps": "8-10",
+            "rest": 150,
+            "note": "Straight sets. 2 x 5 warm-up first"
+          },
+          {
+            "set_code": "B1",
+            "name": "Smith Machine Incline Press",
+            "equipment": "machine",
+            "muscle": "chest",
+            "sets": 3,
+            "reps": "10",
+            "rest": 60,
+            "note": "Smith"
+          },
+          {
+            "set_code": "B2",
+            "name": "Push-up",
+            "equipment": "bodyweight",
+            "muscle": "chest",
+            "sets": 3,
+            "reps": "max",
+            "rest": 60,
+            "note": "Hands on the racked bar"
+          },
+          {
+            "set_code": "C1",
+            "name": "Seated DB shoulder press",
+            "equipment": "dumbbell",
+            "muscle": "shoulders",
+            "sets": 3,
+            "reps": "10",
+            "rest": 60,
+            "note": "Bench and dumbbells. Ribs down"
+          },
+          {
+            "set_code": "C2",
+            "name": "Dumbbell Lateral Raise",
+            "equipment": "dumbbell",
+            "muscle": "shoulders",
+            "sets": 3,
+            "reps": "12",
+            "rest": 60,
+            "note": "Same bench, lighter pair"
+          },
+          {
+            "set_code": "D1",
+            "name": "Tricep Rope Pushdown",
+            "equipment": "cable",
+            "muscle": "triceps",
+            "sets": 3,
+            "reps": "12-15",
+            "rest": 60,
+            "note": "Cable tower, rope"
+          },
+          {
+            "set_code": "D2",
+            "name": "OH Tricep Cable Extension",
+            "equipment": "cable",
+            "muscle": "triceps",
+            "sets": 3,
+            "reps": "12",
+            "rest": 60,
+            "note": "Same rope, turn around"
+          }
+        ]
+      },
+      {
+        "name": "Lower: Hinge",
+        "notes": null,
+        "exercises": [
+          {
+            "set_code": "A1",
+            "name": "BB Deadlift",
+            "equipment": "barbell",
+            "muscle": "hamstrings",
+            "sets": 4,
+            "reps": "6-8",
+            "rest": 180,
+            "note": "Straight sets. 2 x 5 warm-up first. Brace, ribs down"
+          },
+          {
+            "set_code": "B1",
+            "name": "Single-Leg Glute Machine (L)",
+            "equipment": "machine",
+            "muscle": "glutes",
+            "sets": 3,
+            "reps": "10",
+            "rest": 45,
+            "note": null
+          },
+          {
+            "set_code": "B2",
+            "name": "Single-Leg Glute Machine (R)",
+            "equipment": "machine",
+            "muscle": "glutes",
+            "sets": 3,
+            "reps": "10",
+            "rest": 45,
+            "note": null
+          },
+          {
+            "set_code": "C1",
+            "name": "Cable Pull-Through",
+            "equipment": "cable",
+            "muscle": "glutes",
+            "sets": 3,
+            "reps": "15",
+            "rest": 60,
+            "note": "Cable tower, rope"
+          },
+          {
+            "set_code": "C2",
+            "name": "Cable Glute Kickback",
+            "equipment": "cable",
+            "muscle": "glutes",
+            "sets": 3,
+            "reps": "15/side",
+            "rest": 60,
+            "note": "Same cable, ankle strap. Left then right"
+          },
+          {
+            "set_code": "D1",
+            "name": "Abductor",
+            "equipment": "machine",
+            "muscle": "glutes",
+            "sets": 3,
+            "reps": "15",
+            "rest": 45,
+            "note": null
+          },
+          {
+            "set_code": "D2",
+            "name": "Adductor",
+            "equipment": "machine",
+            "muscle": "other",
+            "sets": 3,
+            "reps": "15",
+            "rest": 45,
+            "note": "Same machine"
+          },
+          {
+            "set_code": "E1",
+            "name": "Leg Curl",
+            "equipment": "machine",
+            "muscle": "hamstrings",
+            "sets": 3,
+            "reps": "12",
+            "rest": 60,
+            "note": null
+          },
+          {
+            "set_code": "E2",
+            "name": "Back Extension",
+            "equipment": "bodyweight",
+            "muscle": "hamstrings",
+            "sets": 3,
+            "reps": "12",
+            "rest": 60,
+            "note": "Round upper back, squeeze glutes"
+          }
+        ]
+      },
+      {
+        "name": "Pull",
+        "notes": null,
+        "exercises": [
+          {
+            "set_code": "A1",
+            "name": "Chin-up",
+            "equipment": "bodyweight",
+            "muscle": "back",
+            "sets": 4,
+            "reps": "6-10",
+            "rest": 90,
+            "note": "Bar or assisted machine"
+          },
+          {
+            "set_code": "A2",
+            "name": "Push-up",
+            "equipment": "bodyweight",
+            "muscle": "chest",
+            "sets": 4,
+            "reps": "10-15",
+            "rest": 90,
+            "note": "Floor next to the bar"
+          },
+          {
+            "set_code": "B1",
+            "name": "Chest-Supported Dumbbell Row",
+            "equipment": "dumbbell",
+            "muscle": "back",
+            "sets": 3,
+            "reps": "10",
+            "rest": 60,
+            "note": "Incline bench and dumbbells"
+          },
+          {
+            "set_code": "B2",
+            "name": "Incline Dumbbell Curl",
+            "equipment": "dumbbell",
+            "muscle": "biceps",
+            "sets": 3,
+            "reps": "10-12",
+            "rest": 60,
+            "note": "Same bench"
+          },
+          {
+            "set_code": "C1",
+            "name": "Single-Arm Cable Row",
+            "equipment": "cable",
+            "muscle": "back",
+            "sets": 3,
+            "reps": "10/side",
+            "rest": 60,
+            "note": "One handle. Left then right"
+          },
+          {
+            "set_code": "C2",
+            "name": "Single-Arm Cable Rear Delt Fly",
+            "equipment": "cable",
+            "muscle": "shoulders",
+            "sets": 3,
+            "reps": "12/side",
+            "rest": 60,
+            "note": "Same handle. Left then right"
+          },
+          {
+            "set_code": "D1",
+            "name": "Face Pull",
+            "equipment": "cable",
+            "muscle": "shoulders",
+            "sets": 3,
+            "reps": "15",
+            "rest": 60,
+            "note": "Cable set high, rope"
+          },
+          {
+            "set_code": "D2",
+            "name": "High Cable Curl",
+            "equipment": "cable",
+            "muscle": "biceps",
+            "sets": 3,
+            "reps": "12",
+            "rest": 60,
+            "note": "Same rope and height"
+          }
+        ]
+      },
+      {
+        "name": "Metcon",
+        "notes": "Full: 30 min EMOM (6 rounds of the 5 stations), then the runs. Easy: 20 min EMOM with half the reps and no runs, or 30 min incline walk plus 10 min mobility.",
+        "exercises": [
+          {
+            "set_code": "A1",
+            "name": "Assault Bike",
+            "equipment": "machine",
+            "muscle": "full_body",
+            "sets": 6,
+            "reps": "12-15 cal",
+            "rest": 0,
+            "note": "EMOM minute 1"
+          },
+          {
+            "set_code": "A2",
+            "name": "Thruster",
+            "equipment": "dumbbell",
+            "muscle": "full_body",
+            "sets": 6,
+            "reps": "10",
+            "rest": 0,
+            "note": "EMOM minute 2, dumbbells"
+          },
+          {
+            "set_code": "A3",
+            "name": "Dumbbell Swing",
+            "equipment": "dumbbell",
+            "muscle": "full_body",
+            "sets": 6,
+            "reps": "15",
+            "rest": 0,
+            "note": "EMOM minute 3, one dumbbell"
+          },
+          {
+            "set_code": "A4",
+            "name": "Walking Lunges",
+            "equipment": "bodyweight",
+            "muscle": "quads",
+            "sets": 6,
+            "reps": "10/side",
+            "rest": 60,
+            "note": "EMOM minute 4, then rest minute 5"
+          },
+          {
+            "set_code": "B1",
+            "name": "Run",
+            "equipment": "other",
+            "muscle": "full_body",
+            "sets": 3,
+            "reps": "200 m",
+            "rest": 60,
+            "note": "Or 1 min hard on the bike. 1 min easy between"
+          }
+        ]
+      },
+      {
+        "name": "Shoulders & Arms",
+        "notes": "No heavy legs today, so you're fresh for Saturday.",
+        "exercises": [
+          {
+            "set_code": "A1",
+            "name": "Overhead Press",
+            "equipment": "barbell",
+            "muscle": "shoulders",
+            "sets": 4,
+            "reps": "8-10",
+            "rest": 150,
+            "note": "Straight sets. 2 x 5 warm-up first. Glutes tight, ribs down"
+          },
+          {
+            "set_code": "B1",
+            "name": "Cable Curl",
+            "equipment": "cable",
+            "muscle": "biceps",
+            "sets": 3,
+            "reps": "12",
+            "rest": 60,
+            "note": "Straight bar, low"
+          },
+          {
+            "set_code": "B2",
+            "name": "Cable Tricep Pushdown",
+            "equipment": "cable",
+            "muscle": "triceps",
+            "sets": 3,
+            "reps": "12",
+            "rest": 60,
+            "note": "Same bar, move it high"
+          },
+          {
+            "set_code": "C1",
+            "name": "Dumbbell Lateral Raise",
+            "equipment": "dumbbell",
+            "muscle": "shoulders",
+            "sets": 3,
+            "reps": "12",
+            "rest": 60,
+            "note": null
+          },
+          {
+            "set_code": "C2",
+            "name": "Hammer Curl",
+            "equipment": "dumbbell",
+            "muscle": "biceps",
+            "sets": 3,
+            "reps": "12",
+            "rest": 60,
+            "note": "Same spot, heavier pair"
+          },
+          {
+            "set_code": "D1",
+            "name": "Preacher Curl (L)",
+            "equipment": "dumbbell",
+            "muscle": "biceps",
+            "sets": 3,
+            "reps": "10",
+            "rest": 45,
+            "note": "Preacher bench"
+          },
+          {
+            "set_code": "D2",
+            "name": "Preacher Curl (R)",
+            "equipment": "dumbbell",
+            "muscle": "biceps",
+            "sets": 3,
+            "reps": "10",
+            "rest": 45,
+            "note": null
+          },
+          {
+            "set_code": "D3",
+            "name": "Overhead Tricep Extension",
+            "equipment": "dumbbell",
+            "muscle": "triceps",
+            "sets": 3,
+            "reps": "12",
+            "rest": 60,
+            "note": "Same bench, one dumbbell"
+          },
+          {
+            "set_code": "E1",
+            "name": "Cable Glute Kickback",
+            "equipment": "cable",
+            "muscle": "glutes",
+            "sets": 3,
+            "reps": "15/side",
+            "rest": 45,
+            "note": "Ankle strap. Left then right"
+          },
+          {
+            "set_code": "E2",
+            "name": "Standing Cable Hip Abduction",
+            "equipment": "cable",
+            "muscle": "glutes",
+            "sets": 3,
+            "reps": "15/side",
+            "rest": 45,
+            "note": "Same strap"
+          }
+        ]
+      },
+      {
+        "name": "Legs: Squat",
+        "notes": "The long one, up to 90 minutes.",
+        "exercises": [
+          {
+            "set_code": "A1",
+            "name": "BB Back Squat",
+            "equipment": "barbell",
+            "muscle": "quads",
+            "sets": 4,
+            "reps": "8-10",
+            "rest": 180,
+            "note": "Straight sets. 2 x 5 warm-up first. Smith if the rack is taken"
+          },
+          {
+            "set_code": "B1",
+            "name": "Split Squat (L)",
+            "equipment": "dumbbell",
+            "muscle": "quads",
+            "sets": 3,
+            "reps": "10",
+            "rest": 30,
+            "note": null
+          },
+          {
+            "set_code": "B2",
+            "name": "Split Squat (R)",
+            "equipment": "dumbbell",
+            "muscle": "quads",
+            "sets": 3,
+            "reps": "10",
+            "rest": 60,
+            "note": null
+          },
+          {
+            "set_code": "C1",
+            "name": "Leg Press",
+            "equipment": "machine",
+            "muscle": "quads",
+            "sets": 4,
+            "reps": "12",
+            "rest": 60,
+            "note": null
+          },
+          {
+            "set_code": "C2",
+            "name": "Calf Press on Leg Press",
+            "equipment": "machine",
+            "muscle": "calves",
+            "sets": 4,
+            "reps": "15",
+            "rest": 60,
+            "note": "Same machine"
+          },
+          {
+            "set_code": "D1",
+            "name": "Leg Extension",
+            "equipment": "machine",
+            "muscle": "quads",
+            "sets": 3,
+            "reps": "15",
+            "rest": 60,
+            "note": null
+          },
+          {
+            "set_code": "D2",
+            "name": "Leg Curl",
+            "equipment": "machine",
+            "muscle": "hamstrings",
+            "sets": 3,
+            "reps": "12",
+            "rest": 60,
+            "note": null
+          },
+          {
+            "set_code": "E1",
+            "name": "Smith Machine Hip Thrust",
+            "equipment": "machine",
+            "muscle": "glutes",
+            "sets": 3,
+            "reps": "12",
+            "rest": 60,
+            "note": "1 second pause at the top"
+          },
+          {
+            "set_code": "E2",
+            "name": "Frog Pumps",
+            "equipment": "bodyweight",
+            "muscle": "glutes",
+            "sets": 3,
+            "reps": "20",
+            "rest": 60,
+            "note": "Floor beside the bench"
+          },
+          {
+            "set_code": "F1",
+            "name": "Abductor",
+            "equipment": "machine",
+            "muscle": "glutes",
+            "sets": 3,
+            "reps": "15",
+            "rest": 45,
+            "note": null
+          },
+          {
+            "set_code": "F2",
+            "name": "Adductor",
+            "equipment": "machine",
+            "muscle": "other",
+            "sets": 3,
+            "reps": "15",
+            "rest": 45,
+            "note": "Same machine"
+          },
+          {
+            "set_code": "G1",
+            "name": "Wide Squat Pulses",
+            "equipment": "bodyweight",
+            "muscle": "quads",
+            "sets": 2,
+            "reps": "20 pulses + 10",
+            "rest": 30,
+            "note": "Toes out"
+          },
+          {
+            "set_code": "G2",
+            "name": "Side-Lying Leg Raise",
+            "equipment": "bodyweight",
+            "muscle": "glutes",
+            "sets": 2,
+            "reps": "10 pulses + 10 + 10 pulses/side",
+            "rest": 30,
+            "note": null
+          }
+        ]
+      },
+      {
+        "name": "Whole Body",
+        "notes": "Optional. Moderate weights, light legs. One bench and two pairs of dumbbells.",
+        "exercises": [
+          {
+            "set_code": "A1",
+            "name": "Goblet Squat",
+            "equipment": "dumbbell",
+            "muscle": "quads",
+            "sets": 3,
+            "reps": "12",
+            "rest": 60,
+            "note": "Light"
+          },
+          {
+            "set_code": "A2",
+            "name": "Dumbbell Row",
+            "equipment": "dumbbell",
+            "muscle": "back",
+            "sets": 3,
+            "reps": "10/side",
+            "rest": 60,
+            "note": "Single arm. Left then right"
+          },
+          {
+            "set_code": "B1",
+            "name": "Dumbbell Bench Press",
+            "equipment": "dumbbell",
+            "muscle": "chest",
+            "sets": 3,
+            "reps": "12",
+            "rest": 60,
+            "note": null
+          },
+          {
+            "set_code": "B2",
+            "name": "Dumbbell RDL",
+            "equipment": "dumbbell",
+            "muscle": "hamstrings",
+            "sets": 3,
+            "reps": "12",
+            "rest": 60,
+            "note": "Light"
+          },
+          {
+            "set_code": "C1",
+            "name": "Dumbbell Lateral Raise",
+            "equipment": "dumbbell",
+            "muscle": "shoulders",
+            "sets": 3,
+            "reps": "12",
+            "rest": 60,
+            "note": null
+          },
+          {
+            "set_code": "C2",
+            "name": "Hammer Curl",
+            "equipment": "dumbbell",
+            "muscle": "biceps",
+            "sets": 3,
+            "reps": "12",
+            "rest": 60,
+            "note": null
+          },
+          {
+            "set_code": "D1",
+            "name": "Overhead Tricep Extension",
+            "equipment": "dumbbell",
+            "muscle": "triceps",
+            "sets": 2,
+            "reps": "12",
+            "rest": 60,
+            "note": null
+          },
+          {
+            "set_code": "D2",
+            "name": "Glute Bridges",
+            "equipment": "bodyweight",
+            "muscle": "glutes",
+            "sets": 2,
+            "reps": "15",
+            "rest": 60,
+            "note": null
+          },
+          {
+            "set_code": "E1",
+            "name": "Incline Walk",
+            "equipment": "machine",
+            "muscle": "other",
+            "sets": 1,
+            "reps": "10 min",
+            "rest": 0,
+            "note": "Cooldown"
+          }
+        ]
+      }
+    ]
+  },
+  "core": {
+    "name": "Core: Rib Flare",
+    "description": "Daily core routine. Alternate A and B. On heavy leg days do A, since B's Copenhagens load the adductors.",
+    "days": [
+      {
+        "name": "Core A",
+        "notes": "No hollow holds. Exhale fully before each set, ribs down throughout.",
+        "exercises": [
+          {
+            "set_code": "A1",
+            "name": "90/90 Hip Lift",
+            "equipment": "bodyweight",
+            "muscle": "core",
+            "sets": 2,
+            "reps": "5 breaths",
+            "rest": 0,
+            "note": "Heels into the wall, tailbone up slightly"
+          },
+          {
+            "set_code": "A2",
+            "name": "Wall Slides",
+            "equipment": "bodyweight",
+            "muscle": "shoulders",
+            "sets": 2,
+            "reps": "8",
+            "rest": 30,
+            "note": "Ribs stay down"
+          },
+          {
+            "set_code": "B1",
+            "name": "Dead Bug",
+            "equipment": "bodyweight",
+            "muscle": "core",
+            "sets": 3,
+            "reps": "8/side",
+            "rest": 0,
+            "note": null
+          },
+          {
+            "set_code": "B2",
+            "name": "Side Plank",
+            "equipment": "bodyweight",
+            "muscle": "core",
+            "sets": 3,
+            "reps": "30 s/side",
+            "rest": 0,
+            "note": null
+          },
+          {
+            "set_code": "B3",
+            "name": "Pallof Press",
+            "equipment": "cable",
+            "muscle": "core",
+            "sets": 3,
+            "reps": "10/side",
+            "rest": 0,
+            "note": null
+          },
+          {
+            "set_code": "B4",
+            "name": "Bear Hold",
+            "equipment": "bodyweight",
+            "muscle": "core",
+            "sets": 3,
+            "reps": "30 s",
+            "rest": 45,
+            "note": null
+          },
+          {
+            "set_code": "C1",
+            "name": "Reverse Crunch",
+            "equipment": "bodyweight",
+            "muscle": "core",
+            "sets": 3,
+            "reps": "10-12",
+            "rest": 0,
+            "note": "Curl the pelvis up. Hanging knee raise if your grip is fresh"
+          },
+          {
+            "set_code": "C2",
+            "name": "Cable Crunch",
+            "equipment": "cable",
+            "muscle": "core",
+            "sets": 3,
+            "reps": "10-15",
+            "rest": 60,
+            "note": "Exhale hard. Watch for doming"
+          }
+        ]
+      },
+      {
+        "name": "Core B",
+        "notes": "No hollow holds. Exhale fully before each set, ribs down throughout.",
+        "exercises": [
+          {
+            "set_code": "A1",
+            "name": "90/90 Hip Lift",
+            "equipment": "bodyweight",
+            "muscle": "core",
+            "sets": 2,
+            "reps": "5 breaths",
+            "rest": 0,
+            "note": null
+          },
+          {
+            "set_code": "A2",
+            "name": "Wall Slides",
+            "equipment": "bodyweight",
+            "muscle": "shoulders",
+            "sets": 2,
+            "reps": "8",
+            "rest": 30,
+            "note": null
+          },
+          {
+            "set_code": "B1",
+            "name": "Dead Bug",
+            "equipment": "bodyweight",
+            "muscle": "core",
+            "sets": 3,
+            "reps": "8/side",
+            "rest": 0,
+            "note": null
+          },
+          {
+            "set_code": "B2",
+            "name": "Copenhagen with Twist",
+            "equipment": "bodyweight",
+            "muscle": "core",
+            "sets": 3,
+            "reps": "6/side",
+            "rest": 0,
+            "note": "Slow. Exhale as you rotate"
+          },
+          {
+            "set_code": "B3",
+            "name": "Bear Hold",
+            "equipment": "bodyweight",
+            "muscle": "core",
+            "sets": 3,
+            "reps": "30 s",
+            "rest": 45,
+            "note": null
+          },
+          {
+            "set_code": "C1",
+            "name": "Ab Wheel Rollout",
+            "equipment": "other",
+            "muscle": "core",
+            "sets": 3,
+            "reps": "6-10",
+            "rest": 0,
+            "note": "Stop before your back arches"
+          },
+          {
+            "set_code": "C2",
+            "name": "Suitcase Carry",
+            "equipment": "dumbbell",
+            "muscle": "core",
+            "sets": 3,
+            "reps": "30-40 m/side",
+            "rest": 60,
+            "note": "Or crunches after a leg day"
+          }
+        ]
+      }
+    ]
+  }
+}

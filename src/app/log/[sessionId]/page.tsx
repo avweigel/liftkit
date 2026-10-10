@@ -5,6 +5,7 @@ import { formatDayLabel } from "@/lib/display/format-day";
 import { SessionActions } from "./session-actions";
 import { SessionLogger } from "./session-logger";
 import { SessionStartedAt } from "./session-started-at";
+import { classifyDay, warmupOptions } from "@/lib/program/day-profile";
 
 type Props = { params: Promise<{ sessionId: string }> };
 
@@ -278,6 +279,17 @@ export default async function LogSessionPage({ params }: Props) {
 
   const title = sessionTitle(session);
 
+  const dayProfile = session.plan_day
+    ? classifyDay(
+        session.plan_day.name,
+        planExercises.map((e) => e.name),
+      )
+    : null;
+  const warmup =
+    dayProfile && dayProfile.kind !== "core"
+      ? { kind: dayProfile.kind, options: warmupOptions(dayProfile.kind) }
+      : null;
+
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 space-y-4 px-3 py-4 sm:px-6 sm:py-8">
       <header className="space-y-1">
@@ -323,6 +335,7 @@ export default async function LogSessionPage({ params }: Props) {
         activeSupersetCodes={activeSupersetCodes}
         planName={planName}
         hasPlanDay={!!session.plan_day_id}
+        warmup={warmup}
       />
     </main>
   );
