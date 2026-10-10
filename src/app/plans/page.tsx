@@ -98,7 +98,7 @@ export default async function PlansPage() {
     <main className="mx-auto w-full max-w-lg flex-1 space-y-6 px-4 pt-4 pb-tabbar">
       <PageHeader
         title="Plans"
-        subtitle="Follow one plan for 6 to 8 weeks. Your active plan sets today's workout."
+        subtitle="Your active plan sets today's workout."
         action={
           <Link href="/plans/new" className="btn btn-secondary btn-sm h-11">
             Import

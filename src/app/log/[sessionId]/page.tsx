@@ -146,8 +146,9 @@ export default async function LogSessionPage({ params }: Props) {
     ...new Set([...planExerciseIds, ...extraExerciseIds]),
   ];
 
-  const ninetyDaysAgo = new Date(
-    Date.now() - 90 * 24 * 60 * 60 * 1000,
+  // a year back: "last time" should still work after a long break
+  const historyFrom = new Date(
+    new Date(session.started_at).getTime() - 365 * 24 * 60 * 60 * 1000,
   ).toISOString();
 
   const [{ data: sets }, { data: history }] = await Promise.all([
@@ -168,7 +169,7 @@ export default async function LogSessionPage({ params }: Props) {
           .in("exercise_id", exerciseIds)
           .eq("is_warmup", false)
           .neq("session_id", sessionId)
-          .gte("logged_at", ninetyDaysAgo)
+          .gte("logged_at", historyFrom)
           .order("logged_at", { ascending: false })
           .returns<HistoryRow[]>()
       : Promise.resolve({ data: [] as HistoryRow[] }),
@@ -252,7 +253,39 @@ export default async function LogSessionPage({ params }: Props) {
       last_session: attachLast(e.exercise!.id),
     }));
 
-  const exercises = [...planExercises, ...extraExercises];
+  // sets logged under an exercise that's no longer on this day (the plan
+  // was edited, or left and right were split later) still belong to this
+  // workout, so show them instead of hiding them.
+  const shownIds = new Set([...planExercises, ...extraExercises].map((e) => e.exercise_id));
+  const orphanIds = [
+    ...new Set((sets ?? []).map((s) => s.exercise_id).filter((id) => !shownIds.has(id))),
+  ];
+  let orphanExercises: typeof planExercises = [];
+  if (orphanIds.length > 0) {
+    const { data: orphanRows } = await supabase
+      .from("exercises")
+      .select("id, name, equipment")
+      .in("id", orphanIds)
+      .returns<Array<{ id: string; name: string; equipment: string | null }>>();
+    orphanExercises = (orphanRows ?? []).map((ex, i) => ({
+      id: `orphan-${ex.id}`,
+      order_index: 20_000 + i,
+      exercise_id: ex.id,
+      name: ex.name,
+      equipment: ex.equipment ?? "other",
+      prescribed_sets: (sets ?? []).filter((s) => s.exercise_id === ex.id).length,
+      prescribed_reps: "",
+      prescribed_weight: null,
+      rest_seconds: null,
+      notes: "Logged under an exercise that's no longer on this day",
+      is_extra: false as const,
+      extra_id: null,
+      superset_code_override: null,
+      last_session: null,
+    }));
+  }
+
+  const exercises = [...planExercises, ...extraExercises, ...orphanExercises];
 
   const { data: libraryRaw } = await supabase
     .from("exercises")

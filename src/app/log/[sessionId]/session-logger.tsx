@@ -287,6 +287,9 @@ export function SessionLogger({
   };
 
   const onFinishTap = () => {
+    if (workingSetsLogged === 0 && !confirm("You haven't logged any sets. Finish anyway?")) {
+      return;
+    }
     if (hasExtras && hasPlanDay) {
       setFinishPromptOpen(true);
     } else {
@@ -642,7 +645,7 @@ function ExerciseHeader({
           </span>
         )}
       </div>
-      {cleanNotes && <p className="text-[14px] text-(--muted)">{cleanNotes}</p>}
+      {cleanNotes && <p className="text-[14px] text-(--muted)">{sentence(cleanNotes)}</p>}
       {exercise.last_session && (
         <p className="text-[13px] text-(--muted)">
           Last time, {relativeDays(exercise.last_session.logged_at)}:{" "}
@@ -711,7 +714,7 @@ function SetList({
 
   const suggestedForSet = (
     n: number,
-  ): { weight: number | null; reps: number | null } => {
+  ): { weight: number | null; reps: number | null; weightKnown: boolean } => {
     const target = repTargetForSet(exercise.prescribed_reps, n);
     const prevInSession =
       [...sets]
@@ -749,7 +752,16 @@ function SetList({
     const reps =
       sameSetLast?.reps ?? target.value ?? prevInSession?.reps ?? null;
 
-    return { weight, reps };
+    // with no history, no other side and no earlier set, an empty weight
+    // would quietly log bodyweight on a barbell. make the lifter pick one.
+    const weightKnown =
+      weight != null ||
+      carried != null ||
+      !!sameSetLast ||
+      !!prevInSession ||
+      isBodyweight(exercise.name, exercise.equipment);
+
+    return { weight, reps, weightKnown };
   };
 
   if (finished) {
@@ -830,13 +842,14 @@ function SetList({
             <QuickLogRow
               setNumber={r.n}
               weight={suggest.weight}
+              weightKnown={suggest.weightKnown}
               reps={suggest.reps}
               targetText={target.text}
               showTarget={target.perSet}
               current={r.n === nextUp}
               onExpand={() => setExpandedSetNumber(r.n)}
               onQuickLog={async () => {
-                if (suggest.reps === null) {
+                if (suggest.reps === null || !suggest.weightKnown) {
                   setExpandedSetNumber(r.n);
                   return;
                 }
@@ -920,6 +933,7 @@ function LoggedRow({
 function QuickLogRow({
   setNumber,
   weight,
+  weightKnown,
   reps,
   targetText,
   showTarget,
@@ -929,6 +943,7 @@ function QuickLogRow({
 }: {
   setNumber: number;
   weight: number | null;
+  weightKnown: boolean;
   reps: number | null;
   targetText: string;
   showTarget: boolean;
@@ -938,7 +953,7 @@ function QuickLogRow({
 }) {
   const [pending, setPending] = useState(false);
   const handleQuick = async () => {
-    if (reps === null) return onExpand();
+    if (reps === null || !weightKnown) return onExpand();
     setPending(true);
     try {
       await onQuickLog();
@@ -967,6 +982,12 @@ function QuickLogRow({
       >
         {reps === null ? (
           <span className="text-[15px] font-semibold text-(--muted)">Tap to enter</span>
+        ) : !weightKnown ? (
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-[15px] font-semibold text-(--accent)">Set weight</span>
+            <span className="text-[14px] text-(--muted)">×</span>
+            <span className={`num text-[24px] leading-none ${current ? "" : "text-(--muted)"}`}>{reps}</span>
+          </span>
         ) : (
           <span className={`flex items-baseline gap-1 ${current ? "" : "text-(--muted)"}`}>
             <span className="num text-[24px] leading-none">{weight ?? "BW"}</span>
@@ -981,8 +1002,8 @@ function QuickLogRow({
       <button
         type="button"
         onClick={handleQuick}
-        disabled={pending || reps === null}
-        aria-label={`Log set ${setNumber} as shown`}
+        disabled={pending}
+        aria-label={reps === null || !weightKnown ? `Enter set ${setNumber}` : `Log set ${setNumber} as shown`}
         className={`flex h-11 w-14 shrink-0 items-center justify-center rounded-[12px] transition active:scale-95 disabled:opacity-50 ${
           current ? "bg-(--accent) text-(--accent-contrast)" : "bg-(--surface) text-(--muted)"
         }`}
@@ -1700,4 +1721,23 @@ function WarmupCard({
       )}
     </section>
   );
+}
+
+const BODYWEIGHT_NAME =
+  /push-?ups?|pull-?ups?|chin-?ups?|\bdips?\b|plank|hold|bridge|frog|pulse|leg raise|crunch|dead ?bug|bear|wall slide|hip lift|copenhagen|v-?ups?|sit-?ups?|burpee|jump|walk|run\b|bike|row(ing)? machine|rower|double unders|mountain climber|air squat|side-lying/i;
+
+function isBodyweight(name: string, equipment: string | null): boolean {
+  if (equipment === "bodyweight") return true;
+  // free weights and cables always need a number
+  if (equipment === "barbell" || equipment === "dumbbell" || equipment === "kettlebell" || equipment === "cable") {
+    return false;
+  }
+  // machines and unknown equipment: bikes, rowers and body-only moves don't
+  return BODYWEIGHT_NAME.test(name);
+}
+
+// plan notes were written in lowercase ("tempo: controlled"); show them
+// as sentences
+function sentence(text: string): string {
+  return text.replace(/(^|[.!?]\s+)([a-z])/g, (_, p, c: string) => p + c.toUpperCase());
 }

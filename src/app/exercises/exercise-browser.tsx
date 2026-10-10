@@ -174,7 +174,7 @@ export function ExerciseBrowser({
 function LibraryRow({ item }: { item: LibraryItem }) {
   const muscle = enumLabel(item.primary_muscle);
   const equipment = enumLabel(item.equipment);
-  const hasMeta = muscle || equipment || item.custom;
+  const meta = [muscle, equipment].filter(Boolean).join(", ");
   return (
     <Link
       href={`/exercises/${item.id}`}
@@ -182,13 +182,7 @@ function LibraryRow({ item }: { item: LibraryItem }) {
     >
       <div className="min-w-0 flex-1">
         <div className="truncate text-[16px]">{item.name}</div>
-        {hasMeta && (
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {muscle && <span className="chip">{muscle}</span>}
-            {equipment && <span className="chip">{equipment}</span>}
-            {item.custom && <span className="chip">Custom</span>}
-          </div>
-        )}
+        {meta && <div className="truncate text-[13px] text-(--muted)">{meta}</div>}
       </div>
       <Chevron />
     </Link>

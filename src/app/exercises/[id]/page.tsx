@@ -271,7 +271,7 @@ function formatNumber(n: number) {
 }
 
 function sentence(text: string) {
-  return text.charAt(0).toUpperCase() + text.slice(1);
+  return text.replace(/(^|[.!?]\s+)([a-z])/g, (_, p: string, c: string) => p + c.toUpperCase());
 }
 
 function groupSessions(sets: SetRow[]): Session[] {

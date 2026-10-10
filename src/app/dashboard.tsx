@@ -357,9 +357,7 @@ function WorkoutCard({
     ordered.filter(
       (e) => parseSetCode(e.notes).code?.letter === parseSetCode(lead.notes).code?.letter,
     ).length === 1;
-  const blocks = new Set(
-    ordered.map((e) => parseSetCode(e.notes).code?.letter ?? e.id),
-  ).size;
+  const totalSets = ordered.reduce((n, e) => n + e.prescribed_sets, 0);
 
   return (
     <section className="card overflow-hidden">
@@ -373,7 +371,7 @@ function WorkoutCard({
             <span className="num text-[13px]">{ordered.length}</span> exercises
           </span>
           <span className="chip">
-            <span className="num text-[13px]">{blocks}</span> blocks
+            <span className="num text-[13px]">{totalSets}</span> sets
           </span>
           {lead?.exercise && leadIsStraight && (
             <span className="chip chip-accent">
@@ -444,13 +442,13 @@ function WeekStrip({
                   {label.weekdayShort.slice(0, 2)}
                 </span>
                 <span
-                  aria-label={isDone ? "done" : d ? (past ? "missed" : "planned") : "rest"}
+                  aria-label={isDone ? "done" : d ? (past ? "not logged" : "planned") : "rest"}
                   className={`flex h-6 w-6 items-center justify-center rounded-full ${
                     isDone
                       ? "bg-(--ok) text-(--surface)"
                       : d
                         ? past
-                          ? "border-2 border-dashed border-(--border)"
+                          ? "border-2 border-(--border) opacity-50"
                           : "border-2 border-(--border)"
                         : ""
                   }`}
@@ -468,7 +466,14 @@ function WeekStrip({
           );
         })}
       </ul>
-      <ul className="card divide-y divide-(--border) overflow-hidden">
+      <details className="card group overflow-hidden">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-4 font-semibold">
+          Train a different day
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-(--muted) transition-transform group-open:rotate-180" aria-hidden>
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </summary>
+      <ul className="divide-y divide-(--border) border-t border-(--border)">
         {days
           .filter((d) => d.day_number !== todayNumber)
           .map((d) => {
@@ -481,11 +486,12 @@ function WeekStrip({
                   </span>
                   <span className="font-medium">{label.name}</span>
                 </div>
-                <StartOtherDayButton dayId={d.id} label="Train" />
+                <StartOtherDayButton dayId={d.id} label="Start" />
               </li>
             );
           })}
       </ul>
+      </details>
     </section>
   );
 }

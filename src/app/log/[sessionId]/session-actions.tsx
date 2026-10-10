@@ -42,7 +42,8 @@ export function SessionActions({ sessionId, finished }: Props) {
           });
         }}
         disabled={pending}
-        className={`btn btn-block ${confirming ? "bg-(--danger) text-white" : "btn-danger"}`}
+        className={`btn btn-block ${confirming ? "" : "btn-danger"}`}
+        style={confirming ? { background: "var(--danger)", color: "#fff" } : undefined}
       >
         {pending && confirming
           ? "Deleting…"

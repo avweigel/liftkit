@@ -62,15 +62,19 @@ export function TonightCardio({
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-2 text-[13px] text-(--muted)">
-        <span>
-          Hard sessions this week{" "}
-          <span className="num text-[15px] text-(--foreground)">
-            {hardThisWeek}/{maxHard}
-          </span>
-        </span>
-        <span>Tomorrow: {tomorrowLabel}</span>
-      </div>
+      <dl className="grid grid-cols-2 gap-2">
+        <div className="rounded-xl bg-(--surface-2) px-3 py-2">
+          <dt className="text-[12px] text-(--muted)">Hard this week</dt>
+          <dd className="num text-[20px]">
+            {hardThisWeek}
+            <span className="text-[14px] text-(--muted)"> of {maxHard}</span>
+          </dd>
+        </div>
+        <div className="rounded-xl bg-(--surface-2) px-3 py-2">
+          <dt className="text-[12px] text-(--muted)">Tomorrow</dt>
+          <dd className="truncate text-[15px] font-semibold leading-[1.6]">{tomorrowLabel}</dd>
+        </div>
+      </dl>
 
       <button
         type="button"
