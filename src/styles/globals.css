@@ -260,3 +260,13 @@ select {
 .timer-flash {
   animation: timer-flash 0.8s ease-in-out infinite;
 }
+
+/* the last three seconds of a step: a small heartbeat on the number */
+@keyframes timer-final {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+.timer-final {
+  display: inline-block;
+  animation: timer-final 1s ease-in-out infinite;
+}

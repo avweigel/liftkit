@@ -142,54 +142,74 @@ export function CardioTimer({
   const current = steps[stepIndex];
   const next = steps[stepIndex + 1];
   const flashing = running && now < flashUntil;
+  const stepMs = (current?.seconds ?? totalSeconds) * 1000;
+  const stepFraction = steps.length === 0 ? remaining / totalMs : started ? stepEndsIn / stepMs : 1;
 
   return (
     <div
       className={`space-y-3 rounded-xl p-3 transition-colors duration-200 ${
-        flashing ? "timer-flash bg-(--accent) text-(--accent-contrast)" : "bg-(--surface-2)"
+        flashing
+          ? "timer-flash bg-(--accent) text-(--accent-contrast) [&_.label]:text-current [&_.label]:opacity-75"
+          : "bg-(--surface-2)"
       }`}
     >
-      {flashing && current && (
-        <p className="display text-center text-[22px]">{incline ? `Change to ${current.label}` : "Switch"}</p>
+      {flashing && current && incline && (
+        <p className="display text-center text-[22px]">Change to {current.label}</p>
       )}
-      {steps.length > 0 && (
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <p className="label">{started && !doneAll ? (incline ? "Incline now" : "Now") : incline ? "Starts at" : "First"}</p>
-            {incline ? (
-              <p className={`num text-[40px] leading-none ${flashing ? "" : "text-(--accent)"}`}>{current?.label}</p>
-            ) : (
-              <p className={`display text-[24px] leading-tight ${flashing ? "" : "text-(--accent)"}`}>{current?.label}</p>
-            )}
-          </div>
-          {next && !doneAll && (
-            <div className="text-right">
-              <p className="label">{incline ? `Next ${next.label}` : "Next in"}</p>
-              <p className="num text-[22px] leading-none">{started ? clock(stepEndsIn) : clock((current?.seconds ?? 0) * 1000)}</p>
-            </div>
+      <div className="flex items-center gap-4">
+        <Ring
+          fraction={doneAll ? 1 : stepFraction}
+          label={doneAll ? "" : steps.length === 0 ? clock(remaining) : clock(started ? stepEndsIn : stepMs)}
+          final={running && stepEndsIn <= 3000 && stepEndsIn > 0}
+          done={doneAll}
+          inverted={flashing}
+        />
+        <div className="min-w-0 flex-1">
+          {steps.length > 0 && (
+            <>
+              <p className="label">{doneAll ? "Finished" : started ? (incline ? "Incline now" : "Now") : incline ? "Starts at" : "First"}</p>
+              {incline ? (
+                <p className={`num text-[40px] leading-none ${flashing ? "" : "text-(--accent)"}`}>{current?.label}</p>
+              ) : (
+                <p className={`display text-[22px] leading-tight ${flashing ? "" : "text-(--accent)"}`}>{doneAll ? "Nice work" : current?.label}</p>
+              )}
+              {next && !doneAll && (
+                <p className={`mt-1 text-[13px] ${flashing ? "" : "text-(--muted)"}`}>Then {incline ? next.label : next.label.toLowerCase()}</p>
+              )}
+            </>
           )}
         </div>
-      )}
+      </div>
 
-      {steps.length > 0 && (
-        <div className="flex h-10 items-end gap-0.5" aria-hidden>
-          {steps.map((s, i) => {
-            const h = incline ? (s.level ?? 0) : 1;
+      {steps.length > 1 && (
+        <div className="flex h-8 items-end gap-0.5" aria-hidden>
+          {steps.map((st, i) => {
+            const h = incline ? (st.level ?? 0) : 1;
             const max = incline ? Math.max(...steps.map((x) => x.level ?? 0), 1) : 1;
+            const fill = doneAll || i < stepIndex ? 1 : i === stepIndex && started ? 1 - stepFraction : 0;
             return (
               <div
                 key={i}
-                className={`basis-0 rounded-sm ${i < stepIndex || doneAll ? "bg-(--accent-line)" : i === stepIndex && started ? "bg-(--accent)" : "bg-(--border)"}`}
-                style={{ flexGrow: s.seconds, height: incline ? `${Math.max(15, ((h || 0) / max) * 100)}%` : "40%" }}
-              />
+                className={`relative basis-0 overflow-hidden rounded-sm ${flashing ? "bg-current/25" : "bg-(--border)"}`}
+                style={{ flexGrow: st.seconds, height: incline ? `${Math.max(18, ((h || 0) / max) * 100)}%` : "45%" }}
+              >
+                <div
+                  className={`absolute inset-y-0 left-0 ${flashing ? "bg-current" : "bg-(--accent)"} transition-[width] duration-300 ease-linear`}
+                  style={{ width: `${fill * 100}%` }}
+                />
+              </div>
             );
           })}
         </div>
       )}
 
       <div className="flex items-center gap-3">
-        <span className="num text-[28px] leading-none">{doneAll ? "Done" : clock(remaining)}</span>
-        <span className="label">{doneAll ? "" : "left"}</span>
+        {steps.length > 1 && !doneAll && (
+          <>
+            <span className="num text-[20px] leading-none">{clock(remaining)}</span>
+            <span className="label">total left</span>
+          </>
+        )}
         <div className="ml-auto flex gap-1.5">
           {running ? (
             <button type="button" onClick={pause} className="btn btn-secondary btn-sm">
@@ -208,6 +228,55 @@ export function CardioTimer({
             </>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// the current step's time drains out of the ring, smoothly between ticks.
+// something to watch while a hold burns.
+function Ring({
+  fraction,
+  label,
+  final,
+  done,
+  inverted,
+}: {
+  fraction: number;
+  label: string;
+  final: boolean;
+  done: boolean;
+  inverted: boolean;
+}) {
+  const size = 112;
+  const stroke = 9;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const f = Math.max(0, Math.min(1, fraction));
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90" aria-hidden>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} className={inverted ? "stroke-current/25" : "stroke-(--border)"} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={c * (1 - f)}
+          className={`${inverted ? "stroke-current" : done ? "stroke-(--ok)" : "stroke-(--accent)"} transition-[stroke-dashoffset] duration-300 ease-linear`}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        {done ? (
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="text-(--ok)" aria-hidden>
+            <path d="M5 12.5l4.5 4.5L19 7.5" />
+          </svg>
+        ) : (
+          <span className={`num text-[30px] leading-none ${final ? "timer-final" : ""}`}>{label}</span>
+        )}
       </div>
     </div>
   );
