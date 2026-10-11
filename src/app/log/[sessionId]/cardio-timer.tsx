@@ -127,6 +127,16 @@ export function CardioTimer({
     wakeRef.current = null;
   };
 
+  const restart = () => {
+    const t = Date.now();
+    stepRef.current = 0;
+    setFlashUntil(0);
+    setDoneAll(false);
+    setLeftMs(totalMs);
+    setNow(t);
+    setEndAt(t + totalMs);
+  };
+
   const reset = () => {
     setEndAt(null);
     setLeftMs(totalMs);
@@ -212,9 +222,17 @@ export function CardioTimer({
         )}
         <div className="ml-auto flex gap-1.5">
           {running ? (
-            <button type="button" onClick={pause} className="btn btn-secondary btn-sm">
-              Pause
-            </button>
+            <>
+              {/* a short hold started by mistake: one tap back to the start */}
+              {totalSeconds <= 180 && (
+                <button type="button" onClick={restart} className="btn btn-ghost btn-sm">
+                  Restart
+                </button>
+              )}
+              <button type="button" onClick={pause} className="btn btn-secondary btn-sm">
+                Pause
+              </button>
+            </>
           ) : (
             <>
               {started && (
