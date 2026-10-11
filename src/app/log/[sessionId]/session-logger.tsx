@@ -1677,13 +1677,14 @@ function WarmupCard({
           <ul className="space-y-1.5">
             {WARMUP_BASE.map((b) => {
               const on = done.has(b.id);
+              const seconds = "seconds" in b ? b.seconds : null;
               return (
-                <li key={b.id}>
+                <li key={b.id} className={`rounded-xl transition-colors ${on ? "bg-(--ok-soft)" : "bg-(--surface-2)"}`}>
                   <button
                     type="button"
                     onClick={() => toggle(done, setDone, b.id)}
                     aria-pressed={on}
-                    className={`flex w-full items-start gap-3 rounded-xl p-3 text-left transition-colors ${on ? "bg-(--ok-soft)" : "bg-(--surface-2)"}`}
+                    className="flex w-full items-start gap-3 p-3 text-left"
                   >
                     <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${on ? "bg-(--ok) text-(--surface)" : "border-2 border-(--border)"}`}>
                       {on && <CheckGlyph size={12} />}
@@ -1693,6 +1694,14 @@ function WarmupCard({
                       <span className="block text-[13px] text-(--muted)">{b.detail}</span>
                     </span>
                   </button>
+                  {seconds != null && !on && (
+                    <WarmupTimer
+                      seconds={seconds}
+                      onFinish={() =>
+                        setDone((prev) => new Set(prev).add(b.id))
+                      }
+                    />
+                  )}
                 </li>
               );
             })}
@@ -1736,6 +1745,152 @@ function WarmupCard({
       )}
     </section>
   );
+}
+
+// counts down from an end timestamp rather than ticking a counter, so a
+// locked phone or a backgrounded tab still finishes on time
+function WarmupTimer({
+  seconds,
+  onFinish,
+}: {
+  seconds: number;
+  onFinish: () => void;
+}) {
+  const [endAt, setEndAt] = useState<number | null>(null);
+  const [leftMs, setLeftMs] = useState(seconds * 1000);
+  const [now, setNow] = useState(() => Date.now());
+  const finishRef = useRef(onFinish);
+  useEffect(() => {
+    finishRef.current = onFinish;
+  }, [onFinish]);
+  const audioRef = useRef<AudioContext | null>(null);
+  const wakeRef = useRef<{ release: () => Promise<void> } | null>(null);
+
+  const running = endAt != null;
+  const remaining = running ? Math.max(0, endAt - now) : leftMs;
+  const started = running || leftMs < seconds * 1000;
+
+  useEffect(() => {
+    if (endAt == null) return;
+    const id = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t >= endAt) {
+        clearInterval(id);
+        setEndAt(null);
+        setLeftMs(seconds * 1000);
+        chime(audioRef.current);
+        finishRef.current();
+      }
+    }, 250);
+    return () => clearInterval(id);
+  }, [endAt, seconds]);
+
+  useEffect(() => {
+    return () => {
+      wakeRef.current?.release().catch(() => {});
+    };
+  }, []);
+
+  const start = () => {
+    // the audio context has to be created inside a tap for iOS to allow sound later
+    try {
+      const Ctx =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (Ctx && !audioRef.current) audioRef.current = new Ctx();
+      audioRef.current?.resume().catch(() => {});
+    } catch {}
+    const nav = navigator as Navigator & {
+      wakeLock?: { request: (type: "screen") => Promise<{ release: () => Promise<void> }> };
+    };
+    nav.wakeLock
+      ?.request("screen")
+      .then((lock) => {
+        wakeRef.current = lock;
+      })
+      .catch(() => {});
+    const t = Date.now();
+    setNow(t);
+    setEndAt(t + leftMs);
+  };
+
+  const pause = () => {
+    setLeftMs(remaining);
+    setEndAt(null);
+    wakeRef.current?.release().catch(() => {});
+    wakeRef.current = null;
+  };
+
+  const reset = () => {
+    setEndAt(null);
+    setLeftMs(seconds * 1000);
+  };
+
+  const total = Math.ceil(remaining / 1000);
+  const label = `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+  const progress = 1 - remaining / (seconds * 1000);
+
+  return (
+    <div className="px-3 pb-3 pl-12">
+      {!started ? (
+        <button type="button" onClick={start} className="btn btn-secondary btn-sm">
+          Start {label} timer
+        </button>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <span className="num text-[34px] leading-none" aria-live="off">
+              {label}
+            </span>
+            <div className="ml-auto flex gap-1.5">
+              {running ? (
+                <button type="button" onClick={pause} className="btn btn-secondary btn-sm">
+                  Pause
+                </button>
+              ) : (
+                <>
+                  <button type="button" onClick={reset} className="btn btn-ghost btn-sm">
+                    Reset
+                  </button>
+                  <button type="button" onClick={start} className="btn btn-secondary btn-sm">
+                    Resume
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-(--border)">
+            <div
+              className="h-full rounded-full bg-(--accent)"
+              style={{ width: `${Math.min(100, progress * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function chime(ctx: AudioContext | null) {
+  try {
+    navigator.vibrate?.([200, 100, 200]);
+  } catch {}
+  if (!ctx) return;
+  try {
+    [0, 0.35].forEach((offset) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = 880;
+      const t = ctx.currentTime + offset;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.32);
+    });
+  } catch {}
 }
 
 const BODYWEIGHT_NAME =

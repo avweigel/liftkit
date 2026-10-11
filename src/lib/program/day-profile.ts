@@ -75,6 +75,7 @@ export const WARMUP_BASE = [
   {
     id: "machine",
     title: "5 min easy on a machine",
+    seconds: 300,
     detail:
       "Sleepy: elliptical, spin bike or incline walk. More awake: rower or assault bike.",
   },
