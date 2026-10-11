@@ -35,7 +35,8 @@ import {
 } from "@/lib/display/units";
 
 // reads this device's saved warm-up picks, so it renders only in the browser
-import { CardioTimer, parseCardio } from "./cardio-timer";
+import { CardioTimer, parseCardio, type CardioStep } from "./cardio-timer";
+import { howTo } from "@/lib/program/how-to";
 
 const WarmupCard = dynamic(() => import("./warmup-card"), { ssr: false });
 const CooldownCard = dynamic(() => import("./cooldown-card"), { ssr: false });
@@ -764,6 +765,7 @@ function ExerciseHeader({
         )}
       </div>
       {cleanNotes && <p className="text-[14px] text-(--muted)">{sentence(cleanNotes)}</p>}
+      <HowToToggle name={exercise.name} />
       {exercise.last_session && (
         <p className="text-[13px] text-(--muted)">
           Last time, {relativeDays(exercise.last_session.logged_at)}:{" "}
@@ -931,9 +933,35 @@ function SetList({
   const nextUp = rows.find((r) => !r.logged)?.n ?? null;
 
   const cardio = parseCardio(exercise.prescribed_reps, parseSetCode(exercise.notes).cleanNotes);
+  const hold = cardio ? null : parseHold(exercise.prescribed_reps);
+  const steps = hold ? holdSteps(hold) : [];
   return (
     <div className="space-y-2">
     {cardio && <CardioTimer totalSeconds={cardio.totalSeconds} steps={cardio.steps} />}
+    {hold && nextUp != null && (
+      <div>
+        <p className="label pb-1">
+          Set <span className="num text-[14px] text-(--foreground)">{nextUp}</span> logs itself when the timer ends
+        </p>
+        <CardioTimer
+          key={`hold-${nextUp}`}
+          totalSeconds={steps.reduce((t, st) => t + st.seconds, 0)}
+          steps={steps}
+          onComplete={() => {
+            const suggest = suggestedForSet(nextUp);
+            void onUpsert({
+              id: null,
+              set_number: nextUp,
+              weight: suggest.weight,
+              reps: hold.seconds,
+              rpe: null,
+              is_warmup: false,
+              notes: null,
+            });
+          }}
+        />
+      </div>
+    )}
     <ul className="space-y-1.5">
       {rows.map((r) => {
         const isExpanded = expandedSetNumber === r.n;
@@ -1034,6 +1062,58 @@ function SetList({
     </ul>
     </div>
   );
+}
+
+function HowToToggle({ name }: { name: string }) {
+  const [open, setOpen] = useState(false);
+  const h = howTo("", name);
+  if (!h) return null;
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex h-8 items-center gap-1 text-[13px] font-semibold text-(--accent)"
+      >
+        How to
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${open ? "rotate-180" : ""}`} aria-hidden>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <div className="space-y-2 rounded-xl bg-(--surface-2) p-3">
+          <p className="text-[14px] leading-relaxed">{h.how}</p>
+          <ul className="space-y-1">
+            {h.cues.map((c) => (
+              <li key={c} className="flex gap-2 text-[13px] text-(--muted)">
+                <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-(--accent)" aria-hidden />
+                {c}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// "30 s" or "30 s/side" in the plan: a hold you time, not reps you count
+function parseHold(reps: string): { seconds: number; perSide: boolean } | null {
+  const m = reps.match(/^\s*(\d+)\s*(s|sec|secs|seconds)\b(\s*\/\s*side)?/i);
+  if (!m) return null;
+  return { seconds: Number(m[1]), perSide: !!m[3] };
+}
+
+function holdSteps(h: { seconds: number; perSide: boolean }): CardioStep[] {
+  const getSet = { label: "Get in position", seconds: 5 };
+  if (!h.perSide) return [getSet, { label: "Hold", seconds: h.seconds }];
+  return [
+    getSet,
+    { label: "Left side", seconds: h.seconds },
+    { label: "Switch sides", seconds: 5 },
+    { label: "Right side", seconds: h.seconds },
+  ];
 }
 
 function planContext(exercise: Exercise): string {
