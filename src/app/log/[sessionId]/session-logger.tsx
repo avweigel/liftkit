@@ -38,6 +38,7 @@ import {
 import { CardioTimer, parseCardio } from "./cardio-timer";
 
 const WarmupCard = dynamic(() => import("./warmup-card"), { ssr: false });
+const CooldownCard = dynamic(() => import("./cooldown-card"), { ssr: false });
 
 type LastSessionSet = {
   set_number: number;
@@ -395,6 +396,8 @@ export function SessionLogger({
           </button>
         )}
       </div>
+
+      {warmup && !finished && <CooldownCard kind={warmup.kind} sessionId={sessionId} />}
 
       <label className="card block space-y-2 p-4">
         <span className="label">Notes</span>

@@ -260,7 +260,7 @@ function WarmupRow({
 
 const SHORT_LIST = 5;
 
-function SwapPicker({
+export function SwapPicker({
   choices,
   onPick,
 }: {

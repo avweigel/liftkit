@@ -59,7 +59,12 @@ type CorePlan = {
   id: string;
   name: string;
   plan_weeks: Array<{
-    plan_days: Array<{ id: string; day_number: number; name: string | null }>;
+    plan_days: Array<{
+      id: string;
+      day_number: number;
+      name: string | null;
+      plan_day_exercises: Array<{ exercises: { name: string } | null }>;
+    }>;
   }>;
 };
 
@@ -562,7 +567,7 @@ function formatDate(iso: string) {
 type CoreInfo = {
   planName: string;
   suggested: { id: string; name: string };
-  other: { id: string; name: string } | null;
+  others: Array<{ id: string; name: string }>;
   doneToday: string | null;
   openToday: { id: string; name: string } | null;
   reason: string;
@@ -576,7 +581,7 @@ async function loadCore(
 ): Promise<CoreInfo | null> {
   const { data: plans } = await supabase
     .from("workout_plans")
-    .select("id, name, plan_weeks ( plan_days ( id, day_number, name ) )")
+    .select("id, name, plan_weeks ( plan_days ( id, day_number, name, plan_day_exercises ( exercises ( name ) ) ) )")
     .eq("owner_id", userId)
     .ilike("name", "core%")
     .order("created_at", { ascending: false })
@@ -609,24 +614,27 @@ async function loadCore(
   const openToday =
     startedToday && !last?.finished_at ? { id: last!.id as string, name: nameOf(lastDay!) } : null;
 
-  // the first day (A) never loads the adductors, so it's the safe pick on
-  // heavy leg days. otherwise alternate from whatever you did last.
-  let pick = days[0];
-  let reason = "Alternating from your last core session.";
-  if (todayProfile?.heavyLegs) {
-    reason = "Heavy legs today, so no Copenhagens.";
-  } else if (lastDay) {
-    const idx = days.findIndex((d) => d.id === lastDay.id);
-    pick = days[(idx + 1) % days.length];
-  } else {
-    reason = "Start the rotation with A.";
+  // rotate through every core day (A, B, C...). on heavy leg days skip any
+  // day that loads the adductors (Copenhagens), which leg day already hit.
+  const legSafe = (d: (typeof days)[number]) =>
+    !d.plan_day_exercises.some((x) => /copenhagen|adduct/i.test(x.exercises?.name ?? ""));
+  const lastIdx = lastDay ? days.findIndex((d) => d.id === lastDay.id) : -1;
+  const order = days.map((_, i) => days[(lastIdx + 1 + i) % days.length]);
+  let pick = order[0];
+  let reason = lastDay ? `Next in the rotation after ${nameOf(lastDay)}.` : "Start the rotation with A.";
+  if (todayProfile?.heavyLegs && !legSafe(pick)) {
+    const safe = order.find(legSafe);
+    if (safe) {
+      pick = safe;
+      reason = `Heavy legs today, so ${nameOf(safe)} instead of Copenhagens.`;
+    }
   }
-  const other = days.find((d) => d.id !== pick.id) ?? null;
+  const others = days.filter((d) => d.id !== pick.id).map((d) => ({ id: d.id, name: nameOf(d) }));
 
   return {
     planName: plan.name,
     suggested: { id: pick.id, name: nameOf(pick) },
-    other: other ? { id: other.id, name: nameOf(other) } : null,
+    others,
     doneToday,
     openToday,
     reason,
@@ -669,9 +677,10 @@ function CoreCard({ core }: { core: CoreInfo }) {
           label={`Start ${core.suggested.name}`}
           variant="secondary"
         />
-        {core.other && (
-          <StartOtherDayButton dayId={core.other.id} label={`Do ${core.other.name} instead`} />
-        )}
+        {core.others.length > 0 && <span className="label">or</span>}
+        {core.others.map((o) => (
+          <StartOtherDayButton key={o.id} dayId={o.id} label={o.name.replace(/^core\s+/i, "")} />
+        ))}
       </div>
     </section>
   );

@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { chime, keepAwake, unlockAudio } from "@/lib/display/chime";
 
-export type CardioStep = { label: string; seconds: number };
+// level is the treadmill incline. stretch steps have none and show by name.
+export type CardioStep = { label: string; seconds: number; level?: number };
 
 // "20 min" in the reps, and optionally "Incline 3, 5, 7 (2 min each)" in
 // the notes, turn a cardio exercise into a timer that calls out each change
@@ -21,17 +22,24 @@ export function parseCardio(
     .split(",")
     .map((v) => v.trim())
     .filter(Boolean)
-    .map((v) => ({ label: `${v}%`, seconds: each }));
+    .map((v) => ({ label: `${v}%`, seconds: each, level: Number(v) }));
   return { totalSeconds: steps.reduce((t, s) => t + s.seconds, 0), steps };
 }
 
 export function CardioTimer({
   totalSeconds,
   steps,
+  onComplete,
 }: {
   totalSeconds: number;
   steps: CardioStep[];
+  onComplete?: () => void;
 }) {
+  const incline = steps.length > 0 && steps.every((st) => st.level != null);
+  const completeRef = useRef(onComplete);
+  useEffect(() => {
+    completeRef.current = onComplete;
+  }, [onComplete]);
   const totalMs = totalSeconds * 1000;
   const [endAt, setEndAt] = useState<number | null>(null);
   const [leftMs, setLeftMs] = useState(totalMs);
@@ -71,6 +79,7 @@ export function CardioTimer({
         setLeftMs(0);
         setDoneAll(true);
         chime(audioRef.current, 3);
+        completeRef.current?.();
         wakeRef.current?.release().catch(() => {});
         wakeRef.current = null;
       }
@@ -141,17 +150,21 @@ export function CardioTimer({
       }`}
     >
       {flashing && current && (
-        <p className="display text-center text-[22px]">Change to {current.label}</p>
+        <p className="display text-center text-[22px]">{incline ? `Change to ${current.label}` : "Switch"}</p>
       )}
       {steps.length > 0 && (
         <div className="flex items-end justify-between gap-3">
           <div>
-            <p className="label">{started && !doneAll ? "Incline now" : "Starts at"}</p>
-            <p className={`num text-[40px] leading-none ${flashing ? "" : "text-(--accent)"}`}>{current?.label}</p>
+            <p className="label">{started && !doneAll ? (incline ? "Incline now" : "Now") : incline ? "Starts at" : "First"}</p>
+            {incline ? (
+              <p className={`num text-[40px] leading-none ${flashing ? "" : "text-(--accent)"}`}>{current?.label}</p>
+            ) : (
+              <p className={`display text-[24px] leading-tight ${flashing ? "" : "text-(--accent)"}`}>{current?.label}</p>
+            )}
           </div>
           {next && !doneAll && (
             <div className="text-right">
-              <p className="label">Next {next.label}</p>
+              <p className="label">{incline ? `Next ${next.label}` : "Next in"}</p>
               <p className="num text-[22px] leading-none">{started ? clock(stepEndsIn) : clock((current?.seconds ?? 0) * 1000)}</p>
             </div>
           )}
@@ -161,13 +174,13 @@ export function CardioTimer({
       {steps.length > 0 && (
         <div className="flex h-10 items-end gap-0.5" aria-hidden>
           {steps.map((s, i) => {
-            const h = Number.parseFloat(s.label);
-            const max = Math.max(...steps.map((x) => Number.parseFloat(x.label) || 0), 1);
+            const h = incline ? (s.level ?? 0) : 1;
+            const max = incline ? Math.max(...steps.map((x) => x.level ?? 0), 1) : 1;
             return (
               <div
                 key={i}
-                className={`flex-1 rounded-sm ${i < stepIndex || doneAll ? "bg-(--accent-line)" : i === stepIndex && started ? "bg-(--accent)" : "bg-(--border)"}`}
-                style={{ height: `${Math.max(15, ((h || 0) / max) * 100)}%` }}
+                className={`basis-0 rounded-sm ${i < stepIndex || doneAll ? "bg-(--accent-line)" : i === stepIndex && started ? "bg-(--accent)" : "bg-(--border)"}`}
+                style={{ flexGrow: s.seconds, height: incline ? `${Math.max(15, ((h || 0) / max) * 100)}%` : "40%" }}
               />
             );
           })}

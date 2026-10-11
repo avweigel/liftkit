@@ -232,7 +232,10 @@ export default async function LogSessionPage({ params }: Props) {
       superset_code_override: null as string | null,
       last_session: attachLast(pde.exercise?.id ?? ""),
     }))
-    .filter((e) => e.exercise_id.length > 0);
+    .filter((e) => e.exercise_id.length > 0)
+    // the cooldown card at the end of the workout owns cooldowns now, with a
+    // choice of walks and stretches. an old plan row would show it twice.
+    .filter((e) => !/^\s*(\[[A-Z]\d*\]\s*)?cooldown\b/i.test(e.notes ?? ""));
 
   const extraExercises = extras
     .filter((e) => !!e.exercise)
