@@ -34,8 +34,8 @@ const MOBILITY: WarmupItem[] = [
   { id: "hips-9090", name: "90/90 hip switches and cat-cow", dose: "8 switches, 5 cat-cow" },
   { id: "ankle-hip", name: "Ankle rocks, cossack shifts, deep squat hold", dose: "8/side, 5/side, 30 s", detail: "Good before squats." },
   { id: "upper-flow", name: "Wall slides, open books, cat-cow", dose: "8, 5/side, 5", detail: "Good before pressing and pulling." },
-  { id: "squat-reach-flow", name: "Deep squat with T-spine reach, then leg swings", dose: "5/side, then 10/side each way", tags: "rotation twist hips" },
-  { id: "hinge-flow", name: "Hip hinge drill and leg swings", dose: "10, then 10/side each way", detail: "Good before deadlifts." },
+  { id: "squat-reach-flow", name: "Deep squat with T-spine reach, then leg swings", dose: "5/side, then 8-10 each way, twice", detail: "Swings: front, side, back with momentum, then again slow and controlled.", tags: "rotation twist hips" },
+  { id: "hinge-flow", name: "Hip hinge drill and leg swings", dose: "10, then 8-10 each way, twice", detail: "Good before deadlifts. Swings: front, side, back with momentum, then again slow and controlled." },
 ];
 
 const DRILLS: Record<string, WarmupItem> = Object.fromEntries(
@@ -58,7 +58,7 @@ const DRILLS: Record<string, WarmupItem> = Object.fromEntries(
       { id: "lateral-step", name: "Lateral step-ups", dose: "2 x 8/side" },
       { id: "scap-pushup", name: "Scap push-ups", dose: "2 x 10" },
       { id: "light-row", name: "Light cable row, slow", dose: "2 x 12" },
-      { id: "leg-swings", name: "Leg swings, front to back and side to side", dose: "10/side each way", tags: "hips mobility hamstrings adductors" },
+      { id: "leg-swings", name: "Leg swings, dynamic then controlled", dose: "8-10 each way, twice", detail: "Each leg: 8-10 front, 8-10 side, 8-10 back with momentum. Then the same three again, slow and controlled.", tags: "hips mobility hamstrings adductors" },
       { id: "squat-reach", name: "Deep squat with T-spine reach", dose: "5/side", detail: "Sit in a deep squat. One hand stays down, the other reaches to the ceiling as you rotate. Switch sides.", tags: "rotation thoracic twist hips mobility" },
     ] satisfies WarmupItem[]
   ).map((d) => [d.id, d]),
