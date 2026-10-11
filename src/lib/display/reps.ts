@@ -47,3 +47,11 @@ function firstNumber(s: string): number | null {
   const m = s.match(/(\d+)/);
   return m ? Number(m[1]) : null;
 }
+
+// "8-10" accepts 8, 9 or 10; "12" or "12/side" only accepts 12
+export function repsFitTarget(reps: number, target: string): boolean {
+  const range = target.match(/(\d+)\s*(?:-|to)\s*(\d+)/);
+  if (range) return reps >= Number(range[1]) && reps <= Number(range[2]);
+  const n = firstNumber(target);
+  return n != null && reps === n;
+}

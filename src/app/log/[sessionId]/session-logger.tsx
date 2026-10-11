@@ -16,7 +16,7 @@ import {
   saveExtrasToCurrentPhase,
 } from "@/lib/actions/session-extras";
 import { groupIntoSupersets, parseSetCode } from "@/lib/set-code";
-import { formatRxReps, repTargetForSet } from "@/lib/display/reps";
+import { formatRxReps, repTargetForSet, repsFitTarget } from "@/lib/display/reps";
 import { weightConvention } from "@/lib/display/weight-convention";
 import {
   snapWeight,
@@ -749,29 +749,49 @@ function SetList({
       carrySets?.find((s) => s.set_number === n && !s.is_warmup)?.weight ??
       null;
 
-    // weight priority: other side, same set last session, previous set
-    // scaled to the new rep target, previous set as is, prescribed.
+    // the plan's reps win over history: last time may have been a 20/15/10
+    // pyramid, today says 3 x 12. history still sets the load, scaled to the
+    // reps you're doing now.
+    const fits = (r: number | null) => r != null && repsFitTarget(r, target.text);
+    const reps =
+      target.value == null
+        ? sameSetLast?.reps ?? prevInSession?.reps ?? null
+        : fits(sameSetLast?.reps ?? null)
+          ? sameSetLast!.reps
+          : fits(prevInSession?.reps ?? null)
+            ? prevInSession!.reps
+            : target.value;
+
+    const scaleTo = (w: number, from: number, to: number) => {
+      const oneRM = w * (1 + from / 30);
+      const shown = convert(oneRM / (1 + to / 30), base, unit);
+      return convert(snapWeight(kind, shown, unit), unit, base);
+    };
+    const lastWorking = (exercise.last_session?.sets ?? []).filter(
+      (s) => s.weight != null && s.reps != null && s.reps > 0,
+    );
+
     let weight: number | null;
     if (carried != null) {
       weight = carried;
-    } else if (sameSetLast?.weight != null) {
+    } else if (prevInSession?.weight != null && prevInSession.reps != null && reps != null) {
+      weight =
+        prevInSession.reps === reps
+          ? prevInSession.weight
+          : scaleTo(prevInSession.weight, prevInSession.reps, reps);
+    } else if (sameSetLast?.weight != null && (reps == null || sameSetLast.reps === reps)) {
       weight = sameSetLast.weight;
-    } else if (
-      prevInSession?.weight != null &&
-      prevInSession.reps != null &&
-      target.value != null &&
-      target.perSet &&
-      target.value !== prevInSession.reps
-    ) {
-      const oneRM = prevInSession.weight * (1 + prevInSession.reps / 30);
-      const raw = oneRM / (1 + target.value / 30);
-      weight = convert(snapWeight(kind, convert(raw, base, unit), unit), unit, base);
+    } else if (lastWorking.length > 0 && reps != null) {
+      // a typical set from last time (the middle one by estimated max), so
+      // one heavy top set doesn't set the load for all of today's sets
+      const ranked = lastWorking
+        .map((s) => ({ s, e: s.weight! * (1 + s.reps / 30) }))
+        .sort((x, y) => x.e - y.e);
+      const mid = ranked[Math.floor((ranked.length - 1) / 2)].s;
+      weight = scaleTo(mid.weight!, mid.reps, reps);
     } else {
       weight = prevInSession?.weight ?? exercise.prescribed_weight;
     }
-
-    const reps =
-      sameSetLast?.reps ?? target.value ?? prevInSession?.reps ?? null;
 
     // with no history, no other side and no earlier set, an empty weight
     // would quietly log bodyweight on a barbell. make the lifter pick one.
