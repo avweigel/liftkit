@@ -774,13 +774,14 @@ function SetList({
     let weight: number | null;
     if (carried != null) {
       weight = carried;
-    } else if (prevInSession?.weight != null && prevInSession.reps != null && reps != null) {
-      weight =
-        prevInSession.reps === reps
-          ? prevInSession.weight
-          : scaleTo(prevInSession.weight, prevInSession.reps, reps);
+    } else if (prevInSession?.weight != null && prevInSession.reps === reps) {
+      // straight sets: keep today's weight
+      weight = prevInSession.weight;
     } else if (sameSetLast?.weight != null && (reps == null || sameSetLast.reps === reps)) {
+      // a pyramid you've done before: last time's weight for this step
       weight = sameSetLast.weight;
+    } else if (prevInSession?.weight != null && prevInSession.reps != null && reps != null) {
+      weight = scaleTo(prevInSession.weight, prevInSession.reps, reps);
     } else if (lastWorking.length > 0 && reps != null) {
       // a typical set from last time (the middle one by estimated max), so
       // one heavy top set doesn't set the load for all of today's sets
