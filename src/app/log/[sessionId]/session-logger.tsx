@@ -604,7 +604,7 @@ function ExerciseHeader({
   onRemoveExtra?: () => Promise<void> | void;
 }) {
   const { cleanNotes } = parseSetCode(exercise.notes);
-  const conv = weightConvention(exercise.name, exercise.equipment);
+  const conv = weightConvention(exercise.name, exercise.equipment, planContext(exercise));
   const reps = formatRxReps(exercise.prescribed_reps);
   const base = useContext(BaseUnitContext);
   const [unit] = useEntryUnit(exercise.exercise_id);
@@ -706,8 +706,8 @@ function SetList({
   const [expandedSetNumber, setExpandedSetNumber] = useState<number | null>(
     null,
   );
-  const weightConv = weightConvention(exercise.name, exercise.equipment);
-  const kind = weightKind(exercise.name, exercise.equipment);
+  const weightConv = weightConvention(exercise.name, exercise.equipment, planContext(exercise));
+  const kind = weightKind(exercise.name, exercise.equipment, planContext(exercise));
   const base = useContext(BaseUnitContext);
   const [unit, setUnit] = useEntryUnit(exercise.exercise_id);
   const toShown = (w: number | null) => (w == null ? null : convert(w, base, unit));
@@ -907,6 +907,10 @@ function SetList({
       </li>
     </ul>
   );
+}
+
+function planContext(exercise: Exercise): string {
+  return `${exercise.notes ?? ""} ${exercise.prescribed_reps ?? ""}`;
 }
 
 function CheckGlyph({ size = 14 }: { size?: number }) {

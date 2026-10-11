@@ -6,16 +6,20 @@ export type WeightConvention = {
   perSide: (total: number) => number;
 };
 
+// context is the plan's notes and rep text for this exercise. a generic
+// library name like "Dumbbell Row" only says it's one-armed in the plan
+// ("single arm, left then right", "10/side").
 export function weightConvention(
   name: string,
   equipment: string | null | undefined,
+  context = "",
 ): WeightConvention | null {
   const eq = normalizeEquipment(name, equipment);
   if (eq === "other") return null;
   const label = eq === "dumbbell" ? "db" : "kb";
   const long = eq === "dumbbell" ? "dumbbell" : "kettlebell";
 
-  if (isSingleSideUpper(name)) {
+  if (isSingleSideUpper(name) || (!isLegMove(name) && SINGLE_ARM_CONTEXT.test(context))) {
     return {
       equipment: eq,
       mode: "single",
@@ -54,6 +58,17 @@ function normalizeEquipment(
   if (/\b(db|dumbbell)\b/i.test(name)) return "dumbbell";
   if (/\b(kb|kettlebell)\b/i.test(name)) return "kettlebell";
   return "other";
+}
+
+const SINGLE_ARM_CONTEXT = /\b(single|one)[\s-]?arm\b|\/\s*(side|arm)\b|\bper (side|arm)\b|\bleft then right\b|\bl then r\b/i;
+
+function isLegMove(name: string): boolean {
+  if (/single[\s-]?leg/i.test(name)) return true;
+  const legKickback = /\bkickbacks?\b/i.test(name) && !/\btri(cep|ceps)?\b/i.test(name);
+  return (
+    legKickback ||
+    /\b(leg|lunge|squat|rdl|deadlift|calf|pistol|bulgarian|step[\s-]?up|glute bridge|hip thrust|swing)\b/i.test(name)
+  );
 }
 
 function isSingleSideUpper(name: string): boolean {

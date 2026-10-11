@@ -25,6 +25,7 @@ const PAIR_TOTALS_KG = DB_SIZES_KG.map((w) => w * 2);
 export function weightKind(
   name: string,
   equipment: string | null | undefined,
+  context = "",
 ): WeightKind {
   if (
     equipment === "barbell" ||
@@ -32,7 +33,7 @@ export function weightKind(
   ) {
     return "barbell";
   }
-  const conv = weightConvention(name, equipment);
+  const conv = weightConvention(name, equipment, context);
   if (conv?.equipment === "dumbbell") {
     return conv.mode === "total" ? "db-pair" : "db-single";
   }
