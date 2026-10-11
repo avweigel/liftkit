@@ -136,6 +136,51 @@ export default async function LogSessionPage({ params }: Props) {
     .returns<ExtraRow[]>();
   const extras = extrasRaw ?? [];
 
+  // swaps: this workout's, and the last time this plan day was trained
+  type SwapRow = {
+    plan_day_exercise_id: string;
+    exercise: { id: string; name: string; primary_muscle: string | null; equipment: string | null } | null;
+  };
+  const { data: swapsRaw } = await supabase
+    .from("session_swaps")
+    .select("plan_day_exercise_id, exercise:exercises ( id, name, primary_muscle, equipment )")
+    .eq("session_id", sessionId)
+    .returns<SwapRow[]>();
+  const swapByPde = new Map((swapsRaw ?? []).filter((s) => s.exercise).map((s) => [s.plan_day_exercise_id, s.exercise!]));
+
+  const { data: prevSession } = session.plan_day_id
+    ? await supabase
+        .from("workout_sessions")
+        .select("id, started_at")
+        .eq("user_id", user!.id)
+        .eq("plan_day_id", session.plan_day_id)
+        .neq("id", sessionId)
+        .lt("started_at", session.started_at)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+  const { data: prevSwapsRaw } = prevSession
+    ? await supabase
+        .from("session_swaps")
+        .select("plan_day_exercise_id, exercise:exercises ( id, name, primary_muscle, equipment )")
+        .eq("session_id", prevSession.id)
+        .returns<SwapRow[]>()
+    : { data: [] as SwapRow[] };
+  const prevSwapByPde = new Map(
+    (prevSwapsRaw ?? []).filter((s) => s.exercise).map((s) => [s.plan_day_exercise_id, s.exercise!]),
+  );
+  const { data: prevSwapSets } =
+    prevSession && prevSwapByPde.size > 0
+      ? await supabase
+          .from("session_sets")
+          .select("exercise_id, set_number, weight, reps, logged_at")
+          .eq("session_id", prevSession.id)
+          .eq("is_warmup", false)
+          .in("exercise_id", [...prevSwapByPde.values()].map((e) => e.id))
+          .returns<Array<{ exercise_id: string; set_number: number; weight: number | null; reps: number; logged_at: string }>>()
+      : { data: [] };
+
   const planExerciseIds = (session.plan_day?.plan_day_exercises ?? [])
     .map((pde) => pde.exercise?.id)
     .filter((id): id is string => !!id);
@@ -143,7 +188,7 @@ export default async function LogSessionPage({ params }: Props) {
     .map((e) => e.exercise?.id)
     .filter((id): id is string => !!id);
   const exerciseIds = [
-    ...new Set([...planExerciseIds, ...extraExerciseIds]),
+    ...new Set([...planExerciseIds, ...extraExerciseIds, ...[...swapByPde.values()].map((e) => e.id)]),
   ];
 
   // a year back: "last time" should still work after a long break
@@ -216,12 +261,29 @@ export default async function LogSessionPage({ params }: Props) {
   const planExercises = (session.plan_day?.plan_day_exercises ?? [])
     .slice()
     .sort((a, b) => a.order_index - b.order_index)
-    .map((pde) => ({
+    .map((pde) => {
+      const swap = swapByPde.get(pde.id) ?? null;
+      const ex = swap ?? pde.exercise;
+      const prevSwap = prevSwapByPde.get(pde.id) ?? null;
+      const prevSets = prevSwap ? (prevSwapSets ?? []).filter((s) => s.exercise_id === prevSwap.id) : [];
+      return {
       id: pde.id,
       order_index: pde.order_index,
-      exercise_id: pde.exercise?.id ?? "",
-      name: pde.exercise?.name ?? "(deleted)",
-      equipment: pde.exercise?.equipment ?? null,
+      exercise_id: ex?.id ?? "",
+      name: ex?.name ?? "(deleted)",
+      equipment: ex?.equipment ?? null,
+      plan_day_exercise_id: pde.id as string | null,
+      swapped_from: swap ? { id: pde.exercise?.id ?? "", name: pde.exercise?.name ?? "" } : null,
+      last_swap:
+        prevSwap && prevSession && !swap
+          ? {
+              name: prevSwap.name,
+              logged_at: prevSession.started_at as string,
+              sets: prevSets
+                .sort((a, b) => a.set_number - b.set_number)
+                .map((s) => ({ set_number: s.set_number, weight: s.weight, reps: s.reps })),
+            }
+          : null,
       prescribed_sets: pde.prescribed_sets,
       prescribed_reps: pde.prescribed_reps,
       prescribed_weight: pde.prescribed_weight,
@@ -230,8 +292,9 @@ export default async function LogSessionPage({ params }: Props) {
       is_extra: false as const,
       extra_id: null as string | null,
       superset_code_override: null as string | null,
-      last_session: attachLast(pde.exercise?.id ?? ""),
-    }))
+      last_session: attachLast(ex?.id ?? ""),
+      };
+    })
     .filter((e) => e.exercise_id.length > 0)
     // the cooldown card at the end of the workout owns cooldowns now, with a
     // choice of walks and stretches. an old plan row would show it twice.
@@ -252,6 +315,9 @@ export default async function LogSessionPage({ params }: Props) {
       notes: e.notes,
       is_extra: true as const,
       extra_id: e.id,
+      plan_day_exercise_id: null as string | null,
+      swapped_from: null,
+      last_swap: null,
       superset_code_override: e.superset_code,
       last_session: attachLast(e.exercise!.id),
     }));
@@ -276,6 +342,9 @@ export default async function LogSessionPage({ params }: Props) {
       exercise_id: ex.id,
       name: ex.name,
       equipment: ex.equipment ?? "other",
+      plan_day_exercise_id: null,
+      swapped_from: null,
+      last_swap: null,
       prescribed_sets: (sets ?? []).filter((s) => s.exercise_id === ex.id && !s.is_warmup).length,
       prescribed_reps: "",
       prescribed_weight: null,

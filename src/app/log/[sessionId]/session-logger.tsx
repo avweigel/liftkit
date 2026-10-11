@@ -36,6 +36,15 @@ import {
 
 // reads this device's saved warm-up picks, so it renders only in the browser
 import { CardioTimer, parseCardio, type CardioStep } from "./cardio-timer";
+import { swapExercise, undoSwap } from "@/lib/actions/swaps";
+import { createContext } from "react";
+
+// any exercise header can ask to be swapped without threading props
+// through every card
+const SwapContext = createContext<{
+  open: (ex: Exercise) => void;
+  undo: (ex: Exercise) => Promise<void>;
+} | null>(null);
 import { howTo } from "@/lib/program/how-to";
 
 const WarmupCard = dynamic(() => import("./warmup-card"), { ssr: false });
@@ -61,6 +70,13 @@ type Exercise = {
   is_extra: boolean;
   extra_id: string | null;
   superset_code_override: string | null;
+  plan_day_exercise_id: string | null;
+  swapped_from: { id: string; name: string } | null;
+  last_swap: {
+    name: string;
+    logged_at: string;
+    sets: LastSessionSet[];
+  } | null;
   last_session: {
     logged_at: string;
     sets: LastSessionSet[];
@@ -115,6 +131,17 @@ export function SessionLogger({
   baseUnit,
 }: Props) {
   const [sets, setSets] = useState<SessionSet[]>(initialSets);
+  const [swapTarget, setSwapTarget] = useState<Exercise | null>(null);
+  const swapApi = useMemo(
+    () => ({
+      open: (ex: Exercise) => setSwapTarget(ex),
+      undo: async (ex: Exercise) => {
+        if (!ex.plan_day_exercise_id) return;
+        await undoSwap({ sessionId, planDayExerciseId: ex.plan_day_exercise_id });
+      },
+    }),
+    [sessionId],
+  );
   const [notes, setNotes] = useState(initialNotes);
   const [restOn, setRestOn] = useState(true);
   const [restSecondsLeft, setRestSecondsLeft] = useState<number | null>(null);
@@ -322,6 +349,7 @@ export function SessionLogger({
 
   return (
     <BaseUnitContext.Provider value={baseUnit}>
+    <SwapContext.Provider value={finished ? null : swapApi}>
     <div className="space-y-5">
       <ProgressHeader
         done={workingSetsLogged}
@@ -472,7 +500,24 @@ export function SessionLogger({
           <span className="text-[12px] font-semibold opacity-70">Skip</span>
         </button>
       )}
+      {swapTarget && swapTarget.plan_day_exercise_id && (
+        <SwapSheet
+          exercise={swapTarget}
+          library={library}
+          onClose={() => setSwapTarget(null)}
+          onSwap={async (exerciseId, updatePlan) => {
+            await swapExercise({
+              sessionId,
+              planDayExerciseId: swapTarget.plan_day_exercise_id,
+              exerciseId,
+              updatePlan,
+            });
+            setSwapTarget(null);
+          }}
+        />
+      )}
     </div>
+    </SwapContext.Provider>
     </BaseUnitContext.Provider>
   );
 }
@@ -712,6 +757,8 @@ function ExerciseHeader({
   const base = useContext(BaseUnitContext);
   const [unit] = useEntryUnit(exercise.exercise_id);
   const show = (w: number) => formatWeight(convert(w, base, unit));
+  const swap = useContext(SwapContext);
+  const [undoing, setUndoing] = useState(false);
   return (
     <header className="space-y-1.5">
       <div className="flex items-start gap-2">
@@ -724,6 +771,19 @@ function ExerciseHeader({
           </Link>
         </div>
         {exercise.is_extra && <span className="chip shrink-0">Added</span>}
+        {swap && exercise.plan_day_exercise_id && !exercise.swapped_from && (
+          <button
+            type="button"
+            onClick={() => swap.open(exercise)}
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-(--muted) hover:text-(--foreground)"
+            aria-label={`Swap ${exercise.name} for another exercise`}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M7 4L3 8l4 4M3 8h13M17 20l4-4-4-4M21 16H8" />
+            </svg>
+            Swap
+          </button>
+        )}
         {onRemoveExtra && (
           <button
             type="button"
@@ -764,11 +824,48 @@ function ExerciseHeader({
           </span>
         )}
       </div>
+      {exercise.swapped_from && (
+        <div className="flex items-center gap-2 rounded-xl bg-(--accent-soft) px-3 py-2 text-[13px]">
+          <span className="min-w-0 flex-1">
+            Swapped in for <span className="font-semibold">{exercise.swapped_from.name}</span>, this workout only
+          </span>
+          {swap && (
+            <button
+              type="button"
+              disabled={undoing}
+              onClick={async () => {
+                setUndoing(true);
+                try {
+                  await swap.undo(exercise);
+                } finally {
+                  setUndoing(false);
+                }
+              }}
+              className="shrink-0 font-semibold text-(--accent)"
+            >
+              {undoing ? "Undoing…" : "Undo"}
+            </button>
+          )}
+        </div>
+      )}
+      {exercise.last_swap && (
+        <p className="text-[13px] text-(--muted)">
+          Last time, {relativeDays(exercise.last_swap.logged_at)}, you did{" "}
+          <span className="font-semibold text-(--foreground)">{exercise.last_swap.name}</span> instead
+          {exercise.last_swap.sets.length > 0 && ": "}
+          {exercise.last_swap.sets.map((s, i) => (
+            <span key={i} className="num text-[15px] text-(--foreground)">
+              {i > 0 ? ", " : ""}
+              {s.weight != null ? formatWeight(s.weight) : "BW"}×{s.reps}
+            </span>
+          ))}
+        </p>
+      )}
       {cleanNotes && <p className="text-[14px] text-(--muted)">{sentence(cleanNotes)}</p>}
       <HowToToggle name={exercise.name} />
       {exercise.last_session && (
         <p className="text-[13px] text-(--muted)">
-          Last time, {relativeDays(exercise.last_session.logged_at)}:{" "}
+          {exercise.last_swap ? `Last time you did ${exercise.name}` : "Last time"}, {relativeDays(exercise.last_session.logged_at)}:{" "}
           {exercise.last_session.sets.map((s, i) => (
             <span key={i} className="num text-[15px] text-(--foreground)">
               {i > 0 ? ", " : ""}
@@ -1543,6 +1640,147 @@ function WeightSplitHint({
 }
 
 // ----- Add exercise picker + finish prompt -----
+
+function SwapSheet({
+  exercise,
+  library,
+  onClose,
+  onSwap,
+}: {
+  exercise: Exercise;
+  library: LibraryItem[];
+  onClose: () => void;
+  onSwap: (exerciseId: string, updatePlan: boolean) => Promise<void>;
+}) {
+  const [query, setQuery] = useState("");
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [updatePlan, setUpdatePlan] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const original = library.find((l) => l.id === exercise.exercise_id);
+  const q = query.trim().toLowerCase();
+  const results = useMemo(() => {
+    const pool = library.filter((l) => l.id !== exercise.exercise_id);
+    if (!q) {
+      // nothing typed: same muscle first, the gym-friendly way to fill a gap
+      return pool
+        .filter((l) => original && l.primary_muscle === original.primary_muscle)
+        .slice(0, 8);
+    }
+    const words = q.split(/\s+/).filter(Boolean);
+    return pool
+      .filter((l) => words.every((w) => l.name.toLowerCase().includes(w) || l.equipment.includes(w) || l.primary_muscle.includes(w)))
+      .slice(0, 20);
+  }, [library, exercise.exercise_id, original, q]);
+
+  const submit = async () => {
+    if (!pickedId) {
+      setError("Pick an exercise first.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await onSwap(pickedId, updatePlan);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't swap. Try again.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/55 sm:items-center sm:p-4" onClick={onClose}>
+      <div
+        className="safe-bottom max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-[24px] bg-(--surface) p-5 shadow-2xl sm:rounded-[24px]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h2 className="display text-[26px]">Swap {exercise.name}</h2>
+            <p className="text-[14px] text-(--muted)">Same sets, reps and rest. Machine taken, something hurts, whatever the reason.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--surface-2) text-xl leading-none text-(--muted)"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search, like leg press or cable"
+            aria-label="Search exercises"
+            enterKeyHint="search"
+            autoComplete="off"
+            className="h-12 w-full rounded-xl bg-(--surface-2) px-4 text-[16px] outline-none placeholder:text-(--faint) focus:ring-2 focus:ring-(--accent-line)"
+          />
+          {!q && results.length > 0 && <p className="label">Works the same muscles</p>}
+          <div className="space-y-1">
+            {results.length === 0 ? (
+              <p className="py-3 text-center text-[14px] text-(--muted)">
+                {q ? "Nothing matches. Try a shorter word." : "Search for something to swap in."}
+              </p>
+            ) : (
+              results.map((l) => {
+                const on = pickedId === l.id;
+                return (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => setPickedId(l.id)}
+                    aria-pressed={on}
+                    className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-xl px-3 text-left transition-colors ${
+                      on ? "bg-(--accent-soft) ring-1 ring-(--accent-line)" : "bg-(--surface-2)"
+                    }`}
+                  >
+                    <span className="text-[15px] font-semibold">{l.name}</span>
+                    <span className="shrink-0 text-[12px] capitalize text-(--muted)">{l.equipment}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={updatePlan}
+            onClick={() => setUpdatePlan((v) => !v)}
+            className="flex w-full items-center gap-3 rounded-xl bg-(--surface-2) p-3 text-left"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold">Change it in my plan too</span>
+              <span className="block text-[13px] text-(--muted)">
+                {updatePlan ? "Future workouts on this day will use it." : "Off: just this workout. Next time is back to normal."}
+              </span>
+            </span>
+            <span className={`flex h-7 w-12 shrink-0 items-center rounded-full p-0.5 transition-colors ${updatePlan ? "bg-(--accent)" : "bg-(--border)"}`}>
+              <span className={`h-6 w-6 rounded-full bg-(--surface) shadow transition-transform ${updatePlan ? "translate-x-5" : ""}`} />
+            </span>
+          </button>
+
+          {error && <p className="text-[13px] text-(--danger)">{error}</p>}
+
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className="btn btn-secondary flex-1">
+              Cancel
+            </button>
+            <button type="button" onClick={submit} disabled={saving || !pickedId} className="btn btn-primary flex-[2]">
+              {saving ? "Swapping…" : "Swap"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function AddExercisePicker({
   library,
