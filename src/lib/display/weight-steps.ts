@@ -1,4 +1,5 @@
 import { weightConvention } from "@/lib/display/weight-convention";
+import type { Unit } from "@/lib/display/units";
 
 export type WeightKind = "barbell" | "db-pair" | "db-single" | "other";
 
@@ -11,6 +12,15 @@ const DB_SIZES: number[] = (() => {
 })();
 
 const PAIR_TOTALS = DB_SIZES.map((w) => w * 2);
+
+// kg racks: 1 kg steps up to 10, then 12.5 and every 2.5 after that
+const DB_SIZES_KG: number[] = (() => {
+  const sizes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  for (let w = 12.5; w <= 70; w += 2.5) sizes.push(w);
+  return sizes;
+})();
+
+const PAIR_TOTALS_KG = DB_SIZES_KG.map((w) => w * 2);
 
 export function weightKind(
   name: string,
@@ -29,21 +39,23 @@ export function weightKind(
   return "other";
 }
 
-function ladder(kind: WeightKind): number[] | null {
-  if (kind === "db-pair") return PAIR_TOTALS;
-  if (kind === "db-single") return DB_SIZES;
+function ladder(kind: WeightKind, unit: Unit): number[] | null {
+  if (kind === "db-pair") return unit === "kg" ? PAIR_TOTALS_KG : PAIR_TOTALS;
+  if (kind === "db-single") return unit === "kg" ? DB_SIZES_KG : DB_SIZES;
   return null;
 }
 
 // a barbell load changes by both sides at once and the smallest plate is
 // 2.5, so the bar moves in steps of 5. machines and everything else also
 // use 5 as a sensible default.
-const LINEAR_STEP = 5;
+// in kg the smallest common plate is 1.25, so the bar moves by 2.5.
+const linearStep = (unit: Unit) => (unit === "kg" ? 2.5 : 5);
 
-export function snapWeight(kind: WeightKind, raw: number): number {
+export function snapWeight(kind: WeightKind, raw: number, unit: Unit = "lb"): number {
   if (!Number.isFinite(raw) || raw <= 0) return 0;
-  const l = ladder(kind);
-  if (!l) return Math.round(raw / LINEAR_STEP) * LINEAR_STEP;
+  const l = ladder(kind, unit);
+  const step = linearStep(unit);
+  if (!l) return Math.round(raw / step) * step;
   let best = l[0];
   for (const w of l) {
     if (Math.abs(w - raw) < Math.abs(best - raw)) best = w;
@@ -55,12 +67,16 @@ export function stepWeight(
   kind: WeightKind,
   current: number | null,
   dir: 1 | -1,
+  unit: Unit = "lb",
 ): number | null {
-  const l = ladder(kind);
+  const l = ladder(kind, unit);
+  const step = linearStep(unit);
   if (!l) {
+    // land on the grid first, so a converted 44.1 steps to 45, not 49.1
     const base = current ?? 0;
-    const next = base + dir * LINEAR_STEP;
-    if (next <= 0) return dir === -1 ? null : LINEAR_STEP;
+    const snapped = Math.round(base / step) * step;
+    const next = snapped !== base && Math.sign(snapped - base) === dir ? snapped : snapped + dir * step;
+    if (next <= 0) return dir === -1 ? null : step;
     return next;
   }
   if (current === null || current <= 0) {

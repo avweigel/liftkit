@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useContext, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   deleteSessionSet,
   finishSession,
@@ -26,6 +26,13 @@ import {
 } from "@/lib/display/weight-steps";
 import { pairSides } from "@/lib/side";
 import type { DayKind } from "@/lib/program/day-profile";
+import {
+  BaseUnitContext,
+  convert,
+  formatWeight,
+  useEntryUnit,
+  type Unit,
+} from "@/lib/display/units";
 
 // reads this device's saved warm-up picks, so it renders only in the browser
 const WarmupCard = dynamic(() => import("./warmup-card"), { ssr: false });
@@ -86,6 +93,7 @@ type Props = {
   planName: string | null;
   hasPlanDay: boolean;
   warmup: { kind: DayKind } | null;
+  baseUnit: Unit;
 };
 
 export function SessionLogger({
@@ -99,6 +107,7 @@ export function SessionLogger({
   planName,
   hasPlanDay,
   warmup,
+  baseUnit,
 }: Props) {
   const [sets, setSets] = useState<SessionSet[]>(initialSets);
   const [notes, setNotes] = useState(initialNotes);
@@ -298,6 +307,7 @@ export function SessionLogger({
   };
 
   return (
+    <BaseUnitContext.Provider value={baseUnit}>
     <div className="space-y-5">
       <ProgressHeader
         done={workingSetsLogged}
@@ -439,6 +449,7 @@ export function SessionLogger({
         </button>
       )}
     </div>
+    </BaseUnitContext.Provider>
   );
 }
 
@@ -595,6 +606,9 @@ function ExerciseHeader({
   const { cleanNotes } = parseSetCode(exercise.notes);
   const conv = weightConvention(exercise.name, exercise.equipment);
   const reps = formatRxReps(exercise.prescribed_reps);
+  const base = useContext(BaseUnitContext);
+  const [unit] = useEntryUnit(exercise.exercise_id);
+  const show = (w: number) => formatWeight(convert(w, base, unit));
   return (
     <header className="space-y-1.5">
       <div className="flex items-start gap-2">
@@ -631,7 +645,7 @@ function ExerciseHeader({
           </span>
           {exercise.prescribed_weight != null && (
             <span className="num text-[14px] text-(--foreground)">
-              @ {exercise.prescribed_weight}
+              @ {show(exercise.prescribed_weight)}
             </span>
           )}
         </span>
@@ -654,9 +668,10 @@ function ExerciseHeader({
           {exercise.last_session.sets.map((s, i) => (
             <span key={i} className="num text-[15px] text-(--foreground)">
               {i > 0 ? ", " : ""}
-              {s.weight ?? "BW"}×{s.reps}
+              {s.weight != null ? show(s.weight) : "BW"}×{s.reps}
             </span>
           ))}
+          {unit !== base && <span> {unit}</span>}
         </p>
       )}
     </header>
@@ -693,6 +708,10 @@ function SetList({
   );
   const weightConv = weightConvention(exercise.name, exercise.equipment);
   const kind = weightKind(exercise.name, exercise.equipment);
+  const base = useContext(BaseUnitContext);
+  const [unit, setUnit] = useEntryUnit(exercise.exercise_id);
+  const toShown = (w: number | null) => (w == null ? null : convert(w, base, unit));
+  const unitLabel = unit !== base ? unit : null;
 
   // warmups don't count toward the prescribed working-set goal, so
   // reserve an extra row for each warmup already logged.
@@ -746,7 +765,7 @@ function SetList({
     ) {
       const oneRM = prevInSession.weight * (1 + prevInSession.reps / 30);
       const raw = oneRM / (1 + target.value / 30);
-      weight = snapWeight(kind, raw);
+      weight = convert(snapWeight(kind, convert(raw, base, unit), unit), unit, base);
     } else {
       weight = prevInSession?.weight ?? exercise.prescribed_weight;
     }
@@ -778,7 +797,7 @@ function SetList({
       <ul className="space-y-1.5">
         {logged.map((r) => (
           <li key={r.n}>
-            <LoggedRow set={r.logged!} onEdit={() => {}} readOnly />
+            <LoggedRow set={r.logged!} shownWeight={toShown(r.logged!.weight)} unitLabel={unitLabel} onEdit={() => {}} readOnly />
           </li>
         ))}
       </ul>
@@ -798,7 +817,9 @@ function SetList({
             <li key={r.n}>
               <SetEditor
                 setNumber={r.n}
-                initialWeight={r.logged?.weight ?? suggest.weight}
+                initialWeight={toShown(r.logged?.weight ?? suggest.weight)}
+                unit={unit}
+                onUnitChange={setUnit}
                 initialReps={r.logged?.reps ?? suggest.reps}
                 initialIsWarmup={r.logged?.is_warmup ?? false}
                 finished={finished}
@@ -809,7 +830,7 @@ function SetList({
                   await onUpsert({
                     id: r.logged?.id ?? null,
                     set_number: r.n,
-                    weight: state.weight,
+                    weight: state.weight == null ? null : convert(state.weight, state.unit, base),
                     reps: state.reps,
                     rpe: r.logged?.rpe ?? null,
                     is_warmup: state.is_warmup,
@@ -835,6 +856,8 @@ function SetList({
             <li key={r.n}>
               <LoggedRow
                 set={r.logged}
+                shownWeight={toShown(r.logged.weight)}
+                unitLabel={unitLabel}
                 onEdit={() => setExpandedSetNumber(r.n)}
               />
             </li>
@@ -846,7 +869,8 @@ function SetList({
           <li key={r.n}>
             <QuickLogRow
               setNumber={r.n}
-              weight={suggest.weight}
+              weight={toShown(suggest.weight)}
+              unitLabel={unitLabel}
               weightKnown={suggest.weightKnown}
               reps={suggest.reps}
               targetText={target.text}
@@ -895,10 +919,14 @@ function CheckGlyph({ size = 14 }: { size?: number }) {
 
 function LoggedRow({
   set,
+  shownWeight,
+  unitLabel,
   onEdit,
   readOnly = false,
 }: {
   set: SessionSet;
+  shownWeight: number | null;
+  unitLabel: string | null;
   onEdit: () => void;
   readOnly?: boolean;
 }) {
@@ -910,7 +938,8 @@ function LoggedRow({
       <span className="num w-5 text-[15px] text-(--muted)">{set.set_number}</span>
       {set.is_warmup && <span className="chip">Warm-up</span>}
       <span className="ml-auto flex items-baseline gap-1">
-        <span className="num text-[24px] leading-none">{set.weight ?? "BW"}</span>
+        <span className="num text-[24px] leading-none">{shownWeight != null ? formatWeight(shownWeight) : "BW"}</span>
+        {unitLabel && shownWeight != null && <span className="text-[13px] text-(--muted)">{unitLabel}</span>}
         <span className="text-[14px] text-(--muted)">×</span>
         <span className="num text-[24px] leading-none">{set.reps}</span>
       </span>
@@ -927,7 +956,7 @@ function LoggedRow({
     <button
       type="button"
       onClick={onEdit}
-      aria-label={`Set ${set.set_number} logged, ${set.weight ?? "bodyweight"} by ${set.reps}. Tap to edit.`}
+      aria-label={`Set ${set.set_number} logged, ${shownWeight != null ? `${formatWeight(shownWeight)} ${unitLabel ?? ""}` : "bodyweight"} by ${set.reps}. Tap to edit.`}
       className="flex min-h-12 w-full items-center gap-3 rounded-xl bg-(--ok-soft) px-3 text-left"
     >
       {body}
@@ -938,6 +967,7 @@ function LoggedRow({
 function QuickLogRow({
   setNumber,
   weight,
+  unitLabel,
   weightKnown,
   reps,
   targetText,
@@ -948,6 +978,7 @@ function QuickLogRow({
 }: {
   setNumber: number;
   weight: number | null;
+  unitLabel: string | null;
   weightKnown: boolean;
   reps: number | null;
   targetText: string;
@@ -999,7 +1030,8 @@ function QuickLogRow({
           </span>
         ) : (
           <span className={`flex items-baseline gap-1 ${current ? "" : "text-(--muted)"}`}>
-            <span className="num text-[24px] leading-none">{weight ?? "BW"}</span>
+            <span className="num text-[24px] leading-none">{weight != null ? formatWeight(weight) : "BW"}</span>
+            {unitLabel && weight != null && <span className="text-[13px] text-(--muted)">{unitLabel}</span>}
             <span className="text-[14px] text-(--muted)">×</span>
             <span className="num text-[24px] leading-none">{reps}</span>
           </span>
@@ -1036,6 +1068,8 @@ function SetEditor({
   showDelete = false,
   weightConv = null,
   weightKind: kind = "other",
+  unit = "lb",
+  onUnitChange,
   onSave,
   onCancel,
   onDelete,
@@ -1048,8 +1082,11 @@ function SetEditor({
   showDelete?: boolean;
   weightConv?: ReturnType<typeof weightConvention> | null;
   weightKind?: WeightKind;
+  unit?: Unit;
+  onUnitChange?: (u: Unit) => void;
   onSave: (state: {
     weight: number | null;
+    unit: Unit;
     reps: number;
     is_warmup: boolean;
   }) => Promise<void>;
@@ -1057,8 +1094,14 @@ function SetEditor({
   onDelete?: () => Promise<void>;
 }) {
   const [weight, setWeight] = useState<string>(
-    initialWeight === null ? "" : String(initialWeight),
+    initialWeight === null ? "" : formatWeight(initialWeight),
   );
+  const switchUnit = (next: Unit) => {
+    if (next === unit) return;
+    const n = weight.trim() === "" ? null : Number(weight);
+    if (n != null && Number.isFinite(n)) setWeight(formatWeight(convert(n, unit, next)));
+    onUnitChange?.(next);
+  };
   const [reps, setReps] = useState<string>(
     initialReps === null ? "" : String(initialReps),
   );
@@ -1081,7 +1124,7 @@ function SetEditor({
     }
     setSaving(true);
     try {
-      await onSave({ weight: weightNum, reps: repsNum, is_warmup: isWarmup });
+      await onSave({ weight: weightNum, unit, reps: repsNum, is_warmup: isWarmup });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save. Try again.");
     } finally {
@@ -1111,10 +1154,27 @@ function SetEditor({
           value={weight}
           onChange={setWeight}
           step={5}
-          nextValue={(cur, dir) => stepWeight(kind, cur, dir)}
+          nextValue={(cur, dir) => stepWeight(kind, cur, dir, unit)}
           allowEmpty
           disabled={finished}
         />
+        <div className="flex items-center gap-2 pl-16">
+          <div className="grid grid-cols-2 gap-0.5 rounded-lg bg-(--surface) p-0.5" role="group" aria-label="Weight unit">
+            {(["lb", "kg"] as const).map((u) => (
+              <button
+                key={u}
+                type="button"
+                onClick={() => switchUnit(u)}
+                aria-pressed={unit === u}
+                className={`h-8 w-12 rounded-md text-[14px] font-semibold transition-colors ${
+                  unit === u ? "bg-(--accent) text-(--accent-contrast)" : "text-(--muted)"
+                }`}
+              >
+                {u}
+              </button>
+            ))}
+          </div>
+        </div>
         <WeightSplitHint value={weight} conv={weightConv} />
         <Stepper
           label="Reps"

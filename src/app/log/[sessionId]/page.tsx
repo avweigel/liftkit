@@ -318,6 +318,13 @@ export default async function LogSessionPage({ params }: Props) {
         planExercises.map((e) => e.name),
       )
     : null;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("units")
+    .eq("id", user?.id ?? "")
+    .maybeSingle<{ units: "lb" | "kg" | null }>();
+  const profileUnits = profile?.units ?? "lb";
+
   const warmup =
     dayProfile && dayProfile.kind !== "core"
       ? { kind: dayProfile.kind }
@@ -359,6 +366,7 @@ export default async function LogSessionPage({ params }: Props) {
         planName={planName}
         hasPlanDay={!!session.plan_day_id}
         warmup={warmup}
+        baseUnit={profileUnits}
       />
 
       <SessionActions
