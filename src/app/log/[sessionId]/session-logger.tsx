@@ -35,6 +35,8 @@ import {
 } from "@/lib/display/units";
 
 // reads this device's saved warm-up picks, so it renders only in the browser
+import { CardioTimer, parseCardio } from "./cardio-timer";
+
 const WarmupCard = dynamic(() => import("./warmup-card"), { ssr: false });
 
 type LastSessionSet = {
@@ -925,7 +927,10 @@ function SetList({
   // the first unlogged set is the one you're on: give it the spotlight
   const nextUp = rows.find((r) => !r.logged)?.n ?? null;
 
+  const cardio = parseCardio(exercise.prescribed_reps, parseSetCode(exercise.notes).cleanNotes);
   return (
+    <div className="space-y-2">
+    {cardio && <CardioTimer totalSeconds={cardio.totalSeconds} steps={cardio.steps} />}
     <ul className="space-y-1.5">
       {rows.map((r) => {
         const isExpanded = expandedSetNumber === r.n;
@@ -1024,6 +1029,7 @@ function SetList({
         </button>
       </li>
     </ul>
+    </div>
   );
 }
 

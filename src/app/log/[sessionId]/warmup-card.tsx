@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { chime } from "@/lib/display/chime";
 import type { DayKind } from "@/lib/program/day-profile";
 import {
   defaultWarmup,
@@ -464,25 +465,4 @@ function WarmupTimer({
       )}
     </div>
   );
-}
-
-function chime(ctx: AudioContext | null) {
-  try {
-    navigator.vibrate?.([200, 100, 200]);
-  } catch {}
-  if (!ctx) return;
-  try {
-    [0, 0.35].forEach((offset) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = 880;
-      const t = ctx.currentTime + offset;
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(t);
-      osc.stop(t + 0.32);
-    });
-  } catch {}
 }
