@@ -1,6 +1,13 @@
 // beeps through web audio. the context has to be created inside a tap for
 // iOS to allow sound later, so callers make it with unlockAudio() on start.
 export function unlockAudio(existing: AudioContext | null): AudioContext | null {
+  // "ambient" mixes with your music instead of pausing it. iOS mutes it when
+  // the phone is on silent; only a session that stops your music gets past
+  // that, which is worse mid-workout.
+  try {
+    const nav = navigator as Navigator & { audioSession?: { type: string } };
+    if (nav.audioSession) nav.audioSession.type = "ambient";
+  } catch {}
   try {
     const Ctx =
       window.AudioContext ??

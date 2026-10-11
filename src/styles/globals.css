@@ -251,3 +251,12 @@ select {
 .progress-fill {
   background: var(--accent);
 }
+
+/* incline change on the cardio timer: a soft pulse that reads from across the console */
+@keyframes timer-flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
+}
+.timer-flash {
+  animation: timer-flash 0.8s ease-in-out infinite;
+}

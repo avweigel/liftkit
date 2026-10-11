@@ -40,6 +40,7 @@ export function CardioTimer({
   const audioRef = useRef<AudioContext | null>(null);
   const wakeRef = useRef<{ release: () => Promise<void> } | null>(null);
   const stepRef = useRef(0);
+  const [flashUntil, setFlashUntil] = useState(0);
 
   const running = endAt != null;
   const remaining = running ? Math.max(0, endAt - now) : leftMs;
@@ -83,6 +84,10 @@ export function CardioTimer({
     if (stepIndex !== stepRef.current) {
       stepRef.current = stepIndex;
       chime(audioRef.current, 1);
+      // a few seconds of colour you can't miss from the corner of your eye
+      const until = Date.now() + 5000;
+      const id = setTimeout(() => setFlashUntil(until), 0);
+      return () => clearTimeout(id);
     }
   }, [running, stepIndex]);
 
@@ -127,14 +132,22 @@ export function CardioTimer({
   const started = running || leftMs < totalMs;
   const current = steps[stepIndex];
   const next = steps[stepIndex + 1];
+  const flashing = running && now < flashUntil;
 
   return (
-    <div className="space-y-3 rounded-xl bg-(--surface-2) p-3">
+    <div
+      className={`space-y-3 rounded-xl p-3 transition-colors duration-200 ${
+        flashing ? "timer-flash bg-(--accent) text-(--accent-contrast)" : "bg-(--surface-2)"
+      }`}
+    >
+      {flashing && current && (
+        <p className="display text-center text-[22px]">Change to {current.label}</p>
+      )}
       {steps.length > 0 && (
         <div className="flex items-end justify-between gap-3">
           <div>
             <p className="label">{started && !doneAll ? "Incline now" : "Starts at"}</p>
-            <p className="num text-[40px] leading-none text-(--accent)">{current?.label}</p>
+            <p className={`num text-[40px] leading-none ${flashing ? "" : "text-(--accent)"}`}>{current?.label}</p>
           </div>
           {next && !doneAll && (
             <div className="text-right">
