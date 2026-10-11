@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatDayLabel } from "@/lib/display/format-day";
 import { parseSetCode } from "@/lib/set-code";
+import { formatRxReps } from "@/lib/display/reps";
 import { StartDayButton, StartOtherDayButton } from "./dashboard-start-button";
 import { TonightCardio } from "./tonight-cardio";
 import {
@@ -270,6 +271,10 @@ export async function Dashboard({ userId }: Props) {
         </ol>
       )}
 
+      {activePlan && (eveningNow() || todaySession?.finished_at) && (
+        <TomorrowCard day={tomorrowDay} />
+      )}
+
       {activePlan && planDays.length > 0 && (
         <WeekStrip
           days={planDays}
@@ -280,6 +285,88 @@ export async function Dashboard({ userId }: Props) {
 
       <RecentSessions sessions={sessions.filter((s) => s.finished_at).slice(0, 5)} />
     </main>
+  );
+}
+
+function stockholmHour(): number {
+  return Number(
+    new Intl.DateTimeFormat("en-GB", {
+      hour: "numeric",
+      hour12: false,
+      timeZone: "Europe/Stockholm",
+    }).format(new Date()),
+  );
+}
+
+// from late afternoon on, the next thing you want to know is tomorrow
+function eveningNow(): boolean {
+  return stockholmHour() >= 17;
+}
+
+function TomorrowCard({ day }: { day: PlanDay | null }) {
+  if (!day) {
+    return (
+      <section className="space-y-3">
+        <h2 className="display text-[22px]">Tomorrow</h2>
+        <div className="card p-5">
+          <div className="display text-[20px]">Rest day</div>
+          <p className="text-[14px] text-(--muted)">Nothing planned.</p>
+        </div>
+      </section>
+    );
+  }
+  const label = formatDayLabel(day.day_number, day.name);
+  const ordered = day.plan_day_exercises
+    .slice()
+    .sort((a, b) => a.order_index - b.order_index)
+    .filter((e) => !/^\s*(\[[A-Z]\d*\]\s*)?cooldown\b/i.test(e.notes ?? ""));
+  // consecutive exercises with the same letter are one superset
+  const groups: Array<{ letter: string | null; items: typeof ordered }> = [];
+  for (const e of ordered) {
+    const letter = parseSetCode(e.notes).code?.letter ?? null;
+    const last = groups[groups.length - 1];
+    if (last && letter && last.letter === letter) last.items.push(e);
+    else groups.push({ letter, items: [e] });
+  }
+  return (
+    <section className="space-y-3">
+      <h2 className="display text-[22px]">Tomorrow</h2>
+      <details className="card group overflow-hidden" open>
+        <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
+          <div className="min-w-0 flex-1">
+            <div className="label">{label.weekday}</div>
+            <div className="display text-[24px]">{label.name}</div>
+          </div>
+          <span className="chip">
+            <span className="num text-[13px]">{ordered.length}</span> exercises
+          </span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-(--muted) transition-transform group-open:rotate-180" aria-hidden>
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </summary>
+        <ol className="space-y-2 border-t border-(--border) p-4">
+          {groups.map((g, gi) => (
+            <li key={gi} className="flex gap-3">
+              <span className="num flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-(--accent-soft) text-[14px] text-(--accent)">
+                {g.letter ?? gi + 1}
+              </span>
+              <ul className="min-w-0 flex-1 space-y-1">
+                {g.items.map((e) => (
+                  <li key={e.id} className="flex items-baseline justify-between gap-3">
+                    <span className="truncate text-[15px] font-semibold">{e.exercise?.name ?? "Exercise"}</span>
+                    <span className="num shrink-0 text-[14px] text-(--muted)">
+                      {e.prescribed_reps.includes(",")
+                        ? formatRxReps(e.prescribed_reps)
+                        : `${e.prescribed_sets} × ${e.prescribed_reps}`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ol>
+      </details>
+    </section>
   );
 }
 
