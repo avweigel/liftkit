@@ -252,24 +252,93 @@ function WarmupRow({
       {item.seconds != null && !done && !swapOpen && (
         <WarmupTimer seconds={item.seconds} onFinish={onFinishTimer} />
       )}
-      {swapOpen && (
-        <div className="space-y-1 px-3 pb-3">
-          <p className="label pb-1">Pick something else</p>
-          {choices.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => onPick(c.id)}
-              className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg bg-(--surface) px-3 py-2 text-left"
-            >
-              <span className="text-[14px] font-semibold">{c.name}</span>
-              {c.dose && <span className="num shrink-0 text-[14px] text-(--muted)">{c.dose}</span>}
-            </button>
-          ))}
-        </div>
-      )}
+      {swapOpen && <SwapPicker choices={choices} onPick={onPick} />}
     </li>
   );
+}
+
+const SHORT_LIST = 5;
+
+function SwapPicker({
+  choices,
+  onPick,
+}: {
+  choices: WarmupItem[];
+  onPick: (id: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [showAll, setShowAll] = useState(false);
+  const matches = query.trim() ? choices.filter((c) => looseMatch(query, c)) : choices;
+  const visible = query.trim() || showAll ? matches : matches.slice(0, SHORT_LIST);
+  const hidden = matches.length - visible.length;
+
+  return (
+    <div className="space-y-1 px-3 pb-3">
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search, like hips or bike"
+        aria-label="Search warm-ups"
+        enterKeyHint="search"
+        autoComplete="off"
+        className="mb-1 h-11 w-full rounded-lg border border-(--border) bg-(--background) px-3 text-[16px] outline-none placeholder:text-(--faint) focus:border-(--accent-line)"
+      />
+      {visible.map((c) => (
+        <button
+          key={c.id}
+          type="button"
+          onClick={() => onPick(c.id)}
+          className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg bg-(--surface) px-3 py-2 text-left"
+        >
+          <span className="text-[14px] font-semibold">{c.name}</span>
+          {c.dose && <span className="num shrink-0 text-[14px] text-(--muted)">{c.dose}</span>}
+        </button>
+      ))}
+      {visible.length === 0 && (
+        <p className="py-2 text-[14px] text-(--muted)">Nothing matches. Try a shorter word.</p>
+      )}
+      {hidden > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="h-10 w-full text-[14px] font-semibold text-(--accent)"
+        >
+          Show {hidden} more
+        </button>
+      )}
+    </div>
+  );
+}
+
+const words = (text: string) =>
+  text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean);
+
+// every typed word has to hit something: part of a word, or the word with
+// one typo once it's long enough to tell ("swigns" still finds swings)
+function looseMatch(query: string, item: WarmupItem): boolean {
+  const hay = words(`${item.name} ${item.detail ?? ""} ${item.tags ?? ""}`);
+  return words(query).every((q) =>
+    hay.some((w) => w.includes(q) || (q.length >= 4 && withinOne(q, w.slice(0, q.length + 1)))),
+  );
+}
+
+// edit distance where swapping two neighbouring letters counts as one typo
+function withinOne(a: string, b: string): boolean {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  const d = Array.from({ length: a.length + 1 }, (_, i) =>
+    Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)),
+  );
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+  }
+  return d[a.length][b.length] <= 1;
 }
 
 // counts down from an end timestamp rather than ticking a counter, so a
