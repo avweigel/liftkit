@@ -5,7 +5,7 @@ import { formatDayLabel } from "@/lib/display/format-day";
 import { SessionActions } from "./session-actions";
 import { SessionLogger } from "./session-logger";
 import { SessionStartedAt } from "./session-started-at";
-import { classifyDay, warmupOptions } from "@/lib/program/day-profile";
+import { classifyDay } from "@/lib/program/day-profile";
 
 type Props = { params: Promise<{ sessionId: string }> };
 
@@ -320,7 +320,7 @@ export default async function LogSessionPage({ params }: Props) {
     : null;
   const warmup =
     dayProfile && dayProfile.kind !== "core"
-      ? { kind: dayProfile.kind, options: warmupOptions(dayProfile.kind) }
+      ? { kind: dayProfile.kind }
       : null;
 
   return (
