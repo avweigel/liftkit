@@ -80,6 +80,7 @@ type SessionSet = {
   rpe: number | null;
   is_warmup: boolean;
   notes: string | null;
+  logged_at?: string;
 };
 
 type Props = {
@@ -175,6 +176,13 @@ export function SessionLogger({
     [exercises],
   );
 
+  // where you are: the set after the one you logged last. inside a superset
+  // that means the next exercise in the round, not more of the same one.
+  const current = useMemo(
+    () => findCurrentSet(groups.map((g) => g.items.map((it) => it._ex)), sets),
+    [groups, sets],
+  );
+
   const upsert = async (
     exerciseId: string,
     set: {
@@ -197,6 +205,7 @@ export function SessionLogger({
       notes: set.notes,
     });
     setSets((prev) => {
+      const replaced = prev.find((s) => set.id != null && s.id === set.id);
       const filtered = prev.filter(
         (s) =>
           !(set.id && s.id === set.id) &&
@@ -213,6 +222,7 @@ export function SessionLogger({
           rpe: set.rpe,
           is_warmup: set.is_warmup,
           notes: set.notes,
+          logged_at: replaced?.logged_at ?? new Date().toISOString(),
         },
       ];
     });
@@ -435,6 +445,14 @@ export function SessionLogger({
         />
       )}
 
+      {!finished && current && (
+        <JumpToCurrent
+          targetId={`set-${current.exerciseId}-${current.setNumber}`}
+          label={`Set ${current.setNumber}, ${current.name}`}
+          raised={restOn && restSecondsLeft !== null}
+        />
+      )}
+
       {restOn && restSecondsLeft !== null && (
         <button
           type="button"
@@ -450,6 +468,85 @@ export function SessionLogger({
       )}
     </div>
     </BaseUnitContext.Provider>
+  );
+}
+
+function findCurrentSet(
+  order: Exercise[][],
+  sets: SessionSet[],
+): { exerciseId: string; setNumber: number; name: string } | null {
+  const nextOpen = (ex: Exercise): number | null => {
+    const mine = sets.filter((s) => s.exercise_id === ex.exercise_id);
+    const goal = ex.prescribed_sets + mine.filter((s) => s.is_warmup).length;
+    const taken = new Set(mine.map((s) => s.set_number));
+    for (let n = 1; n <= goal; n++) if (!taken.has(n)) return n;
+    return null;
+  };
+  const last = [...sets].sort((a, b) =>
+    (b.logged_at ?? "").localeCompare(a.logged_at ?? ""),
+  )[0];
+  let gi = 0;
+  let start = 0;
+  if (last) {
+    gi = order.findIndex((g) => g.some((e) => e.exercise_id === last.exercise_id));
+    if (gi < 0) gi = 0;
+    else start = order[gi].findIndex((e) => e.exercise_id === last.exercise_id) + 1;
+  }
+  for (let k = 0; k < order.length; k++) {
+    const g = order[(gi + k) % order.length];
+    for (let j = 0; j < g.length; j++) {
+      const ex = g[(k === 0 ? start + j : j) % g.length];
+      const n = nextOpen(ex);
+      if (n != null) return { exerciseId: ex.exercise_id, setNumber: n, name: ex.name };
+    }
+  }
+  return null;
+}
+
+// a way home after scrolling ahead to peek at what's next. it only shows
+// while your current set is off screen.
+function JumpToCurrent({
+  targetId,
+  label,
+  raised,
+}: {
+  targetId: string;
+  label: string;
+  raised: boolean;
+}) {
+  const [away, setAway] = useState<"up" | "down" | null>(null);
+
+  useEffect(() => {
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    // the sticky progress header and the finish bar cover part of the screen
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setAway(null);
+        else setAway(entry.boundingClientRect.top < 0 ? "up" : "down");
+      },
+      { rootMargin: "-120px 0px -110px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [targetId]);
+
+  if (!away) return null;
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "center" })
+      }
+      aria-label={`Back to your current set: ${label}`}
+      className="fixed left-1/2 z-30 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-2 rounded-full border border-(--accent-line) bg-(--surface) py-2.5 pr-4 pl-3 shadow-lg transition-[bottom] duration-200"
+      style={{ bottom: `calc(env(safe-area-inset-bottom) + ${raised ? "9.5rem" : "5.5rem"})` }}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-(--accent)" aria-hidden>
+        {away === "up" ? <path d="M12 19V5M5 12l7-7 7 7" /> : <path d="M12 5v14M5 12l7 7 7-7" />}
+      </svg>
+      <span className="truncate text-[14px] font-semibold">{label}</span>
+    </button>
   );
 }
 
@@ -835,7 +932,7 @@ function SetList({
         if (isExpanded) {
           const suggest = suggestedForSet(r.n);
           return (
-            <li key={r.n}>
+            <li key={r.n} id={`set-${exercise.exercise_id}-${r.n}`} className="scroll-mt-32">
               <SetEditor
                 setNumber={r.n}
                 initialWeight={toShown(r.logged?.weight ?? suggest.weight)}
@@ -874,7 +971,7 @@ function SetList({
         }
         if (r.logged) {
           return (
-            <li key={r.n}>
+            <li key={r.n} id={`set-${exercise.exercise_id}-${r.n}`} className="scroll-mt-32">
               <LoggedRow
                 set={r.logged}
                 shownWeight={toShown(r.logged.weight)}
@@ -887,7 +984,7 @@ function SetList({
         const suggest = suggestedForSet(r.n);
         const target = repTargetForSet(exercise.prescribed_reps, r.n);
         return (
-          <li key={r.n}>
+          <li key={r.n} id={`set-${exercise.exercise_id}-${r.n}`} className="scroll-mt-32">
             <QuickLogRow
               setNumber={r.n}
               weight={toShown(suggest.weight)}
