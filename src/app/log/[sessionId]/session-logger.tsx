@@ -41,6 +41,10 @@ import { createContext } from "react";
 
 // any exercise header can ask to be swapped without threading props
 // through every card
+// the one set you're on right now, as "exerciseId-setNumber". only that row
+// gets the highlight, so in a superset you can't log the wrong exercise.
+const CurrentSetContext = createContext<string | null>(null);
+
 const SwapContext = createContext<{
   open: (ex: Exercise) => void;
   undo: (ex: Exercise) => Promise<void>;
@@ -214,6 +218,22 @@ export function SessionLogger({
     [groups, sets],
   );
 
+  const currentKey = current ? `${current.exerciseId}-${current.setNumber}` : null;
+  // after you log a set, bring the next one to the middle of the screen,
+  // even when it's the first exercise of the superset, above
+  const followNext = useRef(false);
+  useEffect(() => {
+    if (!followNext.current || !currentKey) return;
+    followNext.current = false;
+    const id = window.setTimeout(() => {
+      const el = document.getElementById(`set-${currentKey}`);
+      if (!el) return;
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+    }, 150);
+    return () => window.clearTimeout(id);
+  }, [currentKey]);
+
   const upsert = async (
     exerciseId: string,
     set: {
@@ -226,6 +246,7 @@ export function SessionLogger({
       notes: string | null;
     },
   ) => {
+    if (!set.id) followNext.current = true;
     const { id } = await upsertSessionSet(sessionId, set.id, {
       exercise_id: exerciseId,
       set_number: set.set_number,
@@ -350,6 +371,7 @@ export function SessionLogger({
   return (
     <BaseUnitContext.Provider value={baseUnit}>
     <SwapContext.Provider value={finished ? null : swapApi}>
+    <CurrentSetContext.Provider value={finished ? null : currentKey}>
     <div className="space-y-5">
       <ProgressHeader
         done={workingSetsLogged}
@@ -517,6 +539,7 @@ export function SessionLogger({
         />
       )}
     </div>
+    </CurrentSetContext.Provider>
     </SwapContext.Provider>
     </BaseUnitContext.Provider>
   );
@@ -907,6 +930,7 @@ function SetList({
   const [expandedSetNumber, setExpandedSetNumber] = useState<number | null>(
     null,
   );
+  const currentSet = useContext(CurrentSetContext);
   const weightConv = weightConvention(exercise.name, exercise.equipment, planContext(exercise));
   const kind = weightKind(exercise.name, exercise.equipment, planContext(exercise));
   const base = useContext(BaseUnitContext);
@@ -1026,7 +1050,7 @@ function SetList({
     );
   }
 
-  // the first unlogged set is the one you're on: give it the spotlight
+  // the first unlogged set is where this exercise is up to
   const nextUp = rows.find((r) => !r.logged)?.n ?? null;
 
   const cardio = parseCardio(exercise.prescribed_reps, parseSetCode(exercise.notes).cleanNotes);
@@ -1126,7 +1150,7 @@ function SetList({
               reps={suggest.reps}
               targetText={target.text}
               showTarget={target.perSet}
-              current={r.n === nextUp}
+              current={currentSet === `${exercise.exercise_id}-${r.n}`}
               onExpand={() => setExpandedSetNumber(r.n)}
               onQuickLog={async () => {
                 if (suggest.reps === null || !suggest.weightKnown) {
