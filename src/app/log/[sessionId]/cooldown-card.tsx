@@ -36,9 +36,15 @@ function write(key: string, value: string | null) {
 export default function CooldownCard({
   kind,
   sessionId,
+  standalone = false,
+  onDone,
+  onSkip,
 }: {
   kind: DayKind;
   sessionId: string;
+  standalone?: boolean;
+  onDone?: () => void;
+  onSkip?: () => void;
 }) {
   const preferred = preferredCooldown(kind);
   const [pickId, setPickId] = useState(() => {
@@ -64,9 +70,11 @@ export default function CooldownCard({
   const mark = (next: Saved["state"] | null) => {
     setState(next);
     write(stateKey(sessionId), next ?? null);
+    if (next === "done") onDone?.();
+    if (next === "skipped") onSkip?.();
   };
 
-  if (state === "skipped") {
+  if (state === "skipped" && !standalone) {
     return (
       <section className="card flex min-h-14 items-center gap-3 px-4">
         <span className="display text-[21px]">Cooldown</span>
@@ -79,11 +87,11 @@ export default function CooldownCard({
   }
 
   return (
-    <section className="card overflow-hidden">
+    <section className={standalone ? "" : "card overflow-hidden"}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex min-h-14 w-full items-center gap-3 px-4 text-left"
+        className={`flex min-h-14 w-full items-center gap-3 px-4 text-left ${standalone ? "hidden" : ""}`}
         aria-expanded={open}
       >
         <span className="display text-[21px]">Cooldown</span>
@@ -94,8 +102,8 @@ export default function CooldownCard({
         </svg>
       </button>
 
-      {open && (
-        <div className="space-y-3 px-4 pb-4">
+      {(open || standalone) && (
+        <div className={`space-y-3 ${standalone ? "" : "px-4 pb-4"}`}>
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">

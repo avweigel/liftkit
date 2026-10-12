@@ -52,12 +52,20 @@ function loadPicks(kind: DayKind): Picks {
   };
 }
 
+// "3 x 6/side" is three rounds of 6/side. a dose with no rounds is one go.
+function splitDose(dose: string | undefined): { rounds: number | null; per: string } {
+  const m = (dose ?? "").match(/^\s*(\d+)\s*x\s*(.+)$/i);
+  return m ? { rounds: Number(m[1]), per: m[2] } : { rounds: null, per: dose ?? "" };
+}
+
 export default function WarmupCard({
   kind,
   sessionId,
+  standalone = false,
 }: {
   kind: DayKind;
   sessionId: string;
+  standalone?: boolean;
 }) {
   const [open, setOpen] = useState(true);
   const [picks, setPicks] = useState<Picks>(() => loadPicks(kind));
@@ -94,9 +102,11 @@ export default function WarmupCard({
   const pulse = warmupItem("pulse", picks.pulse)!;
   const mobility = warmupItem("mobility", picks.mobility)!;
   const drills = picks.drills.map((id) => warmupItem("drill", id)!);
-  const drillsDone = drills.filter((d) => done.has(`drill:${d.id}`)).length;
+  // the drills run as a superset: every drill back to back, then repeat
+  const rounds = Math.max(1, ...drills.map((d) => splitDose(d.dose).rounds ?? 1));
+  const roundsDone = Array.from({ length: rounds }, (_, i) => done.has(`round:${i + 1}`)).filter(Boolean).length;
   const complete =
-    done.has("pulse") && done.has("mobility") && (drills.length === 0 || drillsDone >= 2);
+    done.has("pulse") && done.has("mobility") && (drills.length === 0 || roundsDone >= rounds);
 
   const isDefault = JSON.stringify(picks) === JSON.stringify(defaultPicks(kind));
 
@@ -124,7 +134,7 @@ export default function WarmupCard({
     updateDone(next);
   };
 
-  const row = (slot: WarmupSlot, index: number, item: WarmupItem, key: string) => {
+  const row = (slot: WarmupSlot, index: number, item: WarmupItem, key: string, checkable = true) => {
     const swapId = `${slot}:${index}`;
     const exclude = slot === "drill" ? new Set(picks.drills) : new Set([item.id]);
     return (
@@ -138,16 +148,17 @@ export default function WarmupCard({
         onSwap={() => setSwapping(swapping === swapId ? null : swapId)}
         choices={warmupChoices(slot).filter((c) => !exclude.has(c.id))}
         onPick={(id) => swap(slot, index, id)}
+        checkable={checkable}
       />
     );
   };
 
   return (
-    <section className="card overflow-hidden">
+    <section className={standalone ? "" : "card overflow-hidden"}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex min-h-14 w-full items-center gap-3 px-4 text-left"
+        className={`flex min-h-14 w-full items-center gap-3 px-4 text-left ${standalone ? "hidden" : ""}`}
         aria-expanded={open}
       >
         <span className="display text-[21px]">Warm-up</span>
@@ -157,24 +168,50 @@ export default function WarmupCard({
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
-      {open && (
-        <div className="space-y-4 px-4 pb-4">
+      {(open || standalone) && (
+        <div className={`space-y-4 ${standalone ? "" : "px-4 pb-4"}`}>
           <ul className="space-y-1.5">
             {row("pulse", 0, pulse, "pulse")}
             {row("mobility", 0, mobility, "mobility")}
           </ul>
           {drills.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-baseline justify-between">
-                <span className="text-[15px] font-semibold">Then 2 or 3 of these</span>
+            <div className="space-y-2 rounded-xl border border-(--accent-line) p-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-[15px] font-semibold">Superset</span>
                 <span className="label">
-                  <span className="num text-[14px] text-(--foreground)">{drillsDone}</span> of {drills.length} done
+                  {rounds > 1 ? `${rounds} rounds, back to back` : "Once through"}
                 </span>
               </div>
               <ul className="space-y-1.5">
-                {drills.map((d, i) => row("drill", i, d, `drill:${d.id}`))}
+                {drills.map((d, i) =>
+                  row("drill", i, { ...d, dose: splitDose(d.dose).per }, `drill:${d.id}`, false),
+                )}
               </ul>
-              <p className="text-[13px] text-(--muted)">Rest 30 to 60 seconds between sets.</p>
+              <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${rounds}, minmax(0, 1fr))` }}>
+                {Array.from({ length: rounds }, (_, i) => {
+                  const key = `round:${i + 1}`;
+                  const on = done.has(key);
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => toggle(key)}
+                      aria-pressed={on}
+                      className={`flex h-12 items-center justify-center gap-1.5 rounded-xl text-[14px] font-semibold transition-colors ${
+                        on ? "bg-(--ok-soft) text-(--ok)" : "bg-(--surface-2) text-(--muted)"
+                      }`}
+                    >
+                      {on && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                          <path d="M5 12.5l4.5 4.5L19 7.5" />
+                        </svg>
+                      )}
+                      Round {i + 1}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[13px] text-(--muted)">Rest 30 to 60 seconds after each round.</p>
             </div>
           )}
           {kind === "metcon" && (
@@ -209,7 +246,9 @@ function WarmupRow({
   onSwap,
   choices,
   onPick,
+  checkable = true,
 }: {
+  checkable?: boolean;
   item: WarmupItem;
   done: boolean;
   onToggle: () => void;
@@ -220,15 +259,15 @@ function WarmupRow({
   onPick: (id: string) => void;
 }) {
   return (
-    <li className={`rounded-xl transition-colors ${done ? "bg-(--ok-soft)" : "bg-(--surface-2)"}`}>
+    <li className={`rounded-xl transition-colors ${done && checkable ? "bg-(--ok-soft)" : "bg-(--surface-2)"}`}>
       <div className="flex items-start">
         <button
           type="button"
-          onClick={onToggle}
-          aria-pressed={done}
-          className="flex min-h-12 flex-1 items-start gap-3 p-3 text-left"
+          onClick={checkable ? onToggle : undefined}
+          aria-pressed={checkable ? done : undefined}
+          className={`flex min-h-12 flex-1 items-start gap-3 p-3 text-left ${checkable ? "" : "cursor-default"}`}
         >
-          <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${done ? "bg-(--ok) text-(--surface)" : "border-2 border-(--border)"}`}>
+          <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${checkable ? "" : "hidden"} ${done ? "bg-(--ok) text-(--surface)" : "border-2 border-(--border)"}`}>
             {done && (
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M5 12.5l4.5 4.5L19 7.5" />

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatDayLabel } from "@/lib/display/format-day";
 import { parseSetCode } from "@/lib/set-code";
 import { formatRxReps } from "@/lib/display/reps";
+import { preferredCooldown } from "@/lib/program/cooldowns";
 import { StartDayButton, StartOtherDayButton } from "./dashboard-start-button";
 import { TonightCardio } from "./tonight-cardio";
 import {
@@ -187,20 +188,36 @@ export async function Dashboard({ userId }: Props) {
       .map((s) => s.plan_day_id as string),
   );
 
-  const morningState: StepState = todaySession?.finished_at
-    ? "done"
-    : "now";
-  const coreState: StepState = core?.doneToday
-    ? "done"
-    : morningState === "done"
-      ? "now"
-      : "later";
-  const eveningState: StepState =
-    cardioTonight.length > 0
-      ? "done"
-      : morningState === "done" && coreState === "done"
-        ? "now"
-        : "later";
+  const { data: routineRows } = await supabase
+    .from("routine_logs")
+    .select("kind, status")
+    .eq("user_id", userId)
+    .eq("logged_on", local.iso)
+    .returns<Array<{ kind: "warmup" | "cooldown"; status: "done" | "skipped" }>>();
+  const routine = (k: "warmup" | "cooldown") =>
+    routineRows?.find((r) => r.kind === k)?.status ?? null;
+  // warm-up and cooldown only make sense around a lifting day
+  const liftingDay = !!todayDay && todayProfile?.kind !== "core";
+  const cooldownPick = liftingDay && todayProfile ? preferredCooldown(todayProfile.kind) : null;
+
+  // the day line: the first step not done after the last one you did is
+  // "now". anything you passed without logging just sits there, quiet.
+  const steps = [
+    { key: "warmup", show: liftingDay, done: !!routine("warmup") },
+    { key: "workout", show: true, done: !!todaySession?.finished_at },
+    { key: "cooldown", show: liftingDay, done: !!routine("cooldown") },
+    { key: "core", show: !!core, done: !!core?.doneToday },
+    { key: "cardio", show: true, done: cardioTonight.length > 0 },
+  ].filter((st) => st.show);
+  const lastDone = steps.reduce((acc, st, i) => (st.done ? i : acc), -1);
+  const nowIdx = steps.findIndex((st, i) => !st.done && i > lastDone);
+  const stateOf = (key: string): StepState => {
+    const i = steps.findIndex((st) => st.key === key);
+    if (i < 0) return "later";
+    if (steps[i].done) return "done";
+    return i === nowIdx ? "now" : "later";
+  };
+  const morningState = stateOf("workout");
 
   const dateLine = new Intl.DateTimeFormat("en-GB", {
     weekday: "long",
@@ -241,6 +258,19 @@ export async function Dashboard({ userId }: Props) {
         <PickPlanCard hasAnyPlan={(planCount ?? 0) > 0} />
       ) : (
         <ol className="relative space-y-6">
+          {liftingDay && (
+            <Step state={stateOf("warmup")} time="Before lifting" title="Warm-up">
+              <RoutineCard
+                href="/warmup"
+                status={routine("warmup")}
+                title="Warm-up"
+                line="Pulse raiser, mobility, then a quick superset"
+                cta="Start warm-up"
+                active={stateOf("warmup") === "now"}
+              />
+            </Step>
+          )}
+
           <Step state={morningState} time="Morning" title="Workout">
             {todayDay ? (
               <WorkoutCard day={todayDay} session={todaySession} />
@@ -249,13 +279,26 @@ export async function Dashboard({ userId }: Props) {
             )}
           </Step>
 
+          {liftingDay && cooldownPick && (
+            <Step state={stateOf("cooldown")} time="After lifting" title="Cooldown">
+              <RoutineCard
+                href="/cooldown"
+                status={routine("cooldown")}
+                title={cooldownPick.name}
+                line={`${cooldownPick.dose ?? ""}, or swap for a stretch`}
+                cta="Start cooldown"
+                active={stateOf("cooldown") === "now"}
+              />
+            </Step>
+          )}
+
           {core && (
-            <Step state={coreState} time="After lifting" title="Core">
+            <Step state={stateOf("core")} time="After cooldown" title="Core">
               <CoreCard core={core} />
             </Step>
           )}
 
-          <Step state={eveningState} time="Evening" title="Cardio" last>
+          <Step state={stateOf("cardio")} time="Evening" title="Cardio" last>
             <TonightCardio
               suggestions={cardioSuggestions}
               logged={cardioTonight}
@@ -485,6 +528,45 @@ function WorkoutCard({
           </Link>
         )}
       </div>
+    </section>
+  );
+}
+
+function RoutineCard({
+  href,
+  status,
+  title,
+  line,
+  cta,
+  active,
+}: {
+  href: string;
+  status: "done" | "skipped" | null;
+  title: string;
+  line: string;
+  cta: string;
+  active: boolean;
+}) {
+  if (status) {
+    return (
+      <Link href={href} className="card flex items-center justify-between gap-3 p-4">
+        <div className="min-w-0">
+          <div className="truncate font-semibold">{title}</div>
+          <div className="text-[13px] text-(--muted)">{status === "done" ? "Done" : "Skipped today"}</div>
+        </div>
+        <span className="text-[13px] font-semibold text-(--muted)">View</span>
+      </Link>
+    );
+  }
+  return (
+    <section className="card space-y-3 p-4">
+      <div>
+        <div className="display text-[20px]">{title}</div>
+        <p className="text-[14px] text-(--muted)">{line}</p>
+      </div>
+      <Link href={href} className={`btn btn-block ${active ? "btn-primary" : "btn-secondary"}`}>
+        {cta}
+      </Link>
     </section>
   );
 }

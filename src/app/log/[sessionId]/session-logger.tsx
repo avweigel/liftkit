@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { useContext, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   deleteSessionSet,
@@ -51,8 +50,6 @@ const SwapContext = createContext<{
 } | null>(null);
 import { howTo } from "@/lib/program/how-to";
 
-const WarmupCard = dynamic(() => import("./warmup-card"), { ssr: false });
-const CooldownCard = dynamic(() => import("./cooldown-card"), { ssr: false });
 
 type LastSessionSet = {
   set_number: number;
@@ -131,7 +128,6 @@ export function SessionLogger({
   activeSupersetCodes,
   planName,
   hasPlanDay,
-  warmup,
   baseUnit,
 }: Props) {
   const [sets, setSets] = useState<SessionSet[]>(initialSets);
@@ -387,7 +383,6 @@ export function SessionLogger({
         </p>
       )}
 
-      {warmup && !finished && <WarmupCard kind={warmup.kind} sessionId={sessionId} />}
 
       <div className="space-y-4">
         {groups.map((g) => {
@@ -448,7 +443,6 @@ export function SessionLogger({
         )}
       </div>
 
-      {warmup && !finished && <CooldownCard kind={warmup.kind} sessionId={sessionId} />}
 
       <label className="card block space-y-2 p-4">
         <span className="label">Notes</span>
