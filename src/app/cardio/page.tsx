@@ -33,7 +33,11 @@ export default async function CardioPage({ searchParams }: Props) {
       <main className="mx-auto w-full max-w-lg flex-1 space-y-6 px-4 pt-4 pb-tabbar">
         <PageHeader back={{ href: "/", label: "Today" }} eyebrow="Outside" title={type.title} />
         <section className="card space-y-3 p-5">
-          <h2 className="display text-[20px]">{guide.title}</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="display text-[20px]">{guide.title}</h2>
+            <span className="chip chip-accent">{guide.goal}</span>
+          </div>
+          <p className="text-[14px] text-(--muted)">{guide.why}</p>
           <ul className="space-y-2">
             {guide.points.map((pt) => (
               <li key={pt} className="flex gap-2.5 text-[15px]">
@@ -58,6 +62,10 @@ export default async function CardioPage({ searchParams }: Props) {
           title={plan.name}
           subtitle={plan.summary}
         />
+        <section className="rounded-xl bg-(--accent-soft) px-4 py-3">
+          <div className="label text-(--accent)">Why: {plan.goal}</div>
+          <p className="mt-0.5 text-[14px]">{plan.why}</p>
+        </section>
         <CardioRun kind={kind} plan={plan} />
       </main>
     );
@@ -77,6 +85,7 @@ export default async function CardioPage({ searchParams }: Props) {
               <div className="min-w-0 flex-1">
                 <div className="display text-[20px]">{p.machine}</div>
                 <div className="text-[14px] text-(--muted)">{p.name}</div>
+                <span className="chip chip-accent mt-1.5">{p.goal}</span>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1.5">
                 <Shape plan={p} />

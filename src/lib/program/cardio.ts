@@ -19,9 +19,9 @@ export const CARDIO_TYPES: Record<
   intervals: {
     title: "Intervals",
     minutes: 35,
-    what: "10 min easy, 6 x 2 min hard with 2 min easy between, 5 min easy.",
+    what: "VO2 max work: 4 x 4 min hard with 3 min easy between.",
     outside: "Run the hard parts",
-    gym: "Assault bike or rower: 10 x 30 s hard, 90 s easy",
+    gym: "Treadmill, rower or bike 4 x 4, or assault bike sprints",
   },
   tempo: {
     title: "Tempo or long",
