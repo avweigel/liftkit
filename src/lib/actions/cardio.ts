@@ -9,6 +9,7 @@ const logSchema = z.object({
   kind: z.enum(["easy", "intervals", "tempo", "walk"]),
   minutes: z.number().int().min(1).max(600).nullable(),
   place: z.enum(["outside", "gym"]).nullable(),
+  plan_id: z.string().max(60).nullable().optional(),
 });
 
 export async function logCardio(input: z.input<typeof logSchema>) {
@@ -24,6 +25,7 @@ export async function logCardio(input: z.input<typeof logSchema>) {
     kind: parsed.kind,
     minutes: parsed.minutes,
     place: parsed.place,
+    plan_id: parsed.place === "gym" ? (parsed.plan_id ?? null) : null,
   });
   if (error) throw new Error(error.message);
   revalidatePath("/");

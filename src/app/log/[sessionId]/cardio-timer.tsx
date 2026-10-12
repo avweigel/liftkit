@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { chime, keepAwake, unlockAudio } from "@/lib/display/chime";
 
 // level is the treadmill incline. stretch steps have none and show by name.
-export type CardioStep = { label: string; seconds: number; level?: number };
+export type CardioStep = { label: string; seconds: number; level?: number; sub?: string };
 
 // "20 min" in the reps, and optionally "Incline 3, 5, 7 (2 min each)" in
 // the notes, turn a cardio exercise into a timer that calls out each change
@@ -30,10 +30,12 @@ export function CardioTimer({
   totalSeconds,
   steps,
   onComplete,
+  nowLabel = "Incline now",
 }: {
   totalSeconds: number;
   steps: CardioStep[];
   onComplete?: () => void;
+  nowLabel?: string;
 }) {
   const incline = steps.length > 0 && steps.every((st) => st.level != null);
   const completeRef = useRef(onComplete);
@@ -177,11 +179,18 @@ export function CardioTimer({
         <div className="min-w-0 flex-1">
           {steps.length > 0 && (
             <>
-              <p className="label">{doneAll ? "Finished" : started ? (incline ? "Incline now" : "Now") : incline ? "Starts at" : "First"}</p>
+              <p className="label">{doneAll ? "Finished" : started ? (incline ? nowLabel : "Now") : incline ? "Starts at" : "First"}</p>
               {incline ? (
-                <p className={`num text-[40px] leading-none ${flashing ? "" : "text-(--accent)"}`}>{current?.label}</p>
+                <p
+                  className={`num leading-none ${(current?.label.length ?? 0) > 7 ? "text-[26px]" : "text-[40px]"} ${flashing ? "" : "text-(--accent)"}`}
+                >
+                  {current?.label}
+                </p>
               ) : (
                 <p className={`display text-[22px] leading-tight ${flashing ? "" : "text-(--accent)"}`}>{doneAll ? "Nice work" : current?.label}</p>
+              )}
+              {current?.sub && !doneAll && (
+                <p className="mt-1 text-[14px] font-semibold">{current.sub}</p>
               )}
               {next && !doneAll && (
                 <p className={`mt-1 text-[13px] ${flashing ? "" : "text-(--muted)"}`}>Then {incline ? next.label : next.label.toLowerCase()}</p>

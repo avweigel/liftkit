@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { deleteCardio, logCardio } from "@/lib/actions/cardio";
+import { CardioTimer } from "./log/[sessionId]/cardio-timer";
+import { OUTSIDE_GUIDE, cardioPlan, plansFor } from "@/lib/program/cardio-plans";
 import {
   CARDIO_TYPES,
   type CardioKind,
@@ -56,7 +58,7 @@ export function TonightCardio({
             <CardioLogForm kind={best.kind} onDone={() => setOpen(null)} onCancel={() => setOpen(null)} />
           ) : (
             <button type="button" onClick={() => setOpen(best.kind)} className="btn btn-secondary btn-block">
-              Log {CARDIO_TYPES[best.kind].title.toLowerCase()}
+              See the plan
             </button>
           )}
         </div>
@@ -131,16 +133,35 @@ function CardioLogForm({
   onCancel: () => void;
 }) {
   const t = CARDIO_TYPES[kind];
-  const [minutes, setMinutes] = useState(t.minutes);
-  const [place, setPlace] = useState<"outside" | "gym">("outside");
+  const plans = plansFor(kind);
+  const [place, setPlace] = useState<"outside" | "gym">("gym");
+  const [planId, setPlanId] = useState<string>(() => {
+    try {
+      const saved = window.localStorage.getItem(`liftkit.cardio.plan.${kind}`);
+      if (saved && plans.some((p) => p.id === saved)) return saved;
+    } catch {}
+    return plans[0]?.id ?? "";
+  });
+  const plan = cardioPlan(planId);
+  const [minutes, setMinutes] = useState(plan?.minutes ?? t.minutes);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const guide = OUTSIDE_GUIDE[kind];
+
+  const pickPlan = (id: string) => {
+    setPlanId(id);
+    const p = cardioPlan(id);
+    if (p) setMinutes(p.minutes);
+    try {
+      window.localStorage.setItem(`liftkit.cardio.plan.${kind}`, id);
+    } catch {}
+  };
 
   const save = () => {
     setError(null);
     startTransition(async () => {
       try {
-        await logCardio({ kind, minutes, place });
+        await logCardio({ kind, minutes, place, plan_id: place === "gym" ? planId : null });
         onDone();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't save. Try again.");
@@ -150,15 +171,14 @@ function CardioLogForm({
 
   return (
     <div className="space-y-3 rounded-xl bg-(--background) p-3">
-      <p className="text-[14px]">{t.what}</p>
       <div className="grid grid-cols-2 gap-1 rounded-xl bg-(--surface-2) p-1">
-        {(["outside", "gym"] as const).map((p) => (
+        {(["gym", "outside"] as const).map((p) => (
           <button
             key={p}
             type="button"
             onClick={() => setPlace(p)}
             aria-pressed={place === p}
-            className={`h-10 rounded-lg text-[14px] font-semibold capitalize transition-colors ${
+            className={`h-10 rounded-lg text-[14px] font-semibold transition-colors ${
               place === p ? "bg-(--surface) text-(--foreground) shadow-sm" : "text-(--muted)"
             }`}
           >
@@ -166,13 +186,66 @@ function CardioLogForm({
           </button>
         ))}
       </div>
-      <p className="text-[13px] text-(--muted)">{place === "outside" ? t.outside : t.gym}</p>
+
+      {place === "outside" ? (
+        <div className="space-y-2">
+          <p className="font-semibold">{guide.title}</p>
+          <ul className="space-y-1.5">
+            {guide.points.map((pt) => (
+              <li key={pt} className="flex gap-2 text-[14px]">
+                <span className="mt-[8px] h-1.5 w-1.5 shrink-0 rounded-full bg-(--accent)" aria-hidden />
+                {pt}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Machine">
+            {plans.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => pickPlan(p.id)}
+                aria-pressed={p.id === planId}
+                className={`h-9 rounded-full px-3 text-[13px] font-semibold transition-colors ${
+                  p.id === planId ? "bg-(--accent) text-(--accent-contrast)" : "bg-(--surface-2) text-(--muted)"
+                }`}
+              >
+                {p.machine === "Treadmill run" && plans.filter((x) => x.machine === p.machine).length > 1
+                  ? p.name
+                  : p.machine}
+              </button>
+            ))}
+          </div>
+          {plan && (
+            <>
+              <div>
+                <p className="font-semibold">
+                  {plan.name} <span className="num text-[14px] font-normal text-(--muted)">{plan.minutes} min</span>
+                </p>
+                <p className="text-[13px] text-(--muted)">{plan.summary}</p>
+              </div>
+              <CardioTimer
+                key={plan.id}
+                totalSeconds={plan.steps.reduce((n, st) => n + st.seconds, 0)}
+                steps={plan.steps}
+                nowLabel="Set to"
+              />
+              <p className="text-[12px] text-(--muted)">
+                The numbers are a starting point. If the effort line and the number disagree, go by the effort.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <span className="label">Minutes</span>
         <div className="flex items-center gap-1">
-          <button type="button" onClick={() => setMinutes((m) => Math.max(5, m - 5))} className="btn btn-secondary btn-sm w-11 px-0" aria-label="5 minutes less">−</button>
+          <button type="button" onClick={() => setMinutes((v) => Math.max(5, v - 5))} className="btn btn-secondary btn-sm w-11 px-0" aria-label="5 minutes less">−</button>
           <span className="num w-12 text-center text-[26px]">{minutes}</span>
-          <button type="button" onClick={() => setMinutes((m) => Math.min(180, m + 5))} className="btn btn-secondary btn-sm w-11 px-0" aria-label="5 minutes more">+</button>
+          <button type="button" onClick={() => setMinutes((v) => Math.min(180, v + 5))} className="btn btn-secondary btn-sm w-11 px-0" aria-label="5 minutes more">+</button>
         </div>
       </div>
       <div className="flex gap-2">
@@ -180,7 +253,7 @@ function CardioLogForm({
           Cancel
         </button>
         <button type="button" onClick={save} disabled={pending} className="btn btn-primary flex-[2]">
-          {pending ? "Saving…" : "Save"}
+          {pending ? "Saving…" : "Log it"}
         </button>
       </div>
       {error && <p className="text-[13px] text-(--danger)">{error}</p>}
