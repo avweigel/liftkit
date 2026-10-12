@@ -105,11 +105,11 @@ export const CARDIO_PLANS: CardioPlan[] = [
     kind: "easy",
     machine: "Stair climber",
     name: "Easy stairs",
-    minutes: 25,
+    minutes: 30,
     summary: "Upright, light hands, whole foot on each step.",
     steps: [
       step("Level 4", WARM, 5, 3),
-      ...repeat(3, [step("Level 6", EASY, 3, 4), step("Level 7", STEADY, 2, 6)]),
+      ...repeat(4, [step("Level 6", EASY, 3, 4), step("Level 7", STEADY, 2, 6)]),
       step("Level 4", COOL, 5, 2),
     ],
   },
