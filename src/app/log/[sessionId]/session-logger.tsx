@@ -1420,7 +1420,7 @@ function SetEditor({
 
   const submit = async () => {
     setError(null);
-    const weightNum = weight.trim() === "" ? null : Number(weight);
+    const weightNum = weight.trim() === "" ? null : Number(weight.replace(/,/g, "."));
     const repsNum = Number(reps);
     if (reps.trim() === "" || !Number.isInteger(repsNum) || repsNum < 0) {
       setError("Enter the reps you did.");
@@ -1593,7 +1593,8 @@ function Stepper({
           type="text"
           inputMode={integer ? "numeric" : "decimal"}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          // a Swedish keyboard types 32,5 for 32.5
+          onChange={(e) => onChange(e.target.value.replace(/,/g, "."))}
           disabled={disabled}
           placeholder={allowEmpty ? "BW" : "0"}
           aria-label={label}
