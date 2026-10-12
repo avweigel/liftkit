@@ -3,7 +3,7 @@ import type { DayProfile } from "@/lib/program/day-profile";
 export type CardioKind = "easy" | "intervals" | "tempo" | "walk";
 
 export const HARD_KINDS: CardioKind[] = ["intervals", "tempo"];
-export const MAX_HARD_PER_WEEK = 2;
+export const MAX_HARD_PER_WEEK = 3;
 
 export const CARDIO_TYPES: Record<
   CardioKind,
@@ -48,6 +48,9 @@ export type CardioContext = {
   hardThisWeek: number;
   // 1 = monday ... 7 = sunday
   weekday: number;
+  // days since the last high heart rate session (hard cardio or a metcon
+  // morning); null = none in the last week
+  daysSinceHigh: number | null;
 };
 
 export type CardioSuggestion = {
@@ -55,72 +58,84 @@ export type CardioSuggestion = {
   recommended: boolean;
   blocked: boolean;
   reason: string;
+  // the plan to put first on the machine page
+  plan?: string;
 };
 
-// ranked suggestions for tonight. the order is the recommendation; blocked
-// sessions stay in the list (greyed out) so the reason is visible.
+// the aim: become a stronger runner and get your heart rate high every
+// second day or so, without stealing recovery from the lifting.
+//
+// - high heart rate (4 x 4 or tempo) when it's been 2+ days and the legs
+//   are free: not after a heavy leg morning, not before one, not on a
+//   metcon day (that was the high heart rate)
+// - running is the default machine, because running gets you better at
+//   running. after a heavy leg morning the easy option moves to no impact
+// - weekends get the tempo or long run, weekdays the 4 x 4
 export function suggestCardio(ctx: CardioContext): CardioSuggestion[] {
-  const { today, tomorrow, hardThisWeek, weekday } = ctx;
+  const { today, tomorrow, hardThisWeek, weekday, daysSinceHigh } = ctx;
+  const weekend = weekday >= 6;
+  const legsTired = !!today?.heavyLegs;
 
   let hardBlock: string | null = null;
-  if (tomorrow?.heavyLegs) {
-    hardBlock = `Tomorrow is ${legWord(tomorrow)}. Keep tonight easy so your legs are fresh.`;
+  if (today?.kind === "metcon") {
+    hardBlock = "The metcon this morning was today's high heart rate work.";
+  } else if (tomorrow?.heavyLegs) {
+    hardBlock = `Tomorrow is ${legWord(tomorrow)}. Hard running tonight would cost you there.`;
+  } else if (legsTired) {
+    hardBlock = `You did ${legWord(today!)} this morning. Your legs need tonight to recover.`;
+  } else if (daysSinceHigh === 0 || daysSinceHigh === 1) {
+    hardBlock = "You went hard in the last day. Easy tonight lets you go hard again soon.";
   } else if (hardThisWeek >= MAX_HARD_PER_WEEK) {
-    hardBlock = `You've done ${hardThisWeek} hard sessions this week already.`;
-  } else if (today?.heavyLegs) {
-    hardBlock = `You did ${legWord(today)} this morning. Let your legs recover.`;
-  } else if (today?.kind === "metcon") {
-    hardBlock = "You already did conditioning this morning.";
+    hardBlock = `${hardThisWeek} hard sessions this week already. That's plenty next to lifting.`;
   }
 
-  const weekend = weekday >= 6;
   const hardKind: CardioKind = weekend ? "tempo" : "intervals";
   const otherHard: CardioKind = weekend ? "intervals" : "tempo";
+  const hardPlan = weekend ? "tempo-run-progression" : "int-run";
+  const otherHardPlan = weekend ? "int-run" : "tempo-run";
 
-  const hardReason = tomorrow?.kind === "metcon"
-    ? "Good night for it. If your legs are heavy tomorrow, do the metcon's easy version."
-    : "Good night for a hard session: nothing heavy for your legs tomorrow.";
+  const since =
+    daysSinceHigh == null ? "It's been a while since your heart rate was really up." : `${daysSinceHigh} days since your last high heart rate session.`;
+  const hardReason = weekend
+    ? `${since} A progression run builds threshold and finishing strength.`
+    : `${since} The 4 x 4 run is the best single session for VO2 max and running fitness.`;
 
-  const easyReason = tomorrow?.heavyLegs
-    ? "Keeps blood moving without tiring your legs for tomorrow."
-    : today?.heavyLegs
-      ? "Easy movement helps your legs recover from this morning."
-      : "Builds your aerobic base and helps recovery.";
-
-  const walkReason = today?.hard || tomorrow?.heavyLegs
-    ? "The gentlest option after a big day."
-    : "Low energy? This counts, and it's always fine.";
+  // easy: run when the legs are fresh, no impact when they aren't
+  const easyPlan = legsTired ? "easy-elliptical" : "easy-run";
+  const easyReason = legsTired
+    ? "Easy aerobic with no impact. It flushes your legs and still builds your base."
+    : tomorrow?.heavyLegs
+      ? "An easy run builds your running base and leaves your legs fresh for tomorrow."
+      : "Easy running is where most running fitness comes from.";
+  const walkReason =
+    legsTired || today?.kind === "metcon"
+      ? "The gentlest option after a big morning. Recovery is training too."
+      : "Low energy? A hill walk still counts.";
 
   if (hardBlock) {
-    const walkFirst = !!today?.heavyLegs || today?.kind === "metcon";
-    const easyFirst: CardioSuggestion[] = walkFirst
-      ? [
-          { kind: "walk", recommended: true, blocked: false, reason: walkReason },
-          { kind: "easy", recommended: false, blocked: false, reason: easyReason },
-        ]
-      : [
-          { kind: "easy", recommended: true, blocked: false, reason: easyReason },
-          { kind: "walk", recommended: false, blocked: false, reason: walkReason },
-        ];
+    const walkFirst = legsTired || today?.kind === "metcon";
+    const easy: CardioSuggestion = { kind: "easy", recommended: !walkFirst, blocked: false, reason: easyReason, plan: easyPlan };
+    const walk: CardioSuggestion = { kind: "walk", recommended: walkFirst, blocked: false, reason: walkReason, plan: "walk-hill" };
     return [
-      ...easyFirst,
-      { kind: hardKind, recommended: false, blocked: true, reason: hardBlock },
-      { kind: otherHard, recommended: false, blocked: true, reason: hardBlock },
+      ...(walkFirst ? [walk, easy] : [easy, walk]),
+      { kind: hardKind, recommended: false, blocked: true, reason: hardBlock, plan: hardPlan },
+      { kind: otherHard, recommended: false, blocked: true, reason: hardBlock, plan: otherHardPlan },
     ];
   }
 
+  // free legs but a high session only a couple of days ago is still fine:
+  // recommend hard from day 2 on
   return [
-    { kind: hardKind, recommended: true, blocked: false, reason: hardReason },
-    { kind: "easy", recommended: false, blocked: false, reason: easyReason },
-    { kind: "walk", recommended: false, blocked: false, reason: walkReason },
+    { kind: hardKind, recommended: true, blocked: false, reason: hardReason, plan: hardPlan },
+    { kind: "easy", recommended: false, blocked: false, reason: easyReason, plan: easyPlan },
     {
       kind: otherHard,
       recommended: false,
       blocked: false,
-      reason: weekend
-        ? "Fine too, but tempo or long suits the weekend."
-        : "Fine too, but save tempo or long for Sunday.",
+      reason: weekend ? "The 4 x 4 works too if you'd rather go short and sharp." : "Tempo works too if you'd rather settle into one long hard block.",
+      plan: otherHardPlan,
     },
+    { kind: "walk", recommended: false, blocked: false, reason: walkReason, plan: "walk-hill" },
   ];
 }
 

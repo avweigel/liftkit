@@ -7,7 +7,7 @@ import { OUTSIDE_GUIDE, cardioPlan, plansFor, type CardioPlan } from "@/lib/prog
 import { CardioRun, OutsideLog } from "./cardio-screens";
 
 type Props = {
-  searchParams: Promise<{ kind?: string; place?: string; plan?: string }>;
+  searchParams: Promise<{ kind?: string; place?: string; plan?: string; pick?: string }>;
 };
 
 function isKind(k: string | undefined): k is CardioKind {
@@ -71,7 +71,9 @@ export default async function CardioPage({ searchParams }: Props) {
     );
   }
 
-  const plans = plansFor(kind);
+  // today's best machine first, from the Today card's suggestion
+  const pick = cardioPlan(params.pick)?.kind === kind ? params.pick : undefined;
+  const plans = plansFor(kind).sort((a, b) => Number(b.id === pick) - Number(a.id === pick));
   return (
     <main className="mx-auto w-full max-w-lg flex-1 space-y-5 px-4 pt-4 pb-tabbar">
       <PageHeader back={{ href: "/", label: "Today" }} eyebrow="Gym" title={type.title} subtitle="Pick a machine." />
@@ -85,7 +87,10 @@ export default async function CardioPage({ searchParams }: Props) {
               <div className="min-w-0 flex-1">
                 <div className="display text-[20px]">{p.machine}</div>
                 <div className="text-[14px] text-(--muted)">{p.name}</div>
-                <span className="chip chip-accent mt-1.5">{p.goal}</span>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {p.id === pick && <span className="chip chip-ok">Best today</span>}
+                  <span className="chip chip-accent">{p.goal}</span>
+                </div>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1.5">
                 <Shape plan={p} />

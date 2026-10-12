@@ -57,7 +57,7 @@ export function TonightCardio({
           {/* where first: it's what you know when you walk out the door */}
           <div className="grid grid-cols-2 gap-2">
             <Link
-              href={`/cardio?kind=${chosen.kind}&place=gym`}
+              href={`/cardio?kind=${chosen.kind}&place=gym${chosen.plan ? `&pick=${chosen.plan}` : ""}`}
               className={`btn ${logged.length > 0 ? "btn-secondary" : "btn-primary"}`}
             >
               Gym

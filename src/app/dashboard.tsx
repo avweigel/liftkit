@@ -172,11 +172,32 @@ export async function Dashboard({ userId }: Props) {
   const cardioTonight = (cardioRows ?? []).filter(
     (r) => r.logged_on === local.iso,
   );
+  // the last time your heart rate was really up: hard cardio, or a metcon
+  // morning, in the last week
+  const { data: recentHard } = await supabase
+    .from("cardio_logs")
+    .select("logged_on, kind")
+    .eq("user_id", userId)
+    .gte("logged_on", addDays(local.iso, -7))
+    .in("kind", HARD_KINDS)
+    .returns<Array<{ logged_on: string; kind: CardioKind }>>();
+  const highDays = [
+    ...(recentHard ?? []).map((r) => r.logged_on),
+    ...sessions
+      .filter((x) => x.finished_at && /metcon|conditioning/i.test(x.plan_day?.name ?? ""))
+      .map(sessionDay),
+  ].filter((d) => d >= addDays(local.iso, -7));
+  const lastHigh = highDays.sort().at(-1) ?? null;
+  const daysSinceHigh = lastHigh
+    ? Math.round((Date.parse(`${local.iso}T12:00:00Z`) - Date.parse(`${lastHigh}T12:00:00Z`)) / 86_400_000)
+    : null;
+
   const cardioSuggestions = suggestCardio({
     today: todayProfile,
     tomorrow: tomorrowProfile,
     hardThisWeek,
     weekday: local.weekday,
+    daysSinceHigh,
   });
 
   const core = await loadCore(supabase, userId, local.iso, todayProfile);
