@@ -464,19 +464,17 @@ export function SessionLogger({
         />
       </label>
 
+      {/* at the end of the page, not pinned under your thumb mid-workout.
+          it only turns into the loud button once every set is logged */}
       {!finished && (
-        <div className="safe-bottom fixed inset-x-0 bottom-0 z-20 border-t border-(--border) bg-(--background)/94 backdrop-blur-md">
-          <div className="mx-auto flex max-w-lg items-center gap-3 px-4 pt-3">
-            <button
-              type="button"
-              onClick={onFinishTap}
-              disabled={pending}
-              className="btn btn-primary btn-block"
-            >
-              {pending ? "Finishing…" : "Finish workout"}
-            </button>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={onFinishTap}
+          disabled={pending}
+          className={`btn btn-block ${workingSetsLogged >= totalSets && totalSets > 0 ? "btn-primary" : "btn-secondary"}`}
+        >
+          {pending ? "Finishing…" : "Finish workout"}
+        </button>
       )}
 
       {pickerOpen && (
@@ -515,7 +513,7 @@ export function SessionLogger({
           onClick={() => setRestSecondsLeft(null)}
           aria-label="Skip rest"
           className="fixed left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-(--foreground) py-2 pr-4 pl-3 text-(--background) shadow-lg"
-          style={{ bottom: "calc(env(safe-area-inset-bottom) + 5.5rem)" }}
+          style={{ bottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
         >
           <span className="text-[13px] font-semibold opacity-70">Rest</span>
           <span className="num text-[22px] leading-none">{formatRest(restSecondsLeft)}</span>
@@ -599,7 +597,7 @@ function JumpToCurrent({
         if (entry.isIntersecting) setAway(null);
         else setAway(entry.boundingClientRect.top < 0 ? "up" : "down");
       },
-      { rootMargin: "-120px 0px -110px 0px" },
+      { rootMargin: "-120px 0px -60px 0px" },
     );
     io.observe(el);
     return () => io.disconnect();
@@ -614,7 +612,7 @@ function JumpToCurrent({
       }
       aria-label={`Back to your current set: ${label}`}
       className="fixed left-1/2 z-30 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-2 rounded-full border border-(--accent-line) bg-(--surface) py-2.5 pr-4 pl-3 shadow-lg transition-[bottom] duration-200"
-      style={{ bottom: `calc(env(safe-area-inset-bottom) + ${raised ? "9.5rem" : "5.5rem"})` }}
+      style={{ bottom: `calc(env(safe-area-inset-bottom) + ${raised ? "5rem" : "1.25rem"})` }}
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-(--accent)" aria-hidden>
         {away === "up" ? <path d="M12 19V5M5 12l7-7 7 7" /> : <path d="M12 5v14M5 12l7 7 7-7" />}
@@ -670,6 +668,16 @@ function ProgressHeader({
 
 // ----- Solo exercise (not in a superset) -----
 
+// the card holding the set you're on gets an accent outline and a faint
+// tint, readable at a glance from the bench
+function useIsActive(exerciseIds: string[]): boolean {
+  const current = useContext(CurrentSetContext);
+  return !!current && exerciseIds.some((id) => current.startsWith(`${id}-`));
+}
+
+const ACTIVE_CARD =
+  "ring-2 ring-(--accent-line) bg-[color-mix(in_oklab,var(--surface)_93%,var(--accent))]";
+
 function SoloExerciseCard({
   exercise,
   sets,
@@ -688,8 +696,9 @@ function SoloExerciseCard({
   finished: boolean;
 }) {
   const letter = parseSetCode(exercise.notes).code?.letter ?? null;
+  const active = useIsActive([exercise.exercise_id]);
   return (
-    <section className="card space-y-3 p-4">
+    <section className={`card space-y-3 p-4 transition-shadow ${active ? ACTIVE_CARD : ""}`}>
       <ExerciseHeader
         exercise={exercise}
         badge={letter}
@@ -728,10 +737,15 @@ function SupersetBlock({
   onRemoveExtra?: (extraId: string) => Promise<void>;
   finished: boolean;
 }) {
+  const active = useIsActive(exercises.map((e) => e.exercise_id));
   return (
-    <section className="card overflow-hidden">
+    <section className={`card overflow-hidden transition-shadow ${active ? ACTIVE_CARD : ""}`}>
       <div className="flex items-center gap-2 px-4 pt-4">
-        <span className="display flex h-7 w-7 items-center justify-center rounded-lg bg-(--accent-soft) text-[16px] text-(--accent)">
+        <span
+          className={`display flex h-7 w-7 items-center justify-center rounded-lg text-[16px] ${
+            active ? "bg-(--accent) text-(--accent-contrast)" : "bg-(--accent-soft) text-(--accent)"
+          }`}
+        >
           {letter}
         </span>
         <span className="label">

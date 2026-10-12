@@ -403,7 +403,7 @@ export default async function LogSessionPage({ params }: Props) {
       : null;
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 space-y-5 px-4 pb-32">
+    <main className="mx-auto w-full max-w-lg flex-1 space-y-5 px-4 pb-24">
       <header className="space-y-1 pt-[max(env(safe-area-inset-top),0.5rem)]">
         <Link
           href="/"
