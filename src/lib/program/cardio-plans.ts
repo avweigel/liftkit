@@ -229,7 +229,7 @@ export const CARDIO_PLANS: CardioPlan[] = [
   {
     id: "walk-hill",
     kind: "walk",
-    machine: "Incline walk",
+    machine: "Incline walk: long hill",
     name: "Long hill walk",
     minutes: 36,
     summary: "About 5.5 km/h. Climb slowly to 12%, hold, then come down.",
@@ -238,13 +238,18 @@ export const CARDIO_PLANS: CardioPlan[] = [
     ),
   },
   {
-    id: "walk-flat",
+    id: "walk-rolling",
     kind: "walk",
-    machine: "Treadmill walk",
-    name: "Easy walk",
+    machine: "Incline walk: rolling hills",
+    name: "Rolling hills walk",
     minutes: 35,
-    summary: "No pace goal. A podcast or nothing at all.",
-    steps: [step("5.5 km/h, 1%", "Easy, just moving", 35, 3)],
+    summary: "About 5.5 km/h. Three minute climbs to 10% with easier stretches between, so it never gets dull.",
+    steps: [
+      step("3%", WARM, 4, 2),
+      ...repeat(4, [step("10%", STEADY, 3, 6), step("5%", EASY, 3, 3)]),
+      step("4%", EASY, 4, 3),
+      step("2%", COOL, 3, 2),
+    ],
   },
 ];
 
