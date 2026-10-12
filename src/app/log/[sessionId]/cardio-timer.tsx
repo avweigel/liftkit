@@ -31,7 +31,9 @@ export function CardioTimer({
   steps,
   onComplete,
   nowLabel = "Incline now",
+  onElapsed,
 }: {
+  onElapsed?: (ms: number) => void;
   totalSeconds: number;
   steps: CardioStep[];
   onComplete?: () => void;
@@ -39,6 +41,10 @@ export function CardioTimer({
 }) {
   const incline = steps.length > 0 && steps.every((st) => st.level != null);
   const completeRef = useRef(onComplete);
+  const elapsedRef = useRef(onElapsed);
+  useEffect(() => {
+    elapsedRef.current = onElapsed;
+  }, [onElapsed]);
   useEffect(() => {
     completeRef.current = onComplete;
   }, [onComplete]);
@@ -75,6 +81,7 @@ export function CardioTimer({
     const id = setInterval(() => {
       const t = Date.now();
       setNow(t);
+      elapsedRef.current?.(totalMs - Math.max(0, endAt - t));
       if (t >= endAt) {
         clearInterval(id);
         setEndAt(null);
@@ -87,7 +94,7 @@ export function CardioTimer({
       }
     }, 250);
     return () => clearInterval(id);
-  }, [endAt]);
+  }, [endAt, totalMs]);
 
   // one beep when it's time to change the incline
   useEffect(() => {
