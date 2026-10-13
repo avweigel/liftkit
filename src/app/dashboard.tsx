@@ -16,12 +16,8 @@ import {
   weekStart,
 } from "@/lib/local-date";
 import { classifyDay, type DayProfile } from "@/lib/program/day-profile";
-import {
-  HARD_KINDS,
-  MAX_HARD_PER_WEEK,
-  suggestCardio,
-  type CardioKind,
-} from "@/lib/program/cardio";
+import { pickForToday } from "@/lib/program/running";
+import { loadLongMinutes, sessionOf, type CardioLog } from "@/lib/running-data";
 
 type SessionRow = {
   id: string;
@@ -70,14 +66,6 @@ type CorePlan = {
       plan_day_exercises: Array<{ exercises: { name: string } | null }>;
     }>;
   }>;
-};
-
-type CardioRow = {
-  id: string;
-  logged_on: string;
-  kind: CardioKind;
-  minutes: number | null;
-  place: "outside" | "gym" | null;
 };
 
 type Props = { userId: string; email: string };
@@ -161,46 +149,33 @@ export async function Dashboard({ userId }: Props) {
     : null;
   const openSession = sessions.find((s) => !s.finished_at) ?? null;
 
+  // a week of cardio, plus the day before monday so tuesday can see it
   const { data: cardioRows } = await supabase
     .from("cardio_logs")
-    .select("id, logged_on, kind, minutes, place")
+    .select("id, logged_on, kind, session, machine, minutes")
     .eq("user_id", userId)
-    .gte("logged_on", mondayIso)
+    .gte("logged_on", addDays(mondayIso, -1))
     .order("created_at", { ascending: true })
-    .returns<CardioRow[]>();
-  const hardThisWeek = (cardioRows ?? []).filter((r) =>
-    HARD_KINDS.includes(r.kind),
-  ).length;
-  const cardioTonight = (cardioRows ?? []).filter(
-    (r) => r.logged_on === local.iso,
-  );
-  // the last time your heart rate was really up: hard cardio, or a metcon
-  // morning, in the last week
-  const { data: recentHard } = await supabase
-    .from("cardio_logs")
-    .select("logged_on, kind")
-    .eq("user_id", userId)
-    .gte("logged_on", addDays(local.iso, -7))
-    .in("kind", HARD_KINDS)
-    .returns<Array<{ logged_on: string; kind: CardioKind }>>();
-  const highDays = [
-    ...(recentHard ?? []).map((r) => r.logged_on),
-    ...sessions
-      .filter((x) => x.finished_at && /metcon|conditioning/i.test(x.plan_day?.name ?? ""))
-      .map(sessionDay),
-  ].filter((d) => d >= addDays(local.iso, -7));
-  const lastHigh = highDays.sort().at(-1) ?? null;
-  const daysSinceHigh = lastHigh
-    ? Math.round((Date.parse(`${local.iso}T12:00:00Z`) - Date.parse(`${lastHigh}T12:00:00Z`)) / 86_400_000)
-    : null;
-
-  const cardioSuggestions = suggestCardio({
+    .returns<CardioLog[]>();
+  const cardioWeek = (cardioRows ?? []).filter((r) => r.logged_on >= mondayIso);
+  const cardioTonight = cardioWeek
+    .filter((r) => r.logged_on === local.iso)
+    .map((r) => ({ id: r.id, session: sessionOf(r), minutes: r.minutes, machine: r.machine }));
+  const yesterday = addDays(local.iso, -1);
+  const metconOn = (day: string) =>
+    sessions.some(
+      (x) => x.finished_at && sessionDay(x) === day && /metcon|conditioning/i.test(x.plan_day?.name ?? ""),
+    );
+  const hardOn = (day: string) =>
+    (cardioRows ?? []).some((r) => r.logged_on === day && sessionOf(r) === "intervals");
+  const running = pickForToday(cardioWeek.map(sessionOf), {
     today: todayProfile,
     tomorrow: tomorrowProfile,
-    hardThisWeek,
     weekday: local.weekday,
-    daysSinceHigh,
+    hardYesterday: hardOn(yesterday) || metconOn(yesterday),
+    hardToday: hardOn(local.iso),
   });
+  const longMinutes = await loadLongMinutes(userId);
 
   const core = await loadCore(supabase, userId, local.iso, todayProfile);
 
@@ -355,15 +330,11 @@ export async function Dashboard({ userId }: Props) {
                   <>
                     <Step state={stateOf("cardio")} time={timeFor("cardio")} title="Cardio" last={lastBlock === "cardio"}>
                       <TonightCardio
-                        suggestions={cardioSuggestions}
+                        pick={running.pick}
+                        options={running.options}
+                        doneThisWeek={cardioWeek.map(sessionOf)}
                         logged={cardioTonight}
-                        tomorrowLabel={
-                          tomorrowDay
-                            ? formatDayLabel(tomorrowDay.day_number, tomorrowDay.name).name
-                            : "a rest day"
-                        }
-                        hardThisWeek={hardThisWeek}
-                        maxHard={MAX_HARD_PER_WEEK}
+                        longMinutes={longMinutes}
                       />
                     </Step>
                   </>

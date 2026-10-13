@@ -2,19 +2,25 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
-import { CARDIO_TYPES, type CardioKind } from "@/lib/program/cardio";
-import { OUTSIDE_GUIDE, cardioPlan, plansFor, type CardioPlan } from "@/lib/program/cardio-plans";
-import { CardioRun, OutsideLog } from "./cardio-screens";
 import { getUnitPrefs } from "@/lib/measurement";
 import { localizeDistance } from "@/lib/display/units-core";
+import {
+  MACHINES_FOR,
+  MACHINE_NAMES,
+  SESSION_TITLES,
+  buildSession,
+  zonesFor,
+  type Machine,
+  type SessionId,
+} from "@/lib/program/running";
+import { loadLongMinutes, loadRunProfile } from "@/lib/running-data";
+import { CardioRun, OutsideLog } from "./cardio-screens";
 
 type Props = {
-  searchParams: Promise<{ kind?: string; place?: string; plan?: string; pick?: string }>;
+  searchParams: Promise<{ session?: string; machine?: string }>;
 };
 
-function isKind(k: string | undefined): k is CardioKind {
-  return !!k && k in CARDIO_TYPES;
-}
+const isSession = (s: string | undefined): s is SessionId => !!s && s in SESSION_TITLES;
 
 export default async function CardioPage({ searchParams }: Props) {
   const supabase = await createClient();
@@ -23,112 +29,80 @@ export default async function CardioPage({ searchParams }: Props) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { measurement } = await getUnitPrefs();
-  const local = (text: string) => localizeDistance(text, measurement);
   const params = await searchParams;
-  const kind: CardioKind = isKind(params.kind) ? params.kind : "easy";
-  const type = CARDIO_TYPES[kind];
-  const place = params.place === "outside" ? "outside" : "gym";
-  const plan = place === "gym" ? cardioPlan(params.plan) : undefined;
+  const id: SessionId = isSession(params.session) ? params.session : "easy";
+  const allowed = MACHINES_FOR[id];
+  const machine: Machine = allowed.includes(params.machine as Machine) ? (params.machine as Machine) : allowed[0];
 
-  if (place === "outside") {
-    const guide = OUTSIDE_GUIDE[kind];
-    return (
-      <main className="mx-auto w-full max-w-lg flex-1 space-y-6 px-4 pt-4 pb-tabbar">
-        <PageHeader back={{ href: "/", label: "Today" }} eyebrow="Outside" title={type.title} />
-        <section className="card space-y-3 p-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="display text-[20px]">{guide.title}</h2>
-            <span className="chip chip-accent">{guide.goal}</span>
-          </div>
-          <p className="text-[14px] text-(--muted)">{guide.why}</p>
-          <ul className="space-y-2">
-            {guide.points.map((pt) => (
-              <li key={pt} className="flex gap-2.5 text-[15px]">
-                <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-(--accent)" aria-hidden />
-                {pt}
-              </li>
-            ))}
-          </ul>
-          <p className="text-[13px] text-(--muted)">Track it on your watch. Log the minutes here when you&rsquo;re back.</p>
-        </section>
-        <OutsideLog kind={kind} defaultMinutes={type.minutes} />
-      </main>
-    );
-  }
+  const [{ measurement }, profile, longMinutes] = await Promise.all([
+    getUnitPrefs(),
+    loadRunProfile(user.id),
+    loadLongMinutes(user.id),
+  ]);
+  const session = buildSession(id, machine, profile, { longMinutes, measurement });
+  const z = zonesFor(profile.maxHr);
+  const local = (t: string) => localizeDistance(t, measurement);
 
-  if (plan) {
-    return (
-      <main className="mx-auto w-full max-w-lg flex-1 space-y-5 px-4 pt-4 pb-tabbar">
-        <PageHeader
-          back={{ href: `/cardio?kind=${kind}&place=gym`, label: "Machines" }}
-          eyebrow={`${type.title}, ${plan.machine}`}
-          title={plan.name}
-          subtitle={local(plan.summary)}
-        />
-        <section className="rounded-xl bg-(--accent-soft) px-4 py-3">
-          <div className="label text-(--accent)">Why: {plan.goal}</div>
-          <p className="mt-0.5 text-[14px]">{plan.why}</p>
-        </section>
-        <CardioRun kind={kind} plan={plan} />
-      </main>
-    );
-  }
-
-  // today's best machine first, from the Today card's suggestion
-  const pick = cardioPlan(params.pick)?.kind === kind ? params.pick : undefined;
-  const plans = plansFor(kind).sort((a, b) => Number(b.id === pick) - Number(a.id === pick));
   return (
     <main className="mx-auto w-full max-w-lg flex-1 space-y-5 px-4 pt-4 pb-tabbar">
-      <PageHeader back={{ href: "/", label: "Today" }} eyebrow="Gym" title={type.title} subtitle="Pick a machine." />
-      <ul className="space-y-2">
-        {plans.map((p) => (
-          <li key={p.id}>
-            <Link
-              href={`/cardio?kind=${kind}&place=gym&plan=${p.id}`}
-              className="card flex items-center gap-4 p-4 transition-colors active:bg-(--surface-2)"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="display text-[20px]">{p.machine}</div>
-                <div className="text-[14px] text-(--muted)">{p.name}</div>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {p.id === pick && <span className="chip chip-ok">Best today</span>}
-                  <span className="chip chip-accent">{p.goal}</span>
-                </div>
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-1.5">
-                <Shape plan={p} />
-                <span className="num text-[15px] text-(--muted)">{p.minutes} min</span>
-              </div>
-            </Link>
-          </li>
+      <PageHeader
+        back={{ href: "/", label: "Today" }}
+        eyebrow={`${session.goal}, ${session.minutes} min`}
+        title={session.title}
+      />
+
+      <nav aria-label="Where" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1">
+        {allowed.map((m) => (
+          <Link
+            key={m}
+            href={`/cardio?session=${id}&machine=${m}`}
+            aria-current={m === machine ? "page" : undefined}
+            className={`chip h-10 shrink-0 px-4 text-[14px] ${m === machine ? "chip-accent" : ""}`}
+          >
+            {MACHINE_NAMES[m]}
+          </Link>
         ))}
-      </ul>
-      <Link href={`/cardio?kind=${kind}&place=outside`} className="btn btn-ghost btn-block">
-        Going outside instead
-      </Link>
+      </nav>
+
+      <section className="rounded-xl bg-(--accent-soft) px-4 py-3">
+        <div className="label text-(--accent)">Why</div>
+        <p className="mt-0.5 text-[14px]">{session.why}</p>
+      </section>
+
+      {id !== "walk" && (
+        <dl className="grid grid-cols-3 gap-2">
+          <Zone label="Easy" range={`${z.easy[0]} to ${z.easy[1]}`} active={id !== "intervals"} />
+          <Zone label="Steady" range={`${z.steady[0]} to ${z.steady[1]}`} active={id === "long"} />
+          <Zone label="Hard" range={`${z.hard[0]} to ${z.hard[1]}`} active={id === "intervals" || id === "strides"} />
+        </dl>
+      )}
+
+      {machine === "outside" ? (
+        <>
+          <section className="card space-y-2 p-5">
+            <ul className="space-y-2">
+              {session.outside.map((pt) => (
+                <li key={pt} className="flex gap-2.5 text-[15px]">
+                  <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-(--accent)" aria-hidden />
+                  {local(pt)}
+                </li>
+              ))}
+            </ul>
+          </section>
+          <OutsideLog session={session} />
+        </>
+      ) : (
+        <CardioRun session={session} />
+      )}
     </main>
   );
 }
 
-// the session at a glance: one bar per step, width by time, height by effort
-function Shape({ plan }: { plan: CardioPlan }) {
-  const total = plan.steps.reduce((n, s) => n + s.seconds, 0);
-  const max = Math.max(...plan.steps.map((s) => s.level), 1);
+function Zone({ label, range, active }: { label: string; range: string; active: boolean }) {
   return (
-    <div className="flex h-7 w-24 items-end gap-px" aria-hidden>
-      {plan.steps.map((s, i) => (
-        <span
-          key={i}
-          className="rounded-[2px] bg-(--accent)"
-          style={{
-            flexGrow: s.seconds / total,
-            flexBasis: 0,
-            height: `${Math.max(15, (s.level / max) * 100)}%`,
-            opacity: 0.35 + (s.level / max) * 0.65,
-          }}
-        />
-      ))}
+    <div className={`rounded-xl px-3 py-2 ${active ? "bg-(--surface-2)" : "bg-(--surface-2)/40 opacity-60"}`}>
+      <dt className="text-[12px] text-(--muted)">{label} HR</dt>
+      <dd className="num text-[17px]">{range}</dd>
     </div>
   );
 }

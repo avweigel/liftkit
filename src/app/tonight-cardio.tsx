@@ -4,35 +4,41 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { deleteCardio } from "@/lib/actions/cardio";
 import {
-  CARDIO_TYPES,
-  type CardioKind,
-  type CardioSuggestion,
-} from "@/lib/program/cardio";
+  MACHINES_FOR,
+  MACHINE_NAMES,
+  SESSION_TITLES,
+  SHORT_TITLES,
+  WEEKLY,
+  type Fit,
+  type SessionId,
+} from "@/lib/program/running";
 
-type Logged = {
+export type LoggedCardio = {
   id: string;
-  kind: CardioKind;
+  session: SessionId;
   minutes: number | null;
-  place: "outside" | "gym" | null;
+  machine: string | null;
 };
 
 export function TonightCardio({
-  suggestions,
+  pick,
+  options,
+  doneThisWeek,
   logged,
-  tomorrowLabel,
-  hardThisWeek,
-  maxHard,
+  longMinutes,
 }: {
-  suggestions: CardioSuggestion[];
-  logged: Logged[];
-  tomorrowLabel: string;
-  hardThisWeek: number;
-  maxHard: number;
+  pick: SessionId;
+  options: Array<{ id: SessionId; fit: Fit }>;
+  doneThisWeek: SessionId[];
+  logged: LoggedCardio[];
+  longMinutes: number;
 }) {
-  const best = suggestions.find((s) => s.recommended) ?? suggestions[0];
-  const [kind, setKind] = useState<CardioKind | undefined>(best?.kind);
+  const [chosenId, setChosenId] = useState<SessionId>(pick);
   const [showAll, setShowAll] = useState(false);
-  const chosen = suggestions.find((s) => s.kind === kind) ?? best;
+  const chosen = options.find((o) => o.id === chosenId) ?? options.find((o) => o.id === pick)!;
+  const title = (id: SessionId) => (id === "long" ? `${SESSION_TITLES.long}, ${longMinutes} min` : SESSION_TITLES[id]);
+  const others = MACHINES_FOR[chosen.id].filter((m) => m !== chosen.fit.machine);
+  const allDone = WEEKLY.every((id) => doneThisWeek.includes(id));
 
   return (
     <section className="card space-y-3 p-4">
@@ -44,30 +50,34 @@ export function TonightCardio({
         </ul>
       )}
 
-      {chosen && (
-        <div className="space-y-3">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="display text-[20px]">{CARDIO_TYPES[chosen.kind].title}</h3>
-              {chosen.recommended && <span className="chip chip-accent">Best tonight</span>}
-              {logged.length > 0 && <span className="chip">Another session</span>}
-            </div>
-            <p className="mt-0.5 text-[14px] text-(--muted)">{chosen.reason}</p>
+      <div className="space-y-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="display text-[20px]">{title(chosen.id)}</h3>
+            {chosen.id === pick && logged.length === 0 && <span className="chip chip-accent">Best today</span>}
+            {!chosen.fit.ok && <span className="chip">Better another day</span>}
           </div>
-          {/* where first: it's what you know when you walk out the door */}
-          <div className="grid grid-cols-2 gap-2">
-            <Link
-              href={`/cardio?kind=${chosen.kind}&place=gym${chosen.plan ? `&pick=${chosen.plan}` : ""}`}
-              className={`btn ${logged.length > 0 ? "btn-secondary" : "btn-primary"}`}
-            >
-              Gym
-            </Link>
-            <Link href={`/cardio?kind=${chosen.kind}&place=outside`} className="btn btn-secondary">
-              Outside
-            </Link>
-          </div>
+          <p className="mt-0.5 text-[14px] text-(--muted)">
+            {chosen.id === "walk" && allDone ? "All four sessions done this week. Walk or rest." : chosen.fit.note}
+          </p>
         </div>
-      )}
+        <Link
+          href={`/cardio?session=${chosen.id}&machine=${chosen.fit.machine}`}
+          className={`btn btn-block ${logged.length > 0 ? "btn-secondary" : "btn-primary"}`}
+        >
+          Start on the {MACHINE_NAMES[chosen.fit.machine].toLowerCase()}
+        </Link>
+        {others.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[13px] text-(--muted)">Or:</span>
+            {others.map((m) => (
+              <Link key={m} href={`/cardio?session=${chosen.id}&machine=${m}`} className="chip h-9 px-3 text-[13px]">
+                {MACHINE_NAMES[m]}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
 
       <button
         type="button"
@@ -75,7 +85,7 @@ export function TonightCardio({
         aria-expanded={showAll}
         className="flex w-full items-center justify-between border-t border-(--border) pt-3 text-[14px] font-semibold text-(--accent)"
       >
-        Other options
+        Other sessions
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${showAll ? "rotate-180" : ""}`} aria-hidden>
           <path d="M6 9l6 6 6-6" />
         </svg>
@@ -83,50 +93,59 @@ export function TonightCardio({
 
       {showAll && (
         <ul className="space-y-1.5">
-          {suggestions
-            .filter((s) => s.kind !== chosen?.kind)
-            .map((s) => (
-              <li key={s.kind}>
+          {options
+            .filter((o) => o.id !== chosen.id)
+            .map((o) => (
+              <li key={o.id}>
                 <button
                   type="button"
                   onClick={() => {
-                    setKind(s.kind);
+                    setChosenId(o.id);
                     setShowAll(false);
                   }}
-                  className={`w-full rounded-xl bg-(--surface-2) px-3 py-2.5 text-left ${s.blocked ? "opacity-60" : ""}`}
+                  className="w-full rounded-xl bg-(--surface-2) px-3 py-2.5 text-left"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold">{CARDIO_TYPES[s.kind].title}</span>
-                    {s.blocked && <span className="chip">Not tonight</span>}
+                    <span className="font-semibold">{title(o.id)}</span>
+                    {!o.fit.ok && <span className="chip">Better another day</span>}
                   </div>
-                  <p className="mt-0.5 text-[13px] text-(--muted)">{s.reason}</p>
+                  <p className="mt-0.5 text-[13px] text-(--muted)">{o.fit.note}</p>
                 </button>
               </li>
             ))}
         </ul>
       )}
 
-      <dl className="grid grid-cols-2 gap-2">
-        <div className="rounded-xl bg-(--surface-2) px-3 py-2">
-          <dt className="text-[12px] text-(--muted)">Hard this week</dt>
-          <dd className="num text-[20px]">
-            {hardThisWeek}
-            <span className="text-[14px] text-(--muted)"> of {maxHard}</span>
-          </dd>
-        </div>
-        <div className="rounded-xl bg-(--surface-2) px-3 py-2">
-          <dt className="text-[12px] text-(--muted)">Tomorrow</dt>
-          <dd className="truncate text-[15px] font-semibold leading-[1.6]">{tomorrowLabel}</dd>
-        </div>
-      </dl>
+      <div>
+        <div className="label pb-1.5">This week</div>
+        <ul className="grid grid-cols-4 gap-1.5">
+          {WEEKLY.map((id) => {
+            const done = doneThisWeek.includes(id);
+            return (
+              <li
+                key={id}
+                className={`flex h-10 items-center justify-center gap-1 rounded-lg text-[13px] font-semibold ${
+                  done ? "bg-(--ok-soft) text-(--ok)" : "bg-(--surface-2) text-(--muted)"
+                }`}
+              >
+                {done && (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M5 12.5l4.5 4.5L19 7.5" />
+                  </svg>
+                )}
+                {SHORT_TITLES[id]}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </section>
   );
 }
 
-function LoggedCardioRow({ entry }: { entry: Logged }) {
+function LoggedCardioRow({ entry }: { entry: LoggedCardio }) {
   const [pending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
-  const t = CARDIO_TYPES[entry.kind];
   return (
     <li className="flex min-h-12 items-center gap-3 rounded-xl bg-(--ok-soft) px-3">
       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-(--ok) text-(--surface)">
@@ -134,11 +153,10 @@ function LoggedCardioRow({ entry }: { entry: Logged }) {
           <path d="M5 12.5l4.5 4.5L19 7.5" />
         </svg>
       </span>
-      <span className="font-semibold">{t.title}</span>
-      <span className="text-[13px] text-(--muted)">
+      <span className="min-w-0 truncate font-semibold">{SESSION_TITLES[entry.session]}</span>
+      <span className="shrink-0 text-[13px] text-(--muted)">
         {entry.minutes ? <span className="num text-[15px] text-(--foreground)">{entry.minutes}</span> : null}
         {entry.minutes ? " min" : ""}
-        {entry.place ? (entry.place === "gym" ? ", gym" : ", outside") : ""}
       </span>
       <button
         type="button"
@@ -153,7 +171,7 @@ function LoggedCardioRow({ entry }: { entry: Logged }) {
             await deleteCardio(entry.id);
           });
         }}
-        className={`ml-auto h-9 rounded-lg px-2 text-[13px] font-semibold ${confirming ? "text-(--danger)" : "text-(--muted)"}`}
+        className={`ml-auto h-9 shrink-0 rounded-lg px-2 text-[13px] font-semibold ${confirming ? "text-(--danger)" : "text-(--muted)"}`}
       >
         {confirming ? "Tap to remove" : "Remove"}
       </button>

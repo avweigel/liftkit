@@ -4,12 +4,12 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { localToday } from "@/lib/local-date";
+import { KIND_FOR } from "@/lib/program/running";
 
 const logSchema = z.object({
-  kind: z.enum(["easy", "intervals", "tempo", "walk"]),
+  session: z.enum(["intervals", "long", "strides", "easy", "walk"]),
+  machine: z.enum(["run", "bike", "row", "elliptical", "walk", "outside"]),
   minutes: z.number().int().min(1).max(600).nullable(),
-  place: z.enum(["outside", "gym"]).nullable(),
-  plan_id: z.string().max(60).nullable().optional(),
 });
 
 export async function logCardio(input: z.input<typeof logSchema>) {
@@ -22,10 +22,11 @@ export async function logCardio(input: z.input<typeof logSchema>) {
   const { error } = await supabase.from("cardio_logs").insert({
     user_id: user.id,
     logged_on: localToday().iso,
-    kind: parsed.kind,
+    kind: KIND_FOR[parsed.session],
+    session: parsed.session,
+    machine: parsed.machine,
     minutes: parsed.minutes,
-    place: parsed.place,
-    plan_id: parsed.place === "gym" ? (parsed.plan_id ?? null) : null,
+    place: parsed.machine === "outside" ? "outside" : "gym",
   });
   if (error) throw new Error(error.message);
   revalidatePath("/");
