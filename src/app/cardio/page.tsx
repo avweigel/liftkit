@@ -15,6 +15,7 @@ import {
 } from "@/lib/program/running";
 import { loadLongMinutes, loadRunProfile } from "@/lib/running-data";
 import { CardioRun, OutsideLog } from "./cardio-screens";
+import { SessionShape } from "@/components/session-shape";
 
 type Props = {
   searchParams: Promise<{ session?: string; machine?: string }>;
@@ -63,6 +64,11 @@ export default async function CardioPage({ searchParams }: Props) {
           </Link>
         ))}
       </nav>
+
+      <section className="space-y-1.5 rounded-xl bg-(--surface-2) p-3">
+        <SessionShape steps={session.steps} className="h-10 w-full" />
+        <p className="text-[14px]">{session.plain}</p>
+      </section>
 
       <section className="rounded-xl bg-(--accent-soft) px-4 py-3">
         <div className="label text-(--accent)">Why</div>

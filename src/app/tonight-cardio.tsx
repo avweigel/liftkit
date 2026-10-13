@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { deleteCardio } from "@/lib/actions/cardio";
+import { SessionShape } from "@/components/session-shape";
 import {
+  DEFAULT_RUN_PROFILE,
+  buildSession,
   MACHINES_FOR,
   MACHINE_NAMES,
   SESSION_TITLES,
@@ -39,6 +42,11 @@ export function TonightCardio({
   const title = (id: SessionId) => (id === "long" ? `${SESSION_TITLES.long}, ${longMinutes} min` : SESSION_TITLES[id]);
   const others = MACHINES_FOR[chosen.id].filter((m) => m !== chosen.fit.machine);
   const allDone = WEEKLY.every((id) => doneThisWeek.includes(id));
+  // only the shape and the plain sentence are used here, which don't
+  // depend on your paces
+  const preview = (id: SessionId, machine = MACHINES_FOR[id][0]) =>
+    buildSession(id, machine, DEFAULT_RUN_PROFILE, { longMinutes, measurement: "metric" });
+  const chosenPreview = preview(chosen.id, chosen.fit.machine);
 
   return (
     <section className="card space-y-3 p-4">
@@ -59,6 +67,12 @@ export function TonightCardio({
           </div>
           <p className="mt-0.5 text-[14px] text-(--muted)">
             {chosen.id === "walk" && allDone ? "All four sessions done this week. Walk or rest." : chosen.fit.note}
+          </p>
+        </div>
+        <div className="space-y-1.5 rounded-xl bg-(--surface-2) p-3">
+          <SessionShape steps={chosenPreview.steps} className="h-9 w-full" />
+          <p className="text-[13px]">
+            <span className="num text-[15px]">{chosenPreview.minutes}</span> min. {chosenPreview.plain}
           </p>
         </div>
         <Link
@@ -105,11 +119,15 @@ export function TonightCardio({
                   }}
                   className="w-full rounded-xl bg-(--surface-2) px-3 py-2.5 text-left"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">{title(o.id)}</span>
-                    {!o.fit.ok && <span className="chip">Better another day</span>}
+                  <div className="flex items-center gap-3">
+                    <span className="min-w-0 flex-1 font-semibold">{SESSION_TITLES[o.id]}</span>
+                    <SessionShape steps={preview(o.id).steps} className="h-6 w-16 shrink-0" />
+                    <span className="num w-12 shrink-0 text-right text-[14px] text-(--muted)">{preview(o.id).minutes} min</span>
                   </div>
-                  <p className="mt-0.5 text-[13px] text-(--muted)">{o.fit.note}</p>
+                  <p className="mt-0.5 text-[13px] text-(--muted)">{preview(o.id).plain}</p>
+                  {!o.fit.ok && (
+                    <p className="mt-1 text-[13px] font-semibold text-(--muted)">Better another day. {o.fit.note}</p>
+                  )}
                 </button>
               </li>
             ))}

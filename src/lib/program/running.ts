@@ -3,7 +3,7 @@ import type { Measurement } from "@/lib/display/units-core";
 
 // the cardio plan, built around one goal: run easy at 6:13/km (10:00/mile)
 // with your heart rate still low. most of that comes from easy running,
-// one 4 x 4 a week lifts the ceiling, and the long run builds the engine.
+// one interval session a week lifts the ceiling, and the long run builds the engine.
 // four sessions a week, done on whatever day and time fits.
 
 export type SessionId = "intervals" | "long" | "strides" | "easy" | "walk";
@@ -16,7 +16,7 @@ export const GOAL_EASY_PACE_S = 373;
 export const WEEKLY: Exclude<SessionId, "walk">[] = ["intervals", "long", "strides", "easy"];
 
 export const SESSION_TITLES: Record<SessionId, string> = {
-  intervals: "4 x 4 intervals",
+  intervals: "Hard intervals",
   long: "Long run",
   strides: "Easy run with strides",
   easy: "Easy run",
@@ -24,7 +24,7 @@ export const SESSION_TITLES: Record<SessionId, string> = {
 };
 
 export const SHORT_TITLES: Record<SessionId, string> = {
-  intervals: "4 x 4",
+  intervals: "Intervals",
   long: "Long",
   strides: "Strides",
   easy: "Easy",
@@ -121,6 +121,8 @@ export type Session = {
   minutes: number;
   goal: string;
   why: string;
+  // the structure in one plain sentence
+  plain: string;
   steps: Step[];
   // for outside: what to do, in words
   outside: string[];
@@ -205,11 +207,12 @@ export function buildSession(
       title: SESSION_TITLES.intervals,
       minutes: 40,
       goal: "VO2 max",
+      plain: "10 min easy, then 4 hard efforts of 4 min each with 3 min easy between, then 5 min easy.",
       why: "Four hard 4 minute reps raise the ceiling on how much oxygen you can use. A higher ceiling makes every easier pace feel easier.",
       steps,
       outside: [
         `10 min easy (${easyPace}, HR under ${z.easy[1]}).`,
-        `4 x 4 min hard, around ${hardPace}. Let heart rate decide: ${z.hard[0]} to ${z.hard[1]} by the end of each rep.`,
+        `4 hard efforts of 4 min, around ${hardPace}. Let heart rate decide: ${z.hard[0]} to ${z.hard[1]} by the end of each rep.`,
         `3 min easy jog or walk between, until HR drops toward ${z.recover}.`,
         "5 min easy to finish. A gentle hill for the hard reps works well too.",
       ],
@@ -224,6 +227,7 @@ export function buildSession(
       title: `${SESSION_TITLES.long}, ${total} min`,
       minutes: total,
       goal: "Aerobic engine",
+      plain: `${total - 10} min easy, then the last 10 min steady.`,
       why: "Time on your feet at an easy effort is what moves your easy pace toward 6:13/km. The steady last 10 minutes teaches you to run well when you're tired.",
       steps: [step("easy", total - 10), step("steady", 10)],
       outside: [
@@ -247,6 +251,7 @@ export function buildSession(
       title: SESSION_TITLES.strides,
       minutes: 35,
       goal: "Aerobic base, running form",
+      plain: "25 min easy, then 6 quick 20 second bursts with easy jogging between, then 4 min easy.",
       why: "Mostly easy running for your base. The six short strides at the end teach your legs a quicker, smoother stride without tiring you out.",
       steps,
       outside: [
@@ -264,6 +269,7 @@ export function buildSession(
       title: machine === "run" || machine === "outside" ? SESSION_TITLES.easy : `Easy ${MACHINE_NAMES[machine].toLowerCase()}`,
       minutes: 35,
       goal: "Aerobic base",
+      plain: "5 min warm-up, then 30 min easy. Nothing hard.",
       why:
         machine === "run" || machine === "outside"
           ? "Easy running is where most running fitness comes from. Keep it truly easy and it adds up fast."
@@ -286,6 +292,7 @@ export function buildSession(
     title: SESSION_TITLES.walk,
     minutes: 36,
     goal: "Recovery, glutes",
+    plain: "A brisk walk that climbs slowly to 12% incline, holds, then comes back down.",
     why: "Moving without adding fatigue. A hill walk still counts toward your 30 minutes.",
     steps: walk.map(([l, m, lvl]) => ({ label: l, sub: `About 5.5 km/h. ${hr("easy")}`, seconds: m * 60, level: lvl })),
     outside: ["30 to 40 min brisk walk, hills if you have them.", "No pace goal."],
@@ -357,7 +364,7 @@ export function pickForToday(
 ): { pick: SessionId; fit: Fit; options: Array<{ id: SessionId; fit: Fit }> } {
   const remaining: SessionId[] = WEEKLY.filter((id) => !done.includes(id));
   // the long run leads at the weekend, when there's time for it. on
-  // weekdays the 4 x 4 leads, since it has the fewest days it fits.
+  // weekdays the intervals lead, since it has the fewest days it fits.
   const order: SessionId[] =
     ctx.weekday >= 6 ? ["long", "intervals", "strides", "easy"] : ["intervals", "strides", "easy", "long"];
   const ranked = order.filter((id) => remaining.includes(id));
