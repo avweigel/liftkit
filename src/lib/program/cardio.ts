@@ -77,12 +77,16 @@ export function suggestCardio(ctx: CardioContext): CardioSuggestion[] {
   const legsTired = !!today?.heavyLegs;
 
   let hardBlock: string | null = null;
+  // set when sore legs are the only thing against going hard. the bike
+  // takes the legs' pounding out of it, so that stays on offer.
+  let onlyLegs = false;
   if (today?.kind === "metcon") {
     hardBlock = "The metcon this morning was today's high heart rate work.";
   } else if (tomorrow?.heavyLegs) {
     hardBlock = `Tomorrow is ${legWord(tomorrow)}. Hard running tonight would cost you there.`;
   } else if (legsTired) {
     hardBlock = `You did ${legWord(today!)} this morning. Your legs need tonight to recover.`;
+    onlyLegs = daysSinceHigh !== 0 && daysSinceHigh !== 1 && hardThisWeek < MAX_HARD_PER_WEEK;
   } else if (daysSinceHigh === 0 || daysSinceHigh === 1) {
     hardBlock = "You went hard in the last day. Easy tonight lets you go hard again soon.";
   } else if (hardThisWeek >= MAX_HARD_PER_WEEK) {
@@ -116,6 +120,18 @@ export function suggestCardio(ctx: CardioContext): CardioSuggestion[] {
     const walkFirst = legsTired || today?.kind === "metcon";
     const easy: CardioSuggestion = { kind: "easy", recommended: !walkFirst, blocked: false, reason: easyReason, plan: easyPlan };
     const walk: CardioSuggestion = { kind: "walk", recommended: walkFirst, blocked: false, reason: walkReason, plan: "walk-hill" };
+    if (onlyLegs) {
+      return [
+        ...(walkFirst ? [walk, easy] : [easy, walk]),
+        {
+          kind: "intervals",
+          recommended: false,
+          blocked: false,
+          reason: "Legs feel fine? The 4 x 4 on the bike gets your heart rate up without pounding them. It makes tomorrow an easy day.",
+          plan: "int-spin",
+        },
+      ];
+    }
     return [
       ...(walkFirst ? [walk, easy] : [easy, walk]),
       { kind: hardKind, recommended: false, blocked: true, reason: hardBlock, plan: hardPlan },
