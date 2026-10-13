@@ -928,7 +928,7 @@ function ExerciseHeader({
           {exercise.last_swap.sets.map((s, i) => (
             <span key={i} className="num text-[15px] text-(--foreground)">
               {i > 0 ? ", " : ""}
-              {s.weight != null ? formatWeight(s.weight) : "BW"}×{s.reps}
+              {s.weight != null ? show(s.weight) : "BW"}×{s.reps}
             </span>
           ))}
         </p>

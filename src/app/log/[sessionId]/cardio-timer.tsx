@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { chime, keepAwake, unlockAudio } from "@/lib/display/chime";
+import { useLocalizeDistance } from "@/lib/display/units";
 
 // level is the treadmill incline. stretch steps have none and show by name.
 export type CardioStep = { label: string; seconds: number; level?: number; sub?: string };
@@ -39,6 +40,7 @@ export function CardioTimer({
   onComplete?: () => void;
   nowLabel?: string;
 }) {
+  const localize = useLocalizeDistance();
   const incline = steps.length > 0 && steps.every((st) => st.level != null);
   const completeRef = useRef(onComplete);
   const elapsedRef = useRef(onElapsed);
@@ -173,7 +175,7 @@ export function CardioTimer({
       }`}
     >
       {flashing && current && incline && (
-        <p className="display text-center text-[22px]">Change to {current.label}</p>
+        <p className="display text-center text-[22px]">Change to {localize(current.label)}</p>
       )}
       <div className="flex items-center gap-4">
         <Ring
@@ -191,16 +193,16 @@ export function CardioTimer({
                 <p
                   className={`num leading-none ${(current?.label.length ?? 0) > 7 ? "text-[26px]" : "text-[40px]"} ${flashing ? "" : "text-(--accent)"}`}
                 >
-                  {current?.label}
+                  {current && localize(current.label)}
                 </p>
               ) : (
-                <p className={`display text-[22px] leading-tight ${flashing ? "" : "text-(--accent)"}`}>{doneAll ? "Nice work" : current?.label}</p>
+                <p className={`display text-[22px] leading-tight ${flashing ? "" : "text-(--accent)"}`}>{doneAll ? "Nice work" : current && localize(current.label)}</p>
               )}
               {current?.sub && !doneAll && (
-                <p className="mt-1 text-[14px] font-semibold">{current.sub}</p>
+                <p className="mt-1 text-[14px] font-semibold">{localize(current.sub)}</p>
               )}
               {next && !doneAll && (
-                <p className={`mt-1 text-[13px] ${flashing ? "" : "text-(--muted)"}`}>Then {incline ? next.label : next.label.toLowerCase()}</p>
+                <p className={`mt-1 text-[13px] ${flashing ? "" : "text-(--muted)"}`}>Then {localize(incline ? next.label : next.label.toLowerCase())}</p>
               )}
             </>
           )}

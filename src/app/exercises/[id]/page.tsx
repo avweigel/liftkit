@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { findCanonical } from "@/lib/exercise-normalize";
 import { weightConvention } from "@/lib/display/weight-convention";
+import { convert } from "@/lib/display/units-core";
+import { getUnitPrefs } from "@/lib/measurement";
 import { PageHeader, SectionTitle } from "@/components/page-header";
 import { enumLabel, formatSet, shortDate } from "../labels";
 import { ProgressChart, type ChartPoint } from "./progress-chart";
@@ -66,8 +68,13 @@ export default async function ExerciseDetailPage({ params }: Props) {
 
   if (!exercise) notFound();
 
-  const unit = profile?.units ?? "lb";
-  const sets = allSets ?? [];
+  const { shown: unit } = await getUnitPrefs();
+  const stored = profile?.units ?? "lb";
+  // stored in the profile unit, shown in the one picked in Settings
+  const sets = (allSets ?? []).map((st) => ({
+    ...st,
+    weight: st.weight == null ? null : convert(Number(st.weight), stored, unit),
+  }));
   const sessions = groupSessions(sets);
   const records = computeRecords(sets);
   const weighted = records.bestWeight !== null;

@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/page-header";
 import { CARDIO_TYPES, type CardioKind } from "@/lib/program/cardio";
 import { OUTSIDE_GUIDE, cardioPlan, plansFor, type CardioPlan } from "@/lib/program/cardio-plans";
 import { CardioRun, OutsideLog } from "./cardio-screens";
+import { getUnitPrefs } from "@/lib/measurement";
+import { localizeDistance } from "@/lib/display/units-core";
 
 type Props = {
   searchParams: Promise<{ kind?: string; place?: string; plan?: string; pick?: string }>;
@@ -21,6 +23,8 @@ export default async function CardioPage({ searchParams }: Props) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const { measurement } = await getUnitPrefs();
+  const local = (text: string) => localizeDistance(text, measurement);
   const params = await searchParams;
   const kind: CardioKind = isKind(params.kind) ? params.kind : "easy";
   const type = CARDIO_TYPES[kind];
@@ -60,7 +64,7 @@ export default async function CardioPage({ searchParams }: Props) {
           back={{ href: `/cardio?kind=${kind}&place=gym`, label: "Machines" }}
           eyebrow={`${type.title}, ${plan.machine}`}
           title={plan.name}
-          subtitle={plan.summary}
+          subtitle={local(plan.summary)}
         />
         <section className="rounded-xl bg-(--accent-soft) px-4 py-3">
           <div className="label text-(--accent)">Why: {plan.goal}</div>

@@ -1,5 +1,5 @@
 import { weightConvention } from "@/lib/display/weight-convention";
-import type { Unit } from "@/lib/display/units";
+import type { Unit } from "@/lib/display/units-core";
 
 export type WeightKind = "barbell" | "db-pair" | "db-single" | "other";
 

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { convert } from "@/lib/display/units-core";
+import { getUnitPrefs } from "@/lib/measurement";
 import { PageHeader } from "@/components/page-header";
 import { ExerciseBrowser, type LibraryItem, type RecentItem } from "./exercise-browser";
 import { NormalizeButton } from "./normalize-button";
@@ -37,6 +39,7 @@ export default async function ExercisesPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const { stored, shown } = await getUnitPrefs();
   const [{ data: library }, { data: recentSets }] = await Promise.all([
     supabase
       .from("exercises")
@@ -62,7 +65,10 @@ export default async function ExercisesPage() {
     custom: r.owner_id === user!.id,
   }));
 
-  const recent = buildRecent(items, recentSets ?? []);
+  const recent = buildRecent(items, recentSets ?? []).map((r) => ({
+    ...r,
+    topWeight: r.topWeight == null ? null : convert(Number(r.topWeight), stored, shown),
+  }));
   const hasCustom = items.some((i) => i.custom);
 
   return (
