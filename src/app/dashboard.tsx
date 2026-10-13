@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatDayLabel } from "@/lib/display/format-day";
@@ -7,6 +7,8 @@ import { formatRxReps } from "@/lib/display/reps";
 import { preferredCooldown } from "@/lib/program/cooldowns";
 import { StartDayButton, StartOtherDayButton } from "./dashboard-start-button";
 import { TonightCardio } from "./tonight-cardio";
+import { DayOrderControl } from "./day-order-control";
+import { normalizeOrder, type DayBlock } from "@/lib/program/day-order";
 import {
   addDays,
   localToday,
@@ -91,7 +93,7 @@ export async function Dashboard({ userId }: Props) {
     await Promise.all([
       supabase
         .from("profiles")
-        .select("active_plan_id")
+        .select("active_plan_id, day_order")
         .eq("id", userId)
         .maybeSingle(),
       supabase
@@ -223,13 +225,17 @@ export async function Dashboard({ userId }: Props) {
 
   // the day line: the first step not done after the last one you did is
   // "now". anything you passed without logging just sits there, quiet.
-  const steps = [
-    { key: "warmup", show: liftingDay, done: !!routine("warmup") },
-    { key: "workout", show: true, done: !!todaySession?.finished_at },
-    { key: "cooldown", show: liftingDay, done: !!routine("cooldown") },
-    { key: "core", show: !!core, done: !!core?.doneToday },
-    { key: "cardio", show: true, done: cardioTonight.length > 0 },
-  ].filter((st) => st.show);
+  const dayOrder = normalizeOrder((profile as { day_order?: string[] | null } | null)?.day_order);
+  const blockSteps: Record<DayBlock, Array<{ key: string; show: boolean; done: boolean }>> = {
+    strength: [
+      { key: "warmup", show: liftingDay, done: !!routine("warmup") },
+      { key: "workout", show: true, done: !!todaySession?.finished_at },
+      { key: "cooldown", show: liftingDay, done: !!routine("cooldown") },
+    ],
+    core: [{ key: "core", show: !!core, done: !!core?.doneToday }],
+    cardio: [{ key: "cardio", show: true, done: cardioTonight.length > 0 }],
+  };
+  const steps = dayOrder.flatMap((b) => blockSteps[b]).filter((st) => st.show);
   const lastDone = steps.reduce((acc, st, i) => (st.done ? i : acc), -1);
   const nowIdx = steps.findIndex((st, i) => !st.done && i > lastDone);
   const stateOf = (key: string): StepState => {
@@ -239,6 +245,20 @@ export async function Dashboard({ userId }: Props) {
     return i === nowIdx ? "now" : "later";
   };
   const morningState = stateOf("workout");
+  // core and cardio say what they follow, since the order is yours to pick
+  const AFTER: Record<DayBlock, string> = {
+    strength: "After lifting",
+    core: "After core",
+    cardio: "After cardio",
+  };
+  const timeFor = (b: DayBlock) => {
+    const i = dayOrder.indexOf(b);
+    if (i === 0) return "First";
+    if (b === "core" && dayOrder[i - 1] === "strength") return "After cooldown";
+    return AFTER[dayOrder[i - 1]];
+  };
+  const shown = dayOrder.filter((b) => b !== "core" || !!core);
+  const lastBlock = shown[shown.length - 1];
 
   const dateLine = new Intl.DateTimeFormat("en-GB", {
     weekday: "long",
@@ -278,61 +298,80 @@ export async function Dashboard({ userId }: Props) {
       {!activePlan ? (
         <PickPlanCard hasAnyPlan={(planCount ?? 0) > 0} />
       ) : (
-        <ol className="relative space-y-6">
-          {liftingDay && (
-            <Step state={stateOf("warmup")} time="Before lifting" title="Warm-up">
-              <RoutineCard
-                href="/warmup"
-                status={routine("warmup")}
-                title="Warm-up"
-                line="Pulse raiser, mobility, then a quick superset"
-                cta="Start warm-up"
-                active={stateOf("warmup") === "now"}
-              />
-            </Step>
-          )}
+        <div className="space-y-3">
+          <div className="-mt-4 flex justify-end">
+            <DayOrderControl order={dayOrder} />
+          </div>
+          <ol className="relative space-y-6">
+            {dayOrder.map((block) => (
+              <Fragment key={block}>
+                {block === "strength" && (
+                  <>
+                    {liftingDay && (
+                      <Step state={stateOf("warmup")} time="Before lifting" title="Warm-up">
+                        <RoutineCard
+                          href="/warmup"
+                          status={routine("warmup")}
+                          title="Warm-up"
+                          line="Pulse raiser, mobility, then a quick superset"
+                          cta="Start warm-up"
+                          active={stateOf("warmup") === "now"}
+                        />
+                      </Step>
+                    )}
 
-          <Step state={morningState} time="Morning" title="Workout">
-            {todayDay ? (
-              <WorkoutCard day={todayDay} session={todaySession} />
-            ) : (
-              <RestCard />
-            )}
-          </Step>
+                    <Step state={morningState} time={dayOrder[0] === "strength" ? "Morning" : AFTER[dayOrder[dayOrder.indexOf("strength") - 1]]} title="Workout" last={lastBlock === "strength" && !(liftingDay && cooldownPick)}>
+                      {todayDay ? (
+                        <WorkoutCard day={todayDay} session={todaySession} />
+                      ) : (
+                        <RestCard />
+                      )}
+                    </Step>
 
-          {liftingDay && cooldownPick && (
-            <Step state={stateOf("cooldown")} time="After lifting" title="Cooldown">
-              <RoutineCard
-                href="/cooldown"
-                status={routine("cooldown")}
-                title={cooldownPick.name}
-                line={`${cooldownPick.dose ?? ""}, or swap for a stretch`}
-                cta="Start cooldown"
-                active={stateOf("cooldown") === "now"}
-              />
-            </Step>
-          )}
-
-          {core && (
-            <Step state={stateOf("core")} time="After cooldown" title="Core">
-              <CoreCard core={core} />
-            </Step>
-          )}
-
-          <Step state={stateOf("cardio")} time="Evening" title="Cardio" last>
-            <TonightCardio
-              suggestions={cardioSuggestions}
-              logged={cardioTonight}
-              tomorrowLabel={
-                tomorrowDay
-                  ? formatDayLabel(tomorrowDay.day_number, tomorrowDay.name).name
-                  : "a rest day"
-              }
-              hardThisWeek={hardThisWeek}
-              maxHard={MAX_HARD_PER_WEEK}
-            />
-          </Step>
-        </ol>
+                    {liftingDay && cooldownPick && (
+                      <Step state={stateOf("cooldown")} time="After lifting" title="Cooldown" last={lastBlock === "strength"}>
+                        <RoutineCard
+                          href="/cooldown"
+                          status={routine("cooldown")}
+                          title={cooldownPick.name}
+                          line={`${cooldownPick.dose ?? ""}, or swap for a stretch`}
+                          cta="Start cooldown"
+                          active={stateOf("cooldown") === "now"}
+                        />
+                      </Step>
+                    )}
+                  </>
+                )}
+                {block === "core" && (
+                  <>
+                    {core && (
+                      <Step state={stateOf("core")} time={timeFor("core")} title="Core" last={lastBlock === "core"}>
+                        <CoreCard core={core} />
+                      </Step>
+                    )}
+                  </>
+                )}
+                {block === "cardio" && (
+                  <>
+                    <Step state={stateOf("cardio")} time={timeFor("cardio")} title="Cardio" last={lastBlock === "cardio"}>
+                      <TonightCardio
+                        suggestions={cardioSuggestions}
+                        logged={cardioTonight}
+                        tomorrowLabel={
+                          tomorrowDay
+                            ? formatDayLabel(tomorrowDay.day_number, tomorrowDay.name).name
+                            : "a rest day"
+                        }
+                        hardThisWeek={hardThisWeek}
+                        maxHard={MAX_HARD_PER_WEEK}
+                      />
+                    </Step>
+                  </>
+                )}
+              </Fragment>
+            ))}
+          </ol>
+        </div>
       )}
 
       {activePlan && (eveningNow() || todaySession?.finished_at) && (
