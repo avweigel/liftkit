@@ -8,6 +8,7 @@ export const setInputSchema = z.object({
   rpe: z.number().min(1).max(10).nullable().optional(),
   is_warmup: z.boolean().default(false),
   notes: z.string().trim().max(500).nullable().optional(),
+  side: z.enum(["L", "R"]).nullable().optional(),
 });
 
 export type SetInput = z.infer<typeof setInputSchema>;

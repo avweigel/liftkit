@@ -23,7 +23,8 @@ import {
   weightKind,
   type WeightKind,
 } from "@/lib/display/weight-steps";
-import { pairSides } from "@/lib/side";
+import { pairSides, type Side } from "@/lib/side";
+import { logsEachSide, roundOf, sideOf, sideWord, slotLabel } from "@/lib/display/sides";
 import type { DayKind } from "@/lib/program/day-profile";
 import {
   BaseUnitContext,
@@ -44,6 +45,9 @@ import { createContext } from "react";
 // gets the highlight, so in a superset you can't log the wrong exercise.
 const CurrentSetContext = createContext<string | null>(null);
 
+// exercise ids logged a side at a time in this workout
+const SidedContext = createContext<Set<string>>(new Set());
+
 const SwapContext = createContext<{
   open: (ex: Exercise) => void;
   undo: (ex: Exercise) => Promise<void>;
@@ -55,6 +59,7 @@ type LastSessionSet = {
   set_number: number;
   weight: number | null;
   reps: number;
+  side?: Side | null;
 };
 
 type Exercise = {
@@ -101,6 +106,7 @@ type SessionSet = {
   rpe: number | null;
   is_warmup: boolean;
   notes: string | null;
+  side?: Side | null;
   logged_at?: string;
 };
 
@@ -171,19 +177,33 @@ export function SessionLogger({
   // all mapped to one library entry) share the same sets in the logger,
   // so counting 3 × prescribed is misleading. take the max prescribed
   // per exercise_id instead, since that's how many unique sets you can log.
+  // one-sided moves get a row per side. a move already logged the old way
+  // today (one row for both sides) stays that way so its sets keep meaning.
+  const sided = useMemo(() => {
+    const out = new Set<string>();
+    for (const ex of exercises) {
+      if (!logsEachSide(ex.name, ex.prescribed_reps, parseSetCode(ex.notes).cleanNotes)) continue;
+      const combined = initialSets.some(
+        (st) => st.exercise_id === ex.exercise_id && !st.is_warmup && !st.side,
+      );
+      if (!combined) out.add(ex.exercise_id);
+    }
+    return out;
+  }, [exercises, initialSets]);
+
   const totalSets = useMemo(() => {
     const maxByExerciseId = new Map<string, number>();
     for (const ex of exercises) {
       const cur = maxByExerciseId.get(ex.exercise_id) ?? 0;
       maxByExerciseId.set(
         ex.exercise_id,
-        Math.max(cur, ex.prescribed_sets),
+        Math.max(cur, ex.prescribed_sets * (sided.has(ex.exercise_id) ? 2 : 1)),
       );
     }
     let total = 0;
     for (const v of maxByExerciseId.values()) total += v;
     return total;
-  }, [exercises]);
+  }, [exercises, sided]);
   const workingSetsLogged = useMemo(
     () => sets.filter((s) => !s.is_warmup).length,
     [sets],
@@ -210,8 +230,8 @@ export function SessionLogger({
   // where you are: the set after the one you logged last. inside a superset
   // that means the next exercise in the round, not more of the same one.
   const current = useMemo(
-    () => findCurrentSet(groups.map((g) => g.items.map((it) => it._ex)), sets),
-    [groups, sets],
+    () => findCurrentSet(groups.map((g) => g.items.map((it) => it._ex)), sets, sided),
+    [groups, sets, sided],
   );
 
   const currentKey = current ? `${current.exerciseId}-${current.setNumber}` : null;
@@ -240,6 +260,7 @@ export function SessionLogger({
       rpe: number | null;
       is_warmup: boolean;
       notes: string | null;
+      side?: Side | null;
     },
   ) => {
     if (!set.id) followNext.current = true;
@@ -251,6 +272,7 @@ export function SessionLogger({
       rpe: set.rpe,
       is_warmup: set.is_warmup,
       notes: set.notes,
+      side: set.side ?? null,
     });
     setSets((prev) => {
       const replaced = prev.find((s) => set.id != null && s.id === set.id);
@@ -270,11 +292,13 @@ export function SessionLogger({
           rpe: set.rpe,
           is_warmup: set.is_warmup,
           notes: set.notes,
+          side: set.side ?? replaced?.side ?? null,
           logged_at: replaced?.logged_at ?? new Date().toISOString(),
         },
       ];
     });
-    if (restOn && !set.is_warmup) {
+    // no rest between your left side and your right
+    if (restOn && !set.is_warmup && set.side !== "L") {
       const restFor =
         exercises.find((e) => e.exercise_id === exerciseId)?.rest_seconds ??
         60;
@@ -329,6 +353,7 @@ export function SessionLogger({
           rpe: twin.rpe,
           is_warmup: twin.is_warmup,
           notes: twin.notes,
+          side: twin.side ?? null,
         });
       }
     }
@@ -367,6 +392,7 @@ export function SessionLogger({
   return (
     <BaseUnitContext.Provider value={baseUnit}>
     <SwapContext.Provider value={finished ? null : swapApi}>
+    <SidedContext.Provider value={sided}>
     <CurrentSetContext.Provider value={finished ? null : currentKey}>
     <div className="space-y-5">
       <ProgressHeader
@@ -496,7 +522,11 @@ export function SessionLogger({
       {!finished && current && (
         <JumpToCurrent
           targetId={`set-${current.exerciseId}-${current.setNumber}`}
-          label={`Set ${current.setNumber}, ${current.name}`}
+          label={
+            sided.has(current.exerciseId)
+              ? `Set ${roundOf(current.setNumber)} ${sideWord(sideOf(current.setNumber)).toLowerCase()}, ${current.name}`
+              : `Set ${current.setNumber}, ${current.name}`
+          }
           raised={restOn && restSecondsLeft !== null}
         />
       )}
@@ -532,6 +562,7 @@ export function SessionLogger({
       )}
     </div>
     </CurrentSetContext.Provider>
+    </SidedContext.Provider>
     </SwapContext.Provider>
     </BaseUnitContext.Provider>
   );
@@ -540,10 +571,12 @@ export function SessionLogger({
 function findCurrentSet(
   order: Exercise[][],
   sets: SessionSet[],
+  sided: Set<string>,
 ): { exerciseId: string; setNumber: number; name: string } | null {
   const nextOpen = (ex: Exercise): number | null => {
     const mine = sets.filter((s) => s.exercise_id === ex.exercise_id);
-    const goal = ex.prescribed_sets + mine.filter((s) => s.is_warmup).length;
+    const perRound = sided.has(ex.exercise_id) ? 2 : 1;
+    const goal = ex.prescribed_sets * perRound + mine.filter((s) => s.is_warmup).length;
     const taken = new Set(mine.map((s) => s.set_number));
     for (let n = 1; n <= goal; n++) if (!taken.has(n)) return n;
     return null;
@@ -551,6 +584,14 @@ function findCurrentSet(
   const last = [...sets].sort((a, b) =>
     (b.logged_at ?? "").localeCompare(a.logged_at ?? ""),
   )[0];
+  // right after a left side, the right side of the same set is next
+  if (last && sided.has(last.exercise_id) && last.set_number % 2 === 1) {
+    const ex = order.flat().find((e) => e.exercise_id === last.exercise_id);
+    const taken = sets.some(
+      (s) => s.exercise_id === last.exercise_id && s.set_number === last.set_number + 1,
+    );
+    if (ex && !taken) return { exerciseId: ex.exercise_id, setNumber: last.set_number + 1, name: ex.name };
+  }
   let gi = 0;
   let start = 0;
   if (last) {
@@ -897,12 +938,13 @@ function ExerciseHeader({
       {exercise.last_session && (
         <p className="text-[13px] text-(--muted)">
           {exercise.last_swap ? `Last time you did ${exercise.name}` : "Last time"}, {relativeDays(exercise.last_session.logged_at)}:{" "}
-          {exercise.last_session.sets.map((s, i) => (
+          {lastTimeParts(exercise.last_session.sets, show).map((part, i) => (
             <span key={i} className="num text-[15px] text-(--foreground)">
               {i > 0 ? ", " : ""}
-              {s.weight != null ? show(s.weight) : "BW"}×{s.reps}
+              {part}
             </span>
           ))}
+          {exercise.last_session.sets.some((s) => s.side) && " (left/right)"}
           {unit !== base && <span> {unit}</span>}
         </p>
       )}
@@ -918,6 +960,7 @@ type UpsertPayload = {
   rpe: number | null;
   is_warmup: boolean;
   notes: string | null;
+  side?: Side | null;
 };
 
 function SetList({
@@ -939,6 +982,9 @@ function SetList({
     null,
   );
   const currentSet = useContext(CurrentSetContext);
+  const sided = useContext(SidedContext).has(exercise.exercise_id);
+  const roundFor = (n: number) => (sided ? roundOf(n) : n);
+  const sideFor = (n: number): Side | null => (sided ? sideOf(n) : null);
   const weightConv = weightConvention(exercise.name, exercise.equipment, planContext(exercise));
   const kind = weightKind(exercise.name, exercise.equipment, planContext(exercise));
   const base = useContext(BaseUnitContext);
@@ -950,7 +996,7 @@ function SetList({
   // reserve an extra row for each warmup already logged.
   const warmupCount = sets.filter((s) => s.is_warmup).length;
   const maxSet = Math.max(
-    exercise.prescribed_sets + warmupCount,
+    exercise.prescribed_sets * (sided ? 2 : 1) + warmupCount,
     ...sets.map((s) => s.set_number),
     0,
   );
@@ -963,13 +1009,23 @@ function SetList({
     });
   }
 
-  const lastForSet = (n: number): LastSessionSet | null =>
-    exercise.last_session?.sets.find((s) => s.set_number === n) ?? null;
+  // last time was logged per side: same set number. last time had one row
+  // for both sides: that round's row, since its reps were per side anyway.
+  const lastBySide = (exercise.last_session?.sets ?? []).some((s) => s.side);
+  const lastForSet = (n: number): LastSessionSet | null => {
+    const want = sided && !lastBySide ? roundOf(n) : n;
+    return exercise.last_session?.sets.find((s) => s.set_number === want) ?? null;
+  };
 
   const suggestedForSet = (
     n: number,
   ): { weight: number | null; reps: number | null; weightKnown: boolean } => {
-    const target = repTargetForSet(exercise.prescribed_reps, n);
+    const target = repTargetForSet(exercise.prescribed_reps, roundFor(n));
+    // your right side starts from what your left side just did
+    const leftSide =
+      sided && n % 2 === 0
+        ? sets.find((s) => s.set_number === n - 1 && !s.is_warmup) ?? null
+        : null;
     const prevInSession =
       [...sets]
         .filter((s) => !s.is_warmup)
@@ -986,8 +1042,9 @@ function SetList({
     // pyramid, today says 3 x 12. history still sets the load, scaled to the
     // reps you're doing now.
     const fits = (r: number | null) => r != null && repsFitTarget(r, target.text);
-    const reps =
-      target.value == null
+    const reps = leftSide
+      ? leftSide.reps
+      : target.value == null
         ? sameSetLast?.reps ?? prevInSession?.reps ?? null
         : fits(sameSetLast?.reps ?? null)
           ? sameSetLast!.reps
@@ -1005,7 +1062,9 @@ function SetList({
     );
 
     let weight: number | null;
-    if (carried != null) {
+    if (leftSide) {
+      weight = leftSide.weight;
+    } else if (carried != null) {
       weight = carried;
     } else if (prevInSession?.weight != null && prevInSession.reps === reps) {
       // straight sets: keep today's weight
@@ -1051,7 +1110,7 @@ function SetList({
       <ul className="space-y-1.5">
         {logged.map((r) => (
           <li key={r.n}>
-            <LoggedRow set={r.logged!} shownWeight={toShown(r.logged!.weight)} unitLabel={unitLabel} onEdit={() => {}} readOnly />
+            <LoggedRow set={r.logged!} label={slotLabel(r.n, sided)} shownWeight={toShown(r.logged!.weight)} unitLabel={unitLabel} onEdit={() => {}} readOnly />
           </li>
         ))}
       </ul>
@@ -1094,12 +1153,14 @@ function SetList({
     <ul className="space-y-1.5">
       {rows.map((r) => {
         const isExpanded = expandedSetNumber === r.n;
+        const gap = sided && r.n > 1 && r.n % 2 === 1 ? "pt-2" : "";
         if (isExpanded) {
           const suggest = suggestedForSet(r.n);
           return (
-            <li key={r.n} id={`set-${exercise.exercise_id}-${r.n}`} className="scroll-mt-32">
+            <li key={r.n} id={`set-${exercise.exercise_id}-${r.n}`} className={`scroll-mt-32 ${gap}`}>
               <SetEditor
                 setNumber={r.n}
+                label={sided ? `Set ${roundOf(r.n)}, ${sideWord(sideOf(r.n)).toLowerCase()} side` : undefined}
                 initialWeight={toShown(r.logged?.weight ?? suggest.weight)}
                 unit={unit}
                 onUnitChange={setUnit}
@@ -1118,6 +1179,7 @@ function SetList({
                     rpe: r.logged?.rpe ?? null,
                     is_warmup: state.is_warmup,
                     notes: r.logged?.notes ?? null,
+                    side: r.logged?.side ?? sideFor(r.n),
                   });
                   setExpandedSetNumber(null);
                 }}
@@ -1136,9 +1198,10 @@ function SetList({
         }
         if (r.logged) {
           return (
-            <li key={r.n} id={`set-${exercise.exercise_id}-${r.n}`} className="scroll-mt-32">
+            <li key={r.n} id={`set-${exercise.exercise_id}-${r.n}`} className={`scroll-mt-32 ${gap}`}>
               <LoggedRow
                 set={r.logged}
+                label={slotLabel(r.n, sided)}
                 shownWeight={toShown(r.logged.weight)}
                 unitLabel={unitLabel}
                 onEdit={() => setExpandedSetNumber(r.n)}
@@ -1147,11 +1210,13 @@ function SetList({
           );
         }
         const suggest = suggestedForSet(r.n);
-        const target = repTargetForSet(exercise.prescribed_reps, r.n);
+        const target = repTargetForSet(exercise.prescribed_reps, roundFor(r.n));
         return (
-          <li key={r.n} id={`set-${exercise.exercise_id}-${r.n}`} className="scroll-mt-32">
+          <li key={r.n} id={`set-${exercise.exercise_id}-${r.n}`} className={`scroll-mt-32 ${gap}`}>
             <QuickLogRow
               setNumber={r.n}
+              label={slotLabel(r.n, sided)}
+              sideName={sided ? sideWord(sideOf(r.n)) : null}
               weight={toShown(suggest.weight)}
               unitLabel={unitLabel}
               weightKnown={suggest.weightKnown}
@@ -1173,6 +1238,7 @@ function SetList({
                   rpe: null,
                   is_warmup: false,
                   notes: null,
+                  side: sideFor(r.n),
                 });
               }}
             />
@@ -1259,6 +1325,7 @@ function CheckGlyph({ size = 14 }: { size?: number }) {
 
 function LoggedRow({
   set,
+  label,
   shownWeight,
   unitLabel,
   onEdit,
@@ -1269,13 +1336,14 @@ function LoggedRow({
   unitLabel: string | null;
   onEdit: () => void;
   readOnly?: boolean;
+  label: string;
 }) {
   const body = (
     <>
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--ok) text-(--surface)">
         <CheckGlyph />
       </span>
-      <span className="num w-5 text-[15px] text-(--muted)">{set.set_number}</span>
+      <span className="num min-w-5 text-[15px] text-(--muted)">{label}</span>
       {set.is_warmup && <span className="chip">Warm-up</span>}
       <span className="ml-auto flex items-baseline gap-1">
         <span className="num text-[24px] leading-none">{shownWeight != null ? formatWeight(shownWeight) : "BW"}</span>
@@ -1296,7 +1364,7 @@ function LoggedRow({
     <button
       type="button"
       onClick={onEdit}
-      aria-label={`Set ${set.set_number} logged, ${shownWeight != null ? `${formatWeight(shownWeight)} ${unitLabel ?? ""}` : "bodyweight"} by ${set.reps}. Tap to edit.`}
+      aria-label={`Set ${label} logged, ${shownWeight != null ? `${formatWeight(shownWeight)} ${unitLabel ?? ""}` : "bodyweight"} by ${set.reps}. Tap to edit.`}
       className="flex min-h-12 w-full items-center gap-3 rounded-xl bg-(--ok-soft) px-3 text-left"
     >
       {body}
@@ -1305,7 +1373,8 @@ function LoggedRow({
 }
 
 function QuickLogRow({
-  setNumber,
+  label,
+  sideName,
   weight,
   unitLabel,
   weightKnown,
@@ -1317,6 +1386,8 @@ function QuickLogRow({
   onQuickLog,
 }: {
   setNumber: number;
+  label: string;
+  sideName: string | null;
   weight: number | null;
   unitLabel: string | null;
   weightKnown: boolean;
@@ -1352,12 +1423,12 @@ function QuickLogRow({
           current ? "border-(--accent)" : "border-(--border)"
         }`}
       >
-        <span className={`num text-[14px] ${current ? "text-(--accent)" : "text-(--muted)"}`}>{setNumber}</span>
+        <span className={`num ${label.length > 2 ? "text-[12px]" : "text-[14px]"} ${current ? "text-(--accent)" : "text-(--muted)"}`}>{label}</span>
       </span>
       <button
         type="button"
         onClick={onExpand}
-        aria-label={`Edit set ${setNumber}`}
+        aria-label={`Edit set ${label}`}
         className="min-w-0 flex-1 py-1.5 text-left"
       >
         {reps === null ? (
@@ -1380,15 +1451,17 @@ function QuickLogRow({
           <span className="block text-[12px] font-semibold text-(--danger)">
             Didn&rsquo;t save. Check your connection and tap again.
           </span>
-        ) : showTarget && targetText ? (
-          <span className="block text-[12px] text-(--muted)">Target {targetText}</span>
+        ) : sideName || (showTarget && targetText) ? (
+          <span className="block text-[12px] text-(--muted)">
+            {[sideName, showTarget && targetText ? `Target ${targetText}` : null].filter(Boolean).join(" · ")}
+          </span>
         ) : null}
       </button>
       <button
         type="button"
         onClick={handleQuick}
         disabled={pending}
-        aria-label={reps === null || !weightKnown ? `Enter set ${setNumber}` : `Log set ${setNumber} as shown`}
+        aria-label={reps === null || !weightKnown ? `Enter set ${label}` : `Log set ${label} as shown`}
         className={`flex h-11 w-14 shrink-0 items-center justify-center rounded-[12px] transition active:scale-95 disabled:opacity-50 ${
           current ? "bg-(--accent) text-(--accent-contrast)" : "bg-(--surface) text-(--muted)"
         }`}
@@ -1401,6 +1474,7 @@ function QuickLogRow({
 
 function SetEditor({
   setNumber,
+  label,
   initialWeight,
   initialReps,
   initialIsWarmup,
@@ -1415,6 +1489,7 @@ function SetEditor({
   onDelete,
 }: {
   setNumber: number;
+  label?: string;
   initialWeight: number | null;
   initialReps: number | null;
   initialIsWarmup: boolean;
@@ -1476,7 +1551,11 @@ function SetEditor({
     <div className="space-y-3 rounded-xl bg-(--accent-soft) p-3 ring-1 ring-(--accent-line)">
       <div className="flex items-center justify-between">
         <span className="text-[14px] font-semibold">
-          Set <span className="num text-[16px]">{setNumber}</span>
+          {label ?? (
+            <>
+              Set <span className="num text-[16px]">{setNumber}</span>
+            </>
+          )}
         </span>
         <button
           type="button"
@@ -2155,6 +2234,22 @@ function FinishWorkoutPrompt({
       </div>
     </div>
   );
+}
+
+// per-side sets read as one pair per set: "25×10/10", or both weights when
+// the sides differed
+function lastTimeParts(sets: LastSessionSet[], show: (w: number) => string): string[] {
+  const fmt = (st: LastSessionSet) => `${st.weight != null ? show(st.weight) : "BW"}×${st.reps}`;
+  if (!sets.some((st) => st.side)) return sets.map(fmt);
+  const out: string[] = [];
+  for (const st of sets) {
+    if (st.side === "R") continue;
+    const right = st.side === "L" ? sets.find((x) => x.set_number === st.set_number + 1 && x.side === "R") : null;
+    if (!right) out.push(fmt(st));
+    else if (right.weight === st.weight) out.push(`${fmt(st)}/${right.reps}`);
+    else out.push(`${fmt(st)}/${fmt(right)}`);
+  }
+  return out;
 }
 
 function relativeDays(iso: string): string {

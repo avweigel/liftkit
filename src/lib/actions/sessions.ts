@@ -119,6 +119,7 @@ export async function upsertSessionSet(
       rpe: parsed.rpe ?? null,
       is_warmup: parsed.is_warmup,
       notes: parsed.notes ?? null,
+      side: parsed.side ?? null,
       logged_at: new Date().toISOString(),
     })
     .select("id")

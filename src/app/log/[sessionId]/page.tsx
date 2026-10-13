@@ -52,6 +52,7 @@ type SessionSet = {
   rpe: number | null;
   is_warmup: boolean;
   notes: string | null;
+  side: "L" | "R" | null;
   logged_at: string;
 };
 
@@ -61,6 +62,7 @@ type HistoryRow = {
   set_number: number;
   weight: number | null;
   reps: number;
+  side: "L" | "R" | null;
   logged_at: string;
 };
 
@@ -200,7 +202,7 @@ export default async function LogSessionPage({ params }: Props) {
     supabase
       .from("session_sets")
       .select(
-        "id,exercise_id,set_number,weight,reps,rpe,is_warmup,notes,logged_at",
+        "id,exercise_id,set_number,weight,reps,rpe,is_warmup,notes,side,logged_at",
       )
       .eq("session_id", sessionId)
       .order("logged_at", { ascending: true })
@@ -209,7 +211,7 @@ export default async function LogSessionPage({ params }: Props) {
       ? supabase
           .from("session_sets")
           .select(
-            "exercise_id,session_id,set_number,weight,reps,logged_at",
+            "exercise_id,session_id,set_number,weight,reps,side,logged_at",
           )
           .in("exercise_id", exerciseIds)
           .eq("is_warmup", false)
@@ -241,7 +243,7 @@ export default async function LogSessionPage({ params }: Props) {
     exerciseId: string,
   ): {
     logged_at: string;
-    sets: Array<{ set_number: number; weight: number | null; reps: number }>;
+    sets: Array<{ set_number: number; weight: number | null; reps: number; side: "L" | "R" | null }>;
   } | null => {
     const last = lastSessionByExercise.get(exerciseId);
     if (!last) return null;
@@ -254,6 +256,7 @@ export default async function LogSessionPage({ params }: Props) {
           set_number: s.set_number,
           weight: s.weight,
           reps: s.reps,
+          side: s.side,
         })),
     };
   };
