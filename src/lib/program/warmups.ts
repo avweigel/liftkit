@@ -7,6 +7,11 @@ export type WarmupItem = {
   detail?: string;
   // shows a countdown when set
   seconds?: number;
+  // what to set the machine to, shown big on the timer
+  setting?: string;
+  cue?: string;
+  // a placeholder that asks you to pick a machine before the timer shows
+  chooser?: boolean;
   // extra words for search, so "hips" or "cardio" finds the right things
   tags?: string;
 };
@@ -17,14 +22,14 @@ export type WarmupSlot = "pulse" | "mobility" | "drill";
 // is meant to work at 5 am in a quiet gym: nothing loud, nothing that needs
 // a big floor space or a band.
 const PULSE: WarmupItem[] = [
-  { id: "machine-easy", name: "Easy on any machine", dose: "5 min", seconds: 300, detail: "Sleepy: elliptical, spin bike or incline walk. More awake: rower or assault bike.", tags: "cardio machine" },
-  { id: "rower-easy", name: "Rower, easy", dose: "5 min", seconds: 300, tags: "cardio machine" },
-  { id: "elliptical", name: "Elliptical", dose: "5 min", seconds: 300, tags: "cardio machine" },
-  { id: "spin-easy", name: "Spin bike", dose: "5 min", seconds: 300, tags: "cardio machine" },
-  { id: "incline-walk", name: "Incline walk", dose: "5 min", seconds: 300, tags: "cardio machine" },
-  { id: "assault-easy", name: "Assault bike, easy", dose: "5 min", seconds: 300, tags: "cardio machine" },
-  { id: "stairs-easy", name: "Stair climber, slow", dose: "5 min", seconds: 300, tags: "cardio machine" },
-  { id: "rope-easy", name: "Jump rope, easy bounce", dose: "3 min", seconds: 180, tags: "cardio machine" },
+  { id: "machine-easy", name: "Easy on any machine", dose: "5 min", seconds: 300, chooser: true, detail: "Sleepy: elliptical, spin bike or incline walk. More awake: rower or assault bike.", tags: "cardio machine" },
+  { id: "elliptical", name: "Elliptical", dose: "5 min", seconds: 300, setting: "Level 4", cue: "Easy pace, nose breathing", tags: "cardio machine" },
+  { id: "spin-easy", name: "Spin bike", dose: "5 min", seconds: 300, setting: "Light, 85 rpm", cue: "Easy spin, seated", tags: "cardio machine" },
+  { id: "incline-walk", name: "Incline walk", dose: "5 min", seconds: 300, setting: "5 km/h, 6%", cue: "Hands off the rails", tags: "cardio machine treadmill" },
+  { id: "rower-easy", name: "Rower", dose: "5 min", seconds: 300, setting: "2:45, 18 spm", cue: "Legs, then lean, then arms", tags: "cardio machine" },
+  { id: "assault-easy", name: "Assault bike", dose: "5 min", seconds: 300, setting: "Easy, 50 rpm", cue: "Arms and legs together, smooth", tags: "cardio machine air bike" },
+  { id: "stairs-easy", name: "Stair climber", dose: "5 min", seconds: 300, setting: "Level 3", cue: "Slow steps, light hands", tags: "cardio machine" },
+  { id: "rope-easy", name: "Jump rope, easy bounce", dose: "3 min", seconds: 180, setting: "Easy bounce", cue: "Small hops, quiet landings", tags: "cardio machine" },
 ];
 
 const MOBILITY: WarmupItem[] = [
@@ -95,6 +100,9 @@ export function warmupChoices(slot: WarmupSlot): WarmupItem[] {
   if (slot === "mobility") return MOBILITY;
   return Object.values(DRILLS);
 }
+
+// the machines you can pick straight from the warm-up, in the order shown
+export const PULSE_MACHINES = ["elliptical", "spin-easy", "incline-walk", "rower-easy", "assault-easy", "stairs-easy"];
 
 export function warmupItem(slot: WarmupSlot, id: string): WarmupItem | undefined {
   return findIn(warmupChoices(slot), id);
