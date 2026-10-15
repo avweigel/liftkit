@@ -223,6 +223,34 @@ export function CardioTimer({
     saveTimer(persistKey, null);
   };
 
+  // move to the start of step j. skipping ahead counts the steps you jump
+  // over as finished; going back doesn't undo anything you logged.
+  const jumpTo = (j: number) => {
+    const target = Math.max(0, Math.min(steps.length - 1, j));
+    const startMs = steps.slice(0, target).reduce((n, st) => n + st.seconds * 1000, 0);
+    const left = totalMs - startMs;
+    if (target < stepRef.current) stepRef.current = target;
+    setFlashUntil(0);
+    setDoneAll(false);
+    const t = Date.now();
+    setNow(t);
+    setLeftMs(left);
+    if (running) {
+      setEndAt(t + left);
+      saveTimer(persistKey, { endAt: t + left, leftMs: left });
+    } else {
+      // paused: fire the skipped steps now, since the clock isn't ticking
+      if (target > stepRef.current) {
+        for (let i = stepRef.current; i < target; i++) stepEndRef.current?.(i);
+        stepRef.current = target;
+      }
+      saveTimer(persistKey, { endAt: null, leftMs: left });
+    }
+  };
+  // a tap early in a step goes to the one before, later it restarts this one
+  const back = () => jumpTo(stepEndsIn > stepMsNow() - 3000 ? stepIndex - 1 : stepIndex);
+  const stepMsNow = () => (steps[stepIndex]?.seconds ?? 0) * 1000;
+
   const clock = (ms: number) => {
     const s = Math.ceil(ms / 1000);
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -296,6 +324,29 @@ export function CardioTimer({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {steps.length > 1 && started && !doneAll && (
+        <div className="grid grid-cols-2 gap-1.5">
+          <button type="button" onClick={back} className="btn btn-ghost btn-sm" aria-label="Back to the previous step">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={() => jumpTo(stepIndex + 1)}
+            disabled={stepIndex >= steps.length - 1}
+            className="btn btn-ghost btn-sm"
+            aria-label="Skip to the next step"
+          >
+            Next
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </button>
         </div>
       )}
 

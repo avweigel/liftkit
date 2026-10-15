@@ -297,6 +297,7 @@ function WarmupRow({
           ) : (
             <CardioTimer
               key={item.id}
+              persistKey={`liftkit.warmup.timer.${item.id}.${new Date().toISOString().slice(0, 10)}`}
               totalSeconds={item.seconds}
               steps={item.setting ? [{ label: item.setting, sub: item.cue, seconds: item.seconds }] : []}
               onComplete={onFinishTimer}

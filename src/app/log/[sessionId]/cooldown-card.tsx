@@ -136,6 +136,7 @@ export default function CooldownCard({
           ) : (
             <CardioTimer
               key={item.id}
+              persistKey={`liftkit.cooldown.timer.${item.id}.${new Date().toISOString().slice(0, 10)}`}
               totalSeconds={total}
               steps={item.steps}
               onComplete={() => mark("done")}

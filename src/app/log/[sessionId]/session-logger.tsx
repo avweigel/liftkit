@@ -1247,7 +1247,13 @@ function SetList({
   const steps = hold ? holdSteps(hold) : [];
   return (
     <div className="space-y-2">
-    {cardio && <CardioTimer totalSeconds={cardio.totalSeconds} steps={cardio.steps} />}
+    {cardio && (
+      <CardioTimer
+        totalSeconds={cardio.totalSeconds}
+        steps={cardio.steps}
+        persistKey={`liftkit.cardio-ex.${exercise.exercise_id}.${new Date().toISOString().slice(0, 10)}`}
+      />
+    )}
     {hold && nextUp != null && (
       <div>
         <p className="label pb-1">

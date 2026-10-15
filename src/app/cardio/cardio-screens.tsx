@@ -37,6 +37,7 @@ export function CardioRun({ session }: { session: Session }) {
         totalSeconds={total}
         steps={session.steps}
         nowLabel={bySpeed ? "Set to" : "Now"}
+        persistKey={`liftkit.cardio.${session.id}.${session.machine}.${new Date().toISOString().slice(0, 10)}`}
         onElapsed={(ms) => {
           elapsed.current = ms;
           if (!started && ms > 0) setStarted(true);
