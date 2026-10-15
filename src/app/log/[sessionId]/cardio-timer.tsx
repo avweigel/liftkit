@@ -37,6 +37,29 @@ function saveTimer(key: string | undefined, state: SavedTimer | null) {
   } catch {}
 }
 
+// "Intervals: 65 s at 11 km/h, 60 s at 6 km/h" in the notes turns a
+// sets x distance exercise into a timer: fast, easy, fast, ... The fast
+// steps are the sets, so each one can log itself when it ends.
+export function parseIntervals(
+  sets: number,
+  notes: string | null,
+): { steps: CardioStep[]; workIndex: Map<number, number> } | null {
+  const m = (notes ?? "").match(
+    /intervals?:\s*(\d+)\s*s\s*at\s*([\d.]+)\s*km\/h\s*,\s*(\d+)\s*s\s*at\s*([\d.]+)\s*km\/h/i,
+  );
+  if (!m || sets < 1) return null;
+  const [work, fast, rest, easy] = [Number(m[1]), m[2], Number(m[3]), m[4]];
+  const steps: CardioStep[] = [];
+  // step index of each fast effort -> its set number
+  const workIndex = new Map<number, number>();
+  for (let r = 1; r <= sets; r++) {
+    workIndex.set(steps.length, r);
+    steps.push({ label: `${fast} km/h`, sub: `Fast, effort ${r} of ${sets}`, seconds: work, level: 9 });
+    if (r < sets) steps.push({ label: `${easy} km/h`, sub: "Easy, walk or jog", seconds: rest, level: 2 });
+  }
+  return { steps, workIndex };
+}
+
 export function CardioTimer({
   totalSeconds,
   steps,

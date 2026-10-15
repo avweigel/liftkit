@@ -35,7 +35,7 @@ import {
 } from "@/lib/display/units";
 
 // reads this device's saved warm-up picks, so it renders only in the browser
-import { CardioTimer, parseCardio, type CardioStep } from "./cardio-timer";
+import { CardioTimer, parseCardio, parseIntervals, type CardioStep } from "./cardio-timer";
 import { swapExercise, undoSwap } from "@/lib/actions/swaps";
 import { createContext } from "react";
 
@@ -247,6 +247,10 @@ export function SessionLogger({
     for (const g of groups) {
       const items = g.items.map((it) => it._ex);
       if (items.length > 1 && emomPlan(items)) items.forEach((e) => out.add(e.exercise_id));
+      // interval runs keep their own clock too
+      for (const e of items) {
+        if (parseIntervals(e.prescribed_sets, parseSetCode(e.notes).cleanNotes)) out.add(e.exercise_id);
+      }
     }
     return out;
   }, [groups]);
@@ -755,6 +759,7 @@ function SoloExerciseCard({
       <ExerciseHeader
         exercise={exercise}
         badge={letter}
+        inEmom={!!parseIntervals(exercise.prescribed_sets, parseSetCode(exercise.notes).cleanNotes)}
         onRemoveExtra={onRemoveExtra}
       />
       <SetList
@@ -1232,7 +1237,7 @@ function SetList({
       <ul className="space-y-1.5">
         {logged.map((r) => (
           <li key={r.n}>
-            <LoggedRow set={r.logged!} label={slotLabel(r.n, sided)} shownWeight={toShown(r.logged!.weight)} unitLabel={unitLabel} onEdit={() => {}} readOnly />
+            <LoggedRow set={r.logged!} metres={metres} label={slotLabel(r.n, sided)} shownWeight={toShown(r.logged!.weight)} unitLabel={unitLabel} onEdit={() => {}} readOnly />
           </li>
         ))}
       </ul>
@@ -1243,7 +1248,10 @@ function SetList({
   const nextUp = rows.find((r) => !r.logged)?.n ?? null;
 
   const cardio = parseCardio(exercise.prescribed_reps, parseSetCode(exercise.notes).cleanNotes);
-  const hold = cardio ? null : parseHold(exercise.prescribed_reps);
+  // "200 m" is a distance, not reps, and needs no weight
+  const metres = /^\s*\d+\s*m\s*$/i.test(exercise.prescribed_reps);
+  const intervals = cardio ? null : parseIntervals(exercise.prescribed_sets, parseSetCode(exercise.notes).cleanNotes);
+  const hold = cardio || intervals ? null : parseHold(exercise.prescribed_reps);
   const steps = hold ? holdSteps(hold) : [];
   return (
     <div className="space-y-2">
@@ -1253,6 +1261,21 @@ function SetList({
         steps={cardio.steps}
         persistKey={`liftkit.cardio-ex.${exercise.exercise_id}.${new Date().toISOString().slice(0, 10)}`}
       />
+    )}
+    {intervals && (
+      <div>
+        <p className="label pb-1">Each fast effort logs itself when it ends</p>
+        <CardioTimer
+          totalSeconds={intervals.steps.reduce((t, st) => t + st.seconds, 0)}
+          steps={intervals.steps}
+          nowLabel="Set to"
+          persistKey={`liftkit.intervals.${exercise.exercise_id}.${new Date().toISOString().slice(0, 10)}`}
+          onStepEnd={(i) => {
+            const round = intervals.workIndex.get(i);
+            if (round != null) autoFillRef.current({ exerciseId: exercise.exercise_id, round, seq: 0 });
+          }}
+        />
+      </div>
     )}
     {hold && nextUp != null && (
       <div>
@@ -1329,6 +1352,7 @@ function SetList({
             <li key={r.n} id={`set-${exercise.exercise_id}-${r.n}`} className={`scroll-mt-32 ${gap}`}>
               <LoggedRow
                 set={r.logged}
+                metres={metres}
                 label={slotLabel(r.n, sided)}
                 shownWeight={toShown(r.logged.weight)}
                 unitLabel={unitLabel}
@@ -1343,6 +1367,7 @@ function SetList({
           <li key={r.n} id={`set-${exercise.exercise_id}-${r.n}`} className={`scroll-mt-32 ${gap}`}>
             <QuickLogRow
               setNumber={r.n}
+              metres={metres}
               label={slotLabel(r.n, sided)}
               sideName={sided ? sideWord(sideOf(r.n)) : null}
               weight={toShown(suggest.weight)}
@@ -1453,6 +1478,7 @@ function CheckGlyph({ size = 14 }: { size?: number }) {
 
 function LoggedRow({
   set,
+  metres = false,
   label,
   shownWeight,
   unitLabel,
@@ -1465,6 +1491,7 @@ function LoggedRow({
   onEdit: () => void;
   readOnly?: boolean;
   label: string;
+  metres?: boolean;
 }) {
   const body = (
     <>
@@ -1473,12 +1500,19 @@ function LoggedRow({
       </span>
       <span className="num min-w-5 text-[15px] text-(--muted)">{label}</span>
       {set.is_warmup && <span className="chip">Warm-up</span>}
-      <span className="ml-auto flex items-baseline gap-1">
-        <span className="num text-[24px] leading-none">{shownWeight != null ? formatWeight(shownWeight) : "BW"}</span>
-        {unitLabel && shownWeight != null && <span className="text-[13px] text-(--muted)">{unitLabel}</span>}
-        <span className="text-[14px] text-(--muted)">×</span>
-        <span className="num text-[24px] leading-none">{set.reps}</span>
-      </span>
+      {metres ? (
+        <span className="ml-auto flex items-baseline gap-1">
+          <span className="num text-[24px] leading-none">{set.reps}</span>
+          <span className="text-[14px] text-(--muted)">m</span>
+        </span>
+      ) : (
+        <span className="ml-auto flex items-baseline gap-1">
+          <span className="num text-[24px] leading-none">{shownWeight != null ? formatWeight(shownWeight) : "BW"}</span>
+          {unitLabel && shownWeight != null && <span className="text-[13px] text-(--muted)">{unitLabel}</span>}
+          <span className="text-[14px] text-(--muted)">×</span>
+          <span className="num text-[24px] leading-none">{set.reps}</span>
+        </span>
+      )}
     </>
   );
   if (readOnly) {
@@ -1501,6 +1535,7 @@ function LoggedRow({
 }
 
 function QuickLogRow({
+  metres = false,
   label,
   sideName,
   weight,
@@ -1514,6 +1549,7 @@ function QuickLogRow({
   onQuickLog,
 }: {
   setNumber: number;
+  metres?: boolean;
   label: string;
   sideName: string | null;
   weight: number | null;
@@ -1566,6 +1602,11 @@ function QuickLogRow({
             <span className="text-[15px] font-semibold text-(--accent)">Set weight</span>
             <span className="text-[14px] text-(--muted)">×</span>
             <span className={`num text-[24px] leading-none ${current ? "" : "text-(--muted)"}`}>{reps}</span>
+          </span>
+        ) : metres ? (
+          <span className={`flex items-baseline gap-1 ${current ? "" : "text-(--muted)"}`}>
+            <span className="num text-[24px] leading-none">{reps}</span>
+            <span className="text-[14px] text-(--muted)">m</span>
           </span>
         ) : (
           <span className={`flex items-baseline gap-1 ${current ? "" : "text-(--muted)"}`}>
