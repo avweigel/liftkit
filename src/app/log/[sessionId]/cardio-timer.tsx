@@ -27,14 +27,30 @@ export function parseCardio(
   return { totalSeconds: steps.reduce((t, s) => t + s.seconds, 0), steps };
 }
 
+type SavedTimer = { endAt: number | null; leftMs: number };
+
+function saveTimer(key: string | undefined, state: SavedTimer | null) {
+  if (!key) return;
+  try {
+    if (state) window.localStorage.setItem(key, JSON.stringify(state));
+    else window.localStorage.removeItem(key);
+  } catch {}
+}
+
 export function CardioTimer({
   totalSeconds,
   steps,
   onComplete,
   nowLabel = "Incline now",
   onElapsed,
+  onStepEnd,
+  persistKey,
 }: {
   onElapsed?: (ms: number) => void;
+  // called once for each step as it finishes, in order
+  onStepEnd?: (index: number) => void;
+  // keeps a running timer through a reload or a locked phone
+  persistKey?: string;
   totalSeconds: number;
   steps: CardioStep[];
   onComplete?: () => void;
@@ -50,6 +66,10 @@ export function CardioTimer({
   useEffect(() => {
     completeRef.current = onComplete;
   }, [onComplete]);
+  const stepEndRef = useRef(onStepEnd);
+  useEffect(() => {
+    stepEndRef.current = onStepEnd;
+  }, [onStepEnd]);
   const totalMs = totalSeconds * 1000;
   const [endAt, setEndAt] = useState<number | null>(null);
   const [leftMs, setLeftMs] = useState(totalMs);
@@ -90,18 +110,22 @@ export function CardioTimer({
         setLeftMs(0);
         setDoneAll(true);
         chime(audioRef.current, 3);
+        for (let i = stepRef.current; i < steps.length; i++) stepEndRef.current?.(i);
+        stepRef.current = steps.length;
+        saveTimer(persistKey, null);
         completeRef.current?.();
         wakeRef.current?.release().catch(() => {});
         wakeRef.current = null;
       }
     }, 250);
     return () => clearInterval(id);
-  }, [endAt, totalMs]);
+  }, [endAt, totalMs, steps.length, persistKey]);
 
   // one beep when it's time to change the incline
   useEffect(() => {
     if (!running) return;
     if (stepIndex !== stepRef.current) {
+      for (let i = stepRef.current; i < stepIndex; i++) stepEndRef.current?.(i);
       stepRef.current = stepIndex;
       chime(audioRef.current, 1);
       // a few seconds of colour you can't miss from the corner of your eye
@@ -117,6 +141,46 @@ export function CardioTimer({
     };
   }, []);
 
+  // pick a saved timer back up. minutes that passed while the page was
+  // closed don't fire their step ends again.
+  useEffect(() => {
+    if (!persistKey) return;
+    let saved: SavedTimer | null = null;
+    try {
+      saved = JSON.parse(window.localStorage.getItem(persistKey) ?? "null");
+    } catch {}
+    if (!saved) return;
+    const t = Date.now();
+    const left = saved.endAt != null ? saved.endAt - t : saved.leftMs;
+    if (left <= 0 || left > totalMs) {
+      saveTimer(persistKey, null);
+      return;
+    }
+    let acc = 0;
+    const gone = totalMs - left;
+    let idx = steps.length - 1;
+    for (let i = 0; i < steps.length; i++) {
+      acc += steps[i].seconds * 1000;
+      if (gone < acc) {
+        idx = i;
+        break;
+      }
+    }
+    stepRef.current = idx;
+    // restoring from storage can only happen after mount
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNow(t);
+    setLeftMs(left);
+    if (saved.endAt != null) {
+      setEndAt(saved.endAt);
+      keepAwake().then((lock) => {
+        wakeRef.current = lock;
+      });
+    }
+    // only on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const start = () => {
     audioRef.current = unlockAudio(audioRef.current);
     keepAwake().then((lock) => {
@@ -129,11 +193,13 @@ export function CardioTimer({
     if (leftMs <= 0) stepRef.current = 0;
     setLeftMs(left);
     setEndAt(t + left);
+    saveTimer(persistKey, { endAt: t + left, leftMs: left });
   };
 
   const pause = () => {
     setLeftMs(remaining);
     setEndAt(null);
+    saveTimer(persistKey, { endAt: null, leftMs: remaining });
     wakeRef.current?.release().catch(() => {});
     wakeRef.current = null;
   };
@@ -146,6 +212,7 @@ export function CardioTimer({
     setLeftMs(totalMs);
     setNow(t);
     setEndAt(t + totalMs);
+    saveTimer(persistKey, { endAt: t + totalMs, leftMs: totalMs });
   };
 
   const reset = () => {
@@ -153,6 +220,7 @@ export function CardioTimer({
     setLeftMs(totalMs);
     setDoneAll(false);
     stepRef.current = 0;
+    saveTimer(persistKey, null);
   };
 
   const clock = (ms: number) => {

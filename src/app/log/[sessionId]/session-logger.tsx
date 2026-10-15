@@ -45,6 +45,10 @@ import { createContext } from "react";
 // gets the highlight, so in a superset you can't log the wrong exercise.
 const CurrentSetContext = createContext<string | null>(null);
 
+// in an EMOM block, the minute that just finished: which exercise and round
+type EmomTick = { exerciseId: string; round: number; seq: number };
+const EmomTickContext = createContext<EmomTick[]>([]);
+
 // exercise ids logged a side at a time in this workout
 const SidedContext = createContext<Set<string>>(new Set());
 
@@ -235,6 +239,17 @@ export function SessionLogger({
   );
 
   const currentKey = current ? `${current.exerciseId}-${current.setNumber}` : null;
+
+  // exercises inside an EMOM block. the clock sets the rest there, so the
+  // rest timer stays out of the way
+  const emomIds = useMemo(() => {
+    const out = new Set<string>();
+    for (const g of groups) {
+      const items = g.items.map((it) => it._ex);
+      if (items.length > 1 && emomPlan(items)) items.forEach((e) => out.add(e.exercise_id));
+    }
+    return out;
+  }, [groups]);
   // after you log a set, bring the next one to the middle of the screen,
   // even when it's the first exercise of the superset, above
   const followNext = useRef(false);
@@ -261,9 +276,11 @@ export function SessionLogger({
       is_warmup: boolean;
       notes: string | null;
       side?: Side | null;
+      quiet?: boolean;
     },
   ) => {
-    if (!set.id) followNext.current = true;
+    // a set the EMOM clock filled in shouldn't scroll the page under you
+    if (!set.id && !set.quiet) followNext.current = true;
     const { id } = await upsertSessionSet(sessionId, set.id, {
       exercise_id: exerciseId,
       set_number: set.set_number,
@@ -298,7 +315,7 @@ export function SessionLogger({
       ];
     });
     // no rest between your left side and your right
-    if (restOn && !set.is_warmup && set.side !== "L") {
+    if (restOn && !set.is_warmup && set.side !== "L" && !emomIds.has(exerciseId)) {
       const restFor =
         exercises.find((e) => e.exercise_id === exerciseId)?.rest_seconds ??
         60;
@@ -437,6 +454,7 @@ export function SessionLogger({
           return (
             <SupersetBlock
               key={g.id}
+              timerKey={`liftkit.emom.${sessionId}.${g.letter}`}
               letter={g.letter!}
               exercises={g.items.map((it) => it._ex)}
               setsByExercise={Object.fromEntries(
@@ -754,6 +772,7 @@ function SoloExerciseCard({
 // ----- Superset block: exercises stacked, done back to back -----
 
 function SupersetBlock({
+  timerKey,
   letter,
   exercises,
   setsByExercise,
@@ -763,6 +782,7 @@ function SupersetBlock({
   onRemoveExtra,
   finished,
 }: {
+  timerKey: string;
   letter: string;
   exercises: Exercise[];
   setsByExercise: Record<string, SessionSet[]>;
@@ -774,6 +794,7 @@ function SupersetBlock({
 }) {
   const active = useIsActive(exercises.map((e) => e.exercise_id));
   const emom = emomPlan(exercises);
+  const [ticks, setTicks] = useState<EmomTick[]>([]);
   return (
     <section className={`card overflow-hidden transition-shadow ${active ? ACTIVE_CARD : ""}`}>
       <div className="flex items-center gap-2 px-4 pt-4">
@@ -793,17 +814,28 @@ function SupersetBlock({
       {emom && !finished && (
         <div className="space-y-1.5 px-4 pt-3">
           <p className="text-[13px] text-(--muted)">
-            Start each move at the top of its minute. What&rsquo;s left of the minute is rest. Log the sets as you go.
+            Start each move at the top of its minute. What&rsquo;s left of the minute is rest. Each set fills itself in when its minute ends. Tap it to fix the reps or weight.
           </p>
-          <CardioTimer totalSeconds={emom.steps.reduce((n, st) => n + st.seconds, 0)} steps={emom.steps} />
+          <CardioTimer
+            totalSeconds={emom.steps.reduce((n, st) => n + st.seconds, 0)}
+            steps={emom.steps}
+            nowLabel="Now"
+            persistKey={timerKey}
+            onStepEnd={(i) => {
+              const slot = emom.slots[i];
+              if (slot) setTicks((prev) => [...prev, { ...slot, seq: prev.length + 1 }]);
+            }}
+          />
         </div>
       )}
+      <EmomTickContext.Provider value={ticks}>
       <div className="divide-y divide-(--border)">
         {exercises.map((ex, i) => (
           <div key={ex.id} className="space-y-3 p-4">
             <ExerciseHeader
               exercise={ex}
               badge={`${letter}${i + 1}`}
+              inEmom={!!emom}
               onRemoveExtra={
                 ex.is_extra && ex.extra_id && onRemoveExtra
                   ? () => onRemoveExtra(ex.extra_id!)
@@ -821,6 +853,7 @@ function SupersetBlock({
           </div>
         ))}
       </div>
+      </EmomTickContext.Provider>
     </section>
   );
 }
@@ -829,7 +862,13 @@ function SupersetBlock({
 // turns a superset into a minute by minute timer
 function emomPlan(
   exercises: Exercise[],
-): { rounds: number; minutesPerRound: number; steps: CardioStep[] } | null {
+): {
+  rounds: number;
+  minutesPerRound: number;
+  steps: CardioStep[];
+  // which exercise and round each step is, null for a rest minute
+  slots: Array<{ exerciseId: string; round: number } | null>;
+} | null {
   const byMinute = new Map<number, Exercise>();
   let rest: number | null = null;
   for (const ex of exercises) {
@@ -844,9 +883,11 @@ function emomPlan(
   const rounds = Math.max(...exercises.map((e) => e.prescribed_sets));
   const name = (ex: Exercise) => `${ex.name}, ${ex.prescribed_reps}`;
   const steps: CardioStep[] = [];
+  const slots: Array<{ exerciseId: string; round: number } | null> = [];
   for (let r = 1; r <= rounds; r++) {
     for (let minute = 1; minute <= minutesPerRound; minute++) {
       const ex = byMinute.get(minute);
+      slots.push(ex ? { exerciseId: ex.exercise_id, round: r } : null);
       steps.push(
         ex
           ? { label: name(ex), sub: `Round ${r} of ${rounds}`, seconds: 60 }
@@ -854,16 +895,19 @@ function emomPlan(
       );
     }
   }
-  return { rounds, minutesPerRound, steps };
+  return { rounds, minutesPerRound, steps, slots };
 }
 
 function ExerciseHeader({
   exercise,
   badge,
   onRemoveExtra,
+  inEmom = false,
 }: {
   exercise: Exercise;
   badge: string | null;
+  // the EMOM clock sets the rest, so the plan's rest time would mislead
+  inEmom?: boolean;
   onRemoveExtra?: () => Promise<void> | void;
 }) {
   const { cleanNotes } = parseSetCode(exercise.notes);
@@ -928,7 +972,7 @@ function ExerciseHeader({
           )}
         </span>
         )}
-        {exercise.rest_seconds != null && exercise.rest_seconds > 0 && (
+        {!inEmom && exercise.rest_seconds != null && exercise.rest_seconds > 0 && (
           <span className="chip">
             rest <span className="num text-[14px]">{exercise.rest_seconds}</span> s
           </span>
@@ -1004,6 +1048,8 @@ type UpsertPayload = {
   is_warmup: boolean;
   notes: string | null;
   side?: Side | null;
+  // filled in by the EMOM clock, not tapped
+  quiet?: boolean;
 };
 
 function SetList({
@@ -1025,6 +1071,7 @@ function SetList({
     null,
   );
   const currentSet = useContext(CurrentSetContext);
+  const emomTicks = useContext(EmomTickContext);
   const sided = useContext(SidedContext).has(exercise.exercise_id);
   const roundFor = (n: number) => (sided ? roundOf(n) : n);
   const sideFor = (n: number): Side | null => (sided ? sideOf(n) : null);
@@ -1143,6 +1190,38 @@ function SetList({
 
     return { weight, reps, weightKnown };
   };
+
+  // when this exercise's EMOM minute ends, fill in that round's set with
+  // what was planned, unless you already logged it. a set that still needs
+  // a weight picked waits for you instead.
+  const autoFill = (tick: EmomTick) => {
+    if (finished || sided || tick.exerciseId !== exercise.exercise_id) return;
+    if (sets.some((st) => st.set_number === tick.round)) return;
+    const suggest = suggestedForSet(tick.round);
+    if (suggest.reps == null || !suggest.weightKnown) return;
+    void onUpsert({
+      id: null,
+      set_number: tick.round,
+      weight: suggest.weight,
+      reps: suggest.reps,
+      rpe: null,
+      is_warmup: false,
+      notes: null,
+      quiet: true,
+    });
+  };
+  const autoFillRef = useRef(autoFill);
+  useEffect(() => {
+    autoFillRef.current = autoFill;
+  });
+  const handledTicks = useRef(0);
+  useEffect(() => {
+    for (const t of emomTicks) {
+      if (t.seq <= handledTicks.current) continue;
+      handledTicks.current = t.seq;
+      autoFillRef.current(t);
+    }
+  }, [emomTicks]);
 
   if (finished) {
     const logged = rows.filter((r) => r.logged);
