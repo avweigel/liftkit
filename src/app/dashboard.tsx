@@ -390,18 +390,7 @@ function TomorrowCard({ day }: { day: PlanDay | null }) {
     );
   }
   const label = formatDayLabel(day.day_number, day.name);
-  const ordered = day.plan_day_exercises
-    .slice()
-    .sort((a, b) => a.order_index - b.order_index)
-    .filter((e) => !/^\s*(\[[A-Z]\d*\]\s*)?cooldown\b/i.test(e.notes ?? ""));
-  // consecutive exercises with the same letter are one superset
-  const groups: Array<{ letter: string | null; items: typeof ordered }> = [];
-  for (const e of ordered) {
-    const letter = parseSetCode(e.notes).code?.letter ?? null;
-    const last = groups[groups.length - 1];
-    if (last && letter && last.letter === letter) last.items.push(e);
-    else groups.push({ letter, items: [e] });
-  }
+  const count = previewItems(day).length;
   return (
     <section className="space-y-3">
       <h2 className="display text-[22px]">Tomorrow</h2>
@@ -412,35 +401,67 @@ function TomorrowCard({ day }: { day: PlanDay | null }) {
             <div className="display text-[24px]">{label.name}</div>
           </div>
           <span className="chip">
-            <span className="num text-[13px]">{ordered.length}</span> exercises
+            <span className="num text-[13px]">{count}</span> exercises
           </span>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-(--muted) transition-transform group-open:rotate-180" aria-hidden>
             <path d="M6 9l6 6 6-6" />
           </svg>
         </summary>
-        <ol className="space-y-2 border-t border-(--border) p-4">
-          {groups.map((g, gi) => (
-            <li key={gi} className="flex gap-3">
-              <span className="num flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-(--accent-soft) text-[14px] text-(--accent)">
-                {g.letter ?? gi + 1}
-              </span>
-              <ul className="min-w-0 flex-1 space-y-1">
-                {g.items.map((e) => (
-                  <li key={e.id} className="flex items-baseline justify-between gap-3">
+        <div className="border-t border-(--border) p-4">
+          <DayExerciseList day={day} />
+        </div>
+      </details>
+    </section>
+  );
+}
+
+function previewItems(day: PlanDay) {
+  return day.plan_day_exercises
+    .slice()
+    .sort((a, b) => a.order_index - b.order_index)
+    .filter((e) => !/^\s*(\[[A-Z]\d*\]\s*)?cooldown\b/i.test(e.notes ?? ""));
+}
+
+// the day's exercises grouped as they'll be done, with the plan's notes,
+// so you can see what's coming without starting anything
+function DayExerciseList({ day }: { day: PlanDay }) {
+  const ordered = previewItems(day);
+  // consecutive exercises with the same letter are one superset
+  const groups: Array<{ letter: string | null; items: typeof ordered }> = [];
+  for (const e of ordered) {
+    const letter = parseSetCode(e.notes).code?.letter ?? null;
+    const last = groups[groups.length - 1];
+    if (last && letter && last.letter === letter) last.items.push(e);
+    else groups.push({ letter, items: [e] });
+  }
+  return (
+    <ol className="space-y-3">
+      {groups.map((g, gi) => (
+        <li key={gi} className="flex gap-3">
+          <span className="num flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-(--accent-soft) text-[14px] text-(--accent)">
+            {g.letter ?? gi + 1}
+          </span>
+          <ul className="min-w-0 flex-1 space-y-1.5">
+            {g.items.map((e) => {
+              const note = parseSetCode(e.notes).cleanNotes;
+              return (
+                <li key={e.id}>
+                  <div className="flex items-baseline justify-between gap-3">
                     <span className="truncate text-[15px] font-semibold">{e.exercise?.name ?? "Exercise"}</span>
                     <span className="num shrink-0 text-[14px] text-(--muted)">
                       {e.prescribed_reps.includes(",")
                         ? formatRxReps(e.prescribed_reps)
                         : `${e.prescribed_sets} × ${e.prescribed_reps}`}
                     </span>
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ol>
-      </details>
-    </section>
+                  </div>
+                  {note && <p className="text-[13px] text-(--muted)">{note}</p>}
+                </li>
+              );
+            })}
+          </ul>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -546,6 +567,17 @@ function WorkoutCard({
           )}
         </div>
       </div>
+      <details className="group border-t border-(--border)">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-5 text-[14px] font-semibold text-(--accent) [&::-webkit-details-marker]:hidden">
+          See the workout
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="transition-transform group-open:rotate-180" aria-hidden>
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </summary>
+        <div className="px-5 pb-4">
+          <DayExerciseList day={day} />
+        </div>
+      </details>
       <div className="border-t border-(--border) bg-(--surface-2)/50 p-3">
         {!session ? (
           <StartDayButton dayId={day.id} label="Start workout" block />
@@ -673,7 +705,7 @@ function WeekStrip({
       </ul>
       <details className="card group overflow-hidden">
         <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-4 font-semibold">
-          Train a different day
+          Other days
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-(--muted) transition-transform group-open:rotate-180" aria-hidden>
             <path d="M6 9l6 6 6-6" />
           </svg>
@@ -684,14 +716,25 @@ function WeekStrip({
           .map((d) => {
             const label = formatDayLabel(d.day_number, d.name);
             return (
-              <li key={d.id} className="flex min-h-14 items-center justify-between gap-3 px-4 py-2">
-                <div className="min-w-0">
-                  <span className="mr-2 text-[13px] font-semibold text-(--muted)">
-                    {label.weekdayShort}
-                  </span>
-                  <span className="font-medium">{label.name}</span>
-                </div>
-                <StartOtherDayButton dayId={d.id} label="Start" />
+              <li key={d.id}>
+                <details className="group/day">
+                  <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-2 [&::-webkit-details-marker]:hidden">
+                    <div className="min-w-0 flex-1">
+                      <span className="mr-2 text-[13px] font-semibold text-(--muted)">
+                        {label.weekdayShort}
+                      </span>
+                      <span className="font-medium">{label.name}</span>
+                    </div>
+                    <span className="text-[13px] font-semibold text-(--muted) group-open/day:hidden">Preview</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-(--muted) transition-transform group-open/day:rotate-180" aria-hidden>
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </summary>
+                  <div className="space-y-3 px-4 pb-4">
+                    <DayExerciseList day={d} />
+                    <StartOtherDayButton dayId={d.id} label={`Start ${label.name}`} />
+                  </div>
+                </details>
               </li>
             );
           })}
