@@ -1077,6 +1077,8 @@ function SetList({
   );
   const currentSet = useContext(CurrentSetContext);
   const emomTicks = useContext(EmomTickContext);
+  // the speed you're really running the fast parts at, null = the plan's
+  const [fastKmh, setFastKmh] = useState<number | null>(null);
   const sided = useContext(SidedContext).has(exercise.exercise_id);
   const roundFor = (n: number) => (sided ? roundOf(n) : n);
   const sideFor = (n: number): Side | null => (sided ? sideOf(n) : null);
@@ -1199,7 +1201,7 @@ function SetList({
   // when this exercise's EMOM minute ends, fill in that round's set with
   // what was planned, unless you already logged it. a set that still needs
   // a weight picked waits for you instead.
-  const autoFill = (tick: EmomTick) => {
+  const autoFill = (tick: EmomTick, override?: { reps: number; notes: string }) => {
     if (finished || sided || tick.exerciseId !== exercise.exercise_id) return;
     if (sets.some((st) => st.set_number === tick.round)) return;
     const suggest = suggestedForSet(tick.round);
@@ -1207,11 +1209,11 @@ function SetList({
     void onUpsert({
       id: null,
       set_number: tick.round,
-      weight: suggest.weight,
-      reps: suggest.reps,
+      weight: override ? null : suggest.weight,
+      reps: override?.reps ?? suggest.reps,
       rpe: null,
       is_warmup: false,
-      notes: null,
+      notes: override?.notes ?? null,
       quiet: true,
     });
   };
@@ -1250,7 +1252,9 @@ function SetList({
   const cardio = parseCardio(exercise.prescribed_reps, parseSetCode(exercise.notes).cleanNotes);
   // "200 m" is a distance, not reps, and needs no weight
   const metres = /^\s*\d+\s*m\s*$/i.test(exercise.prescribed_reps);
-  const intervals = cardio ? null : parseIntervals(exercise.prescribed_sets, parseSetCode(exercise.notes).cleanNotes);
+  const intervals = cardio
+    ? null
+    : parseIntervals(exercise.prescribed_sets, parseSetCode(exercise.notes).cleanNotes, fastKmh ?? undefined);
   const hold = cardio || intervals ? null : parseHold(exercise.prescribed_reps);
   const steps = hold ? holdSteps(hold) : [];
   return (
@@ -1264,7 +1268,28 @@ function SetList({
     )}
     {intervals && (
       <div>
-        <p className="label pb-1">Each fast effort logs itself when it ends</p>
+        <div className="mb-2 flex items-center gap-2 rounded-xl bg-(--surface-2) px-3 py-2">
+          <span className="min-w-0 flex-1 text-[13px] text-(--muted)">
+            Fast speed you&rsquo;re running. Each effort logs its distance from this when it ends.
+          </span>
+          <button
+            type="button"
+            onClick={() => setFastKmh(Math.max(4, Math.round((intervals.fastKmh - 0.5) * 2) / 2))}
+            className="btn btn-secondary btn-sm w-10 px-0"
+            aria-label="Half a km/h slower"
+          >
+            −
+          </button>
+          <span className="num w-16 text-center text-[18px]">{intervals.fastKmh} km/h</span>
+          <button
+            type="button"
+            onClick={() => setFastKmh(Math.min(25, Math.round((intervals.fastKmh + 0.5) * 2) / 2))}
+            className="btn btn-secondary btn-sm w-10 px-0"
+            aria-label="Half a km/h faster"
+          >
+            +
+          </button>
+        </div>
         <CardioTimer
           totalSeconds={intervals.steps.reduce((t, st) => t + st.seconds, 0)}
           steps={intervals.steps}
@@ -1272,7 +1297,13 @@ function SetList({
           persistKey={`liftkit.intervals.${exercise.exercise_id}.${new Date().toISOString().slice(0, 10)}`}
           onStepEnd={(i) => {
             const round = intervals.workIndex.get(i);
-            if (round != null) autoFillRef.current({ exerciseId: exercise.exercise_id, round, seq: 0 });
+            if (round != null) {
+              const metres = Math.round((intervals.fastKmh / 3.6) * intervals.workSeconds);
+              autoFillRef.current(
+                { exerciseId: exercise.exercise_id, round, seq: 0 },
+                { reps: metres, notes: `${intervals.fastKmh} km/h for ${intervals.workSeconds} s` },
+              );
+            }
           }}
         />
       </div>
