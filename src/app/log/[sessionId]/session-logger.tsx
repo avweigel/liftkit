@@ -773,6 +773,7 @@ function SupersetBlock({
   finished: boolean;
 }) {
   const active = useIsActive(exercises.map((e) => e.exercise_id));
+  const emom = emomPlan(exercises);
   return (
     <section className={`card overflow-hidden transition-shadow ${active ? ACTIVE_CARD : ""}`}>
       <div className="flex items-center gap-2 px-4 pt-4">
@@ -784,9 +785,19 @@ function SupersetBlock({
           {letter}
         </span>
         <span className="label">
-          Superset, {exercises.length} exercises back to back
+          {emom
+            ? `EMOM, ${emom.rounds} rounds of ${emom.minutesPerRound} minutes`
+            : `Superset, ${exercises.length} exercises back to back`}
         </span>
       </div>
+      {emom && !finished && (
+        <div className="space-y-1.5 px-4 pt-3">
+          <p className="text-[13px] text-(--muted)">
+            Start each move at the top of its minute. What&rsquo;s left of the minute is rest. Log the sets as you go.
+          </p>
+          <CardioTimer totalSeconds={emom.steps.reduce((n, st) => n + st.seconds, 0)} steps={emom.steps} />
+        </div>
+      )}
       <div className="divide-y divide-(--border)">
         {exercises.map((ex, i) => (
           <div key={ex.id} className="space-y-3 p-4">
@@ -812,6 +823,38 @@ function SupersetBlock({
       </div>
     </section>
   );
+}
+
+// "EMOM minute 2" in each exercise's notes (and "rest minute 5" on one)
+// turns a superset into a minute by minute timer
+function emomPlan(
+  exercises: Exercise[],
+): { rounds: number; minutesPerRound: number; steps: CardioStep[] } | null {
+  const byMinute = new Map<number, Exercise>();
+  let rest: number | null = null;
+  for (const ex of exercises) {
+    const notes = ex.notes ?? "";
+    const m = notes.match(/emom minute (\d+)/i);
+    if (!m) return null;
+    byMinute.set(Number(m[1]), ex);
+    const r = notes.match(/rest minute (\d+)/i);
+    if (r) rest = Number(r[1]);
+  }
+  const minutesPerRound = Math.max(...byMinute.keys(), rest ?? 0);
+  const rounds = Math.max(...exercises.map((e) => e.prescribed_sets));
+  const name = (ex: Exercise) => `${ex.name}, ${ex.prescribed_reps}`;
+  const steps: CardioStep[] = [];
+  for (let r = 1; r <= rounds; r++) {
+    for (let minute = 1; minute <= minutesPerRound; minute++) {
+      const ex = byMinute.get(minute);
+      steps.push(
+        ex
+          ? { label: name(ex), sub: `Round ${r} of ${rounds}`, seconds: 60 }
+          : { label: "Rest", sub: r < rounds ? `Round ${r} of ${rounds} done` : "Last round done", seconds: 60 },
+      );
+    }
+  }
+  return { rounds, minutesPerRound, steps };
 }
 
 function ExerciseHeader({
