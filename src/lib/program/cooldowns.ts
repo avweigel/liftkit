@@ -118,7 +118,7 @@ const OTHER: CooldownItem[] = [
     tags: "stretch mobility sun salutation yoga",
     steps: [
       { label: "Slow sun salutations", seconds: 90 },
-      ...sides("World's greatest stretch", 45),
+      ...sides("Lizard with reach", 45),
       ...sides("Pigeon", 30),
       { label: "Child's pose", seconds: 60 },
     ],

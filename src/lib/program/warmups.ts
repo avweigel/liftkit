@@ -34,7 +34,7 @@ const PULSE: WarmupItem[] = [
 
 const MOBILITY: WarmupItem[] = [
   { id: "sun-lunge", name: "Sun salutations, then side lunges", dose: "3-5, then 3-5/side" },
-  { id: "wgs-flow", name: "World's greatest stretch flow", dose: "1 round", detail: "World's greatest stretch 3/side, cat-cow 5, lateral lunge 5/side." },
+  { id: "wgs-flow", name: "Lizard with reach flow", dose: "1 round", detail: "Lizard with reach 3/side (lunge, elbow to instep, then rotate and reach up), cat-cow 5, side lunge 5/side.", tags: "hips lunge rotation twist stretch" },
   { id: "sun-only", name: "Sun salutations", dose: "3-5" },
   { id: "hips-9090", name: "90/90 hip switches and cat-cow", dose: "8 switches, 5 cat-cow" },
   { id: "ankle-hip", name: "Ankle rocks, cossack shifts, deep squat hold", dose: "8/side, 5/side, 30 s", detail: "Good before squats." },
