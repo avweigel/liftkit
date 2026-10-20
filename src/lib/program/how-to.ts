@@ -17,6 +17,38 @@ const H: Record<string, HowTo> = {
     how: "Lie on your back with your arms pointing at the ceiling and your knees over your hips. Lower one arm and the opposite leg toward the floor, exhale, then bring them back and switch.",
     cues: ["Lower back pressed into the floor the whole time", "Only go as low as you can without arching", "Exhale as you reach"],
   },
+  "front-hold-march": {
+    how: "Hold a kettlebell or plate out in front of you at chest height with straight arms. March on the spot, lifting each knee to hip height, slow and steady.",
+    cues: ["The weight tries to pull your ribs up: keep them down", "No lean back as the knee comes up", "Long exhale every few steps"],
+  },
+  "half-kneeling-dumbbell-woodchop": {
+    how: "Kneel on one knee with a dumbbell held in both hands up by the shoulder on the side of the up knee. Chop it slowly down and across to the opposite hip, then bring it back.",
+    cues: ["Hips stay square to the front", "Ribs down, the chop comes from the trunk", "Exhale on the way down"],
+  },
+  "half-kneeling-one-arm-overhead-press": {
+    how: "Kneel on one knee with a light dumbbell at the shoulder on the same side as the down knee. Press straight up and lower slowly.",
+    cues: ["Ribs stay down at the top. If they lift, stop the set", "No side lean", "Glute of the down leg squeezed"],
+  },
+  "hard-plank": {
+    how: "Forearm plank, elbows under your shoulders. Squeeze your glutes hard, pull your elbows toward your toes without moving, and breathe out long and slow. Ten to twenty seconds at full effort.",
+    cues: ["Tailbone tucked slightly", "Ribs down, back flat", "If you can hold it a minute, you're not squeezing hard enough"],
+  },
+  "kettlebell-figure-8s": {
+    how: "Wide stance, knees bent, chest up. Pass the bell around the outside of one leg, through your legs to the other hand, then around the outside of the other leg. Keep the eight going.",
+    cues: ["Hips low and still, the bell moves, you don't", "Ribs down, flat back", "Exhale as the bell passes through"],
+  },
+  "reverse-lunge-twist": {
+    how: "Hold a dumbbell at your chest. Step one foot back into a lunge, then rotate your trunk toward the front leg and back. Step up and switch legs.",
+    cues: ["Turn from the ribs, hips stay forward", "Exhale as you rotate", "Front knee stays over the foot"],
+  },
+  "bear-hold-kettlebell-slide": {
+    how: "Hands and toes on the floor, knees an inch up, back flat. A kettlebell sits beside one hand. Reach across with the other hand, slide the bell to the other side, and put the hand back down.",
+    cues: ["Hips don't sway or rotate", "Knees stay off the floor", "Exhale as you slide"],
+  },
+  "slow-leg-lowers": {
+    how: "On your back with your legs straight up and your arms by your sides. Lower one leg slowly toward the floor while breathing out, stop just before your lower back lifts, and bring it back. Once that's clean every rep, lower both legs together.",
+    cues: ["Lower back stays pressed down", "Belly stays flat, no doming", "Slower on the way down than the way up"],
+  },
   "side-plank-reach-through": {
     how: "Side plank on your forearm, top arm reaching to the ceiling. Thread the top arm under your body as you rotate toward the floor, then open back up.",
     cues: ["Hips stay lifted and stacked", "Exhale as you rotate under", "Turn from the ribs, not the hips"],
