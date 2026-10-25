@@ -134,6 +134,17 @@ type Effort = "warm" | "easy" | "recover" | "steady" | "hard" | "stride" | "cool
 
 const LEVEL: Record<Effort, number> = { cool: 2, recover: 2, easy: 3, warm: 3, steady: 6, hard: 9, stride: 8 };
 
+// every run covers at least 5 km. distance comes from the speeds on the
+// steps, so a session that comes up short gets more of its easy running.
+export const MIN_RUN_KM = 5;
+
+export function sessionKm(steps: Array<{ label: string; seconds: number }>): number {
+  return steps.reduce((km, st) => {
+    const m = st.label.match(/^([\d.]+)\s*km\/h/);
+    return km + (m ? (Number(m[1]) * st.seconds) / 3600 : 0);
+  }, 0);
+}
+
 export function buildSession(
   id: SessionId,
   machine: Machine,
@@ -201,10 +212,12 @@ export function buildSession(
   // "runwalk" restarts the climb each round and goes up in big steps.
   // "creep" keeps climbing in small steps across the whole session.
   if (id === "intervals" && (machine === "runwalk" || machine === "creep")) {
-    const rounds = 5;
     const easyKmh = 3600 / profile.easyPaceS;
     const r1 = (n: number) => Math.round(n * 10) / 10;
-    const start = r1(easyKmh * 1.15);
+    const start = r1(easyKmh * 1.12);
+    // one round is about 0.9 km. five rounds, or more until it's 5 km
+    const perRound = (4 * (start + 1.2) + 3 * 4.5) / 60;
+    const rounds = Math.max(5, Math.ceil((MIN_RUN_KM - (2 * 4.5) / 60) / perRound));
     const speedAt = (round: number, minute: number) =>
       machine === "runwalk" ? r1(start + 0.8 * minute) : r1(start + 0.16 * (round * 4 + minute));
     const steps: Step[] = [{ label: "4.5 km/h", sub: `Warm-up walk. ${hr("easy")}`, seconds: 120, level: 2 }];
@@ -231,19 +244,19 @@ export function buildSession(
       id,
       machine,
       title: machine === "runwalk" ? "Climbing 4s" : "Creeping ladder",
-      minutes: 37,
+      minutes: 2 + rounds * 7,
       goal: "VO2 max, speed",
       plain:
         machine === "runwalk"
-          ? `2 min walk, then 5 rounds: run 4 min stepping up each minute (${start} to ${speedAt(0, 3)} km/h), walk 3 min.`
-          : `2 min walk, then 5 rounds of run 4 min, walk 3 min. Every running minute is 0.1 mph (0.16 km/h) quicker than the last, ${start} to ${top} km/h.`,
+          ? `2 min walk, then ${rounds} rounds: run 4 min stepping up each minute (${start} to ${speedAt(0, 3)} km/h), walk 3 min. About ${r1(sessionKm(steps))} km.`
+          : `2 min walk, then ${rounds} rounds of run 4 min, walk 3 min. Every running minute is 0.1 mph (0.16 km/h) quicker than the last, ${start} to ${top} km/h. About ${r1(sessionKm(steps))} km.`,
       why:
         machine === "runwalk"
           ? "Each run climbs to a hard top minute, then the walk resets you. Five climbs is a real interval session with a target every single minute."
           : "The speed never stops creeping up, so the last round is well past what you'd pick on your own. The walks make it possible.",
       steps,
       outside: [
-        "2 min walk, then 5 rounds of run 4 min, walk 3 min.",
+        `2 min walk, then ${rounds} rounds of run 4 min, walk 3 min.`,
         machine === "runwalk"
           ? `Each run starts easy and gets quicker every minute, finishing hard (HR ${z.hard[0]} to ${z.hard[1]}).`
           : `Make every running minute a touch quicker than the one before, through all 5 rounds. The last round should be hard (HR ${z.hard[0]} to ${z.hard[1]}).`,
@@ -278,15 +291,21 @@ export function buildSession(
   // run/walk: the same easy work in 3 min runs with 1 min walks between.
   // the walks keep the heart rate honest, which is the point of easy running.
   if (machine === "runwalk" && (id === "easy" || id === "long")) {
-    const total = id === "long" ? opts.longMinutes : 35;
-    const rounds = Math.round((total - 3) / 4);
+    const baseTotal = id === "long" ? opts.longMinutes : 35;
+    const baseRounds = Math.round((baseTotal - 3) / 4);
+    // about 0.6 km a round. more rounds until it's 5 km
+
+    // the ladder's average speed is about easy pace, so each round is
+    // about 3 min of running plus a walk. add rounds until it's 5 km
+    let rounds = baseRounds;
+
     // every run a notch quicker: from a bit under easy pace to a push at
     // the end. the walks keep it honest, the ladder gives you something
     // to chase. the top of the ladder is about the goal easy pace.
     const easyKmh = 3600 / profile.easyPaceS;
     const r1 = (n: number) => Math.round(n * 10) / 10;
     const ramp = (i: number) => r1(easyKmh * (0.92 + (0.26 * i) / Math.max(1, rounds - 1)));
-    const pushFrom = rounds - 2;
+    const pushFrom = () => rounds - 2;
     const walkStep = (minutes: number): Step => ({
       label: "4.5 km/h",
       sub: `Walk it off. ${hr("easy")}`,
@@ -294,7 +313,7 @@ export function buildSession(
       level: 2,
     });
     const runStep = (i: number, minutes: number): Step => {
-      const push = i >= pushFrom;
+      const push = i >= pushFrom();
       return {
         label: `${ramp(i)} km/h`,
         sub: push ? `Run ${i + 1} of ${rounds}. Push, ${hr("steady")}` : `Run ${i + 1} of ${rounds}. Easy, ${hr("easy")}`,
@@ -304,25 +323,39 @@ export function buildSession(
     };
     const steps: Step[] = [walkStep(3)];
     let used = 3;
-    for (let i = 0; i < rounds && used < total; i++) {
-      const run = Math.min(3, total - used);
-      steps.push(runStep(i, run));
-      used += run;
-      if (used < total) {
-        const walk = Math.min(1, total - used);
-        steps.push(walkStep(walk));
-        used += walk;
+    for (let i = 0; i < rounds; i++) {
+      steps.push(runStep(i, 3));
+      used += 3;
+      if (i < rounds - 1) {
+        steps.push(walkStep(1));
+        used += 1;
+      }
+    }
+    // not 5 km yet? another round, with the ladder stretched over it
+    while (sessionKm(steps) < MIN_RUN_KM && rounds < 20) {
+      rounds++;
+      steps.length = 0;
+      steps.push(walkStep(3));
+      used = 3;
+      for (let i = 0; i < rounds; i++) {
+        steps.push(runStep(i, 3));
+        used += 3;
+        if (i < rounds - 1) {
+          steps.push(walkStep(1));
+          used += 1;
+        }
       }
     }
     const low = ramp(0);
     const high = ramp(rounds - 1);
+    const total = used;
     return {
       id,
       machine,
       title: id === "long" ? `Long run/walk, ${total} min` : "Run/walk ladder",
       minutes: total,
       goal: id === "long" ? "Aerobic engine" : "Aerobic base",
-      plain: `3 min walk, then ${rounds} rounds of 3 min running and 1 min walking. Each run a notch quicker, ${low} to ${high} km/h, with the last two as a push.`,
+      plain: `3 min walk, then ${rounds} rounds of 3 min running and 1 min walking. Each run a notch quicker, ${low} to ${high} km/h, with the last two as a push. About ${r1(sessionKm(steps))} km.`,
       why:
         id === "long"
           ? "Same time on your feet as the long run, with walk breaks so the effort stays easy. The speed ladder means the finish is a real push."
@@ -357,7 +390,9 @@ export function buildSession(
   }
 
   if (id === "strides") {
-    const steps = [step("easy", 25)];
+    // 25 min easy, or more if that's what 5 km takes
+    const easyMinutes = Math.max(25, Math.ceil(((MIN_RUN_KM - (6 * (v.stride / 3 + (2 * v.recover) / 3)) / 60 - (4 * v.easy) / 60) * 60) / v.easy));
+    const steps = [step("easy", easyMinutes)];
     for (let i = 0; i < 6; i++) {
       steps.push(step("stride", 1 / 3));
       steps.push(step("recover", 2 / 3));
@@ -367,9 +402,9 @@ export function buildSession(
       id,
       machine,
       title: SESSION_TITLES.strides,
-      minutes: 35,
+      minutes: easyMinutes + 10,
       goal: "Aerobic base, running form",
-      plain: "25 min easy, then 6 quick 20 second bursts with easy jogging between, then 4 min easy.",
+      plain: `${easyMinutes} min easy, then 6 quick 20 second bursts with easy jogging between, then 4 min easy.${machine === "run" ? ` About ${Math.round(sessionKm(steps) * 10) / 10} km.` : ""}`,
       why: "Mostly easy running for your base. The six short strides at the end teach your legs a quicker, smoother stride without tiring you out.",
       steps,
       outside: [
@@ -381,18 +416,20 @@ export function buildSession(
   }
 
   if (id === "easy") {
+    const easyMinutes = machine === "run" ? Math.max(30, Math.ceil(((MIN_RUN_KM - (v.warm * 5) / 60) * 60) / v.easy)) : 30;
+    const easySteps = [step("warm", 5), step("easy", easyMinutes)];
     return {
       id,
       machine,
       title: machine === "run" || machine === "outside" ? SESSION_TITLES.easy : `Easy ${MACHINE_NAMES[machine].toLowerCase()}`,
-      minutes: 35,
+      minutes: easyMinutes + 5,
       goal: "Aerobic base",
-      plain: "5 min warm-up, then 30 min easy. Nothing hard.",
+      plain: `5 min warm-up, then ${easyMinutes} min easy. Nothing hard.${machine === "run" ? ` About ${Math.round(sessionKm(easySteps) * 10) / 10} km.` : ""}`,
       why:
         machine === "run" || machine === "outside"
           ? "Easy running is where most running fitness comes from. Keep it truly easy and it adds up fast."
           : "Same easy aerobic work without the impact, for days your legs need a break.",
-      steps: [step("warm", 5), step("easy", 30)],
+      steps: easySteps,
       outside: [
         `35 min at ${easyPace} or slower. Keep HR under ${z.easy[1]}, even if that means walking up hills.`,
         "You should be able to talk in full sentences the whole way.",
