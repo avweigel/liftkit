@@ -225,7 +225,8 @@ export function buildSession(
   if (machine === "runwalk" && (id === "easy" || id === "long")) {
     const total = id === "long" ? opts.longMinutes : 35;
     const walkStep = (minutes: number): Step => ({
-      label: "6 km/h",
+      // a flat recovery walk, no incline
+      label: "4.5 km/h",
       sub: `Walk. ${hr("easy")}`,
       seconds: Math.round(minutes * 60),
       level: 2,
@@ -346,7 +347,7 @@ export function buildSession(
     goal: "Recovery, glutes",
     plain: "A brisk walk that climbs slowly to 12% incline, holds, then comes back down.",
     why: "Moving without adding fatigue. A hill walk still counts toward your 30 minutes.",
-    steps: walk.map(([l, m, lvl]) => ({ label: l, sub: `About 5.5 km/h. ${hr("easy")}`, seconds: m * 60, level: lvl })),
+    steps: walk.map(([l, m, lvl]) => ({ label: l, sub: `About 4.5 km/h. ${hr("easy")}`, seconds: m * 60, level: lvl })),
     outside: ["30 to 40 min brisk walk, hills if you have them.", "No pace goal."],
   };
 }
