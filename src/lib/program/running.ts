@@ -7,7 +7,7 @@ import type { Measurement } from "@/lib/display/units-core";
 // four sessions a week, done on whatever day and time fits.
 
 export type SessionId = "intervals" | "long" | "strides" | "easy" | "walk";
-export type Machine = "run" | "bike" | "row" | "elliptical" | "walk" | "outside";
+export type Machine = "run" | "runwalk" | "bike" | "row" | "elliptical" | "walk" | "outside";
 
 export type RunProfile = { maxHr: number; easyPaceS: number };
 export const DEFAULT_RUN_PROFILE: RunProfile = { maxHr: 190, easyPaceS: 466 };
@@ -33,6 +33,7 @@ export const SHORT_TITLES: Record<SessionId, string> = {
 
 export const MACHINE_NAMES: Record<Machine, string> = {
   run: "Treadmill",
+  runwalk: "Run/walk",
   bike: "Bike",
   row: "Rower",
   elliptical: "Elliptical",
@@ -44,9 +45,9 @@ export const MACHINE_NAMES: Record<Machine, string> = {
 // its point is time on your feet.
 export const MACHINES_FOR: Record<SessionId, Machine[]> = {
   intervals: ["run", "bike", "row", "outside"],
-  long: ["run", "outside"],
+  long: ["run", "runwalk", "outside"],
   strides: ["run", "outside"],
-  easy: ["run", "elliptical", "bike", "row", "outside"],
+  easy: ["run", "runwalk", "elliptical", "bike", "row", "outside"],
   walk: ["walk", "outside"],
 };
 
@@ -167,12 +168,12 @@ export function buildSession(
     stride: "quick and relaxed, not a sprint",
     cool: "bring it down",
   };
-  const bySpeed = machine === "run" || machine === "row";
+  const bySpeed = machine === "run" || machine === "runwalk" || machine === "row";
 
   // the big number on the timer: a speed when the machine shows one,
   // otherwise the effort itself
   const label = (e: Effort): string => {
-    if (machine === "run") {
+    if (machine === "run" || machine === "runwalk") {
       const kmh = { warm: v.warm, easy: v.easy, recover: v.recover, steady: v.steady, hard: v.hard, stride: v.stride, cool: v.recover }[e];
       return `${kmh} km/h`;
     }
@@ -215,6 +216,57 @@ export function buildSession(
         `4 hard efforts of 4 min, around ${hardPace}. Let heart rate decide: ${z.hard[0]} to ${z.hard[1]} by the end of each rep.`,
         `3 min easy jog or walk between, until HR drops toward ${z.recover}.`,
         "5 min easy to finish. A gentle hill for the hard reps works well too.",
+      ],
+    };
+  }
+
+  // run/walk: the same easy work in 3 min runs with 1 min walks between.
+  // the walks keep the heart rate honest, which is the point of easy running.
+  if (machine === "runwalk" && (id === "easy" || id === "long")) {
+    const total = id === "long" ? opts.longMinutes : 35;
+    const walkStep = (minutes: number): Step => ({
+      label: "6 km/h",
+      sub: `Walk. ${hr("easy")}`,
+      seconds: Math.round(minutes * 60),
+      level: 2,
+    });
+    const runStep = (e: Effort, minutes: number): Step => ({
+      label: label(e),
+      sub: `Run, ${detail[e]}. ${hr(e)}`,
+      seconds: Math.round(minutes * 60),
+      level: LEVEL[e],
+    });
+    const steps: Step[] = [walkStep(3)];
+    let used = 3;
+    // the long run finishes with steady runs, the easy run stays easy
+    const steadyFrom = id === "long" ? total - 10 : Infinity;
+    while (used < total) {
+      const run = Math.min(3, total - used);
+      steps.push(runStep(used >= steadyFrom ? "steady" : "easy", run));
+      used += run;
+      if (used < total) {
+        const walk = Math.min(1, total - used);
+        steps.push(walkStep(walk));
+        used += walk;
+      }
+    }
+    const cycles = Math.round((total - 3) / 4);
+    return {
+      id,
+      machine,
+      title: id === "long" ? `Long run/walk, ${total} min` : "Easy run/walk",
+      minutes: total,
+      goal: id === "long" ? "Aerobic engine" : "Aerobic base",
+      plain: `3 min walk, then ${cycles} rounds of 3 min running and 1 min walking.${id === "long" ? " The last runs are steady." : ""}`,
+      why:
+        id === "long"
+          ? "Same time on your feet as the long run, with walk breaks that keep the effort easy the whole way. A steady finish still teaches you to run tired."
+          : "Walk breaks are the easiest way to keep easy running easy. Your heart rate stays in range, and the total running time still builds your base.",
+      steps,
+      outside: [
+        `3 min walk, then run 3 min at ${easyPace} and walk 1 min, over and over, for ${total} min.`,
+        `Heart rate under ${z.easy[1]} on the runs. If it creeps up, walk a little longer.`,
+        ...(id === "long" ? [`Last 10 min: run segments at ${steadyPace}, HR ${z.steady[0]} to ${z.steady[1]}.`] : []),
       ],
     };
   }

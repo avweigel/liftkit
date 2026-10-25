@@ -29,7 +29,7 @@ export function CardioRun({ session }: { session: Session }) {
   const elapsed = useRef(0);
   const [started, setStarted] = useState(false);
   const total = session.steps.reduce((n, s) => n + s.seconds, 0);
-  const bySpeed = session.machine === "run";
+  const bySpeed = session.machine === "run" || session.machine === "runwalk";
 
   return (
     <div className="space-y-4">
