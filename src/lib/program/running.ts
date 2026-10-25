@@ -224,26 +224,34 @@ export function buildSession(
   // the walks keep the heart rate honest, which is the point of easy running.
   if (machine === "runwalk" && (id === "easy" || id === "long")) {
     const total = id === "long" ? opts.longMinutes : 35;
+    const rounds = Math.round((total - 3) / 4);
+    // every run a notch quicker: from a bit under easy pace to a push at
+    // the end. the walks keep it honest, the ladder gives you something
+    // to chase. the top of the ladder is about the goal easy pace.
+    const easyKmh = 3600 / profile.easyPaceS;
+    const r1 = (n: number) => Math.round(n * 10) / 10;
+    const ramp = (i: number) => r1(easyKmh * (0.92 + (0.26 * i) / Math.max(1, rounds - 1)));
+    const pushFrom = rounds - 2;
     const walkStep = (minutes: number): Step => ({
-      // a flat recovery walk, no incline
       label: "4.5 km/h",
-      sub: `Walk. ${hr("easy")}`,
+      sub: `Walk it off. ${hr("easy")}`,
       seconds: Math.round(minutes * 60),
       level: 2,
     });
-    const runStep = (e: Effort, minutes: number): Step => ({
-      label: label(e),
-      sub: `Run, ${detail[e]}. ${hr(e)}`,
-      seconds: Math.round(minutes * 60),
-      level: LEVEL[e],
-    });
+    const runStep = (i: number, minutes: number): Step => {
+      const push = i >= pushFrom;
+      return {
+        label: `${ramp(i)} km/h`,
+        sub: push ? `Run ${i + 1} of ${rounds}. Push, ${hr("steady")}` : `Run ${i + 1} of ${rounds}. Easy, ${hr("easy")}`,
+        seconds: Math.round(minutes * 60),
+        level: push ? 6 : 3 + Math.round((2 * i) / Math.max(1, rounds - 1)),
+      };
+    };
     const steps: Step[] = [walkStep(3)];
     let used = 3;
-    // the long run finishes with steady runs, the easy run stays easy
-    const steadyFrom = id === "long" ? total - 10 : Infinity;
-    while (used < total) {
+    for (let i = 0; i < rounds && used < total; i++) {
       const run = Math.min(3, total - used);
-      steps.push(runStep(used >= steadyFrom ? "steady" : "easy", run));
+      steps.push(runStep(i, run));
       used += run;
       if (used < total) {
         const walk = Math.min(1, total - used);
@@ -251,26 +259,28 @@ export function buildSession(
         used += walk;
       }
     }
-    const cycles = Math.round((total - 3) / 4);
+    const low = ramp(0);
+    const high = ramp(rounds - 1);
     return {
       id,
       machine,
-      title: id === "long" ? `Long run/walk, ${total} min` : "Easy run/walk",
+      title: id === "long" ? `Long run/walk, ${total} min` : "Run/walk ladder",
       minutes: total,
       goal: id === "long" ? "Aerobic engine" : "Aerobic base",
-      plain: `3 min walk, then ${cycles} rounds of 3 min running and 1 min walking.${id === "long" ? " The last runs are steady." : ""}`,
+      plain: `3 min walk, then ${rounds} rounds of 3 min running and 1 min walking. Each run a notch quicker, ${low} to ${high} km/h, with the last two as a push.`,
       why:
         id === "long"
-          ? "Same time on your feet as the long run, with walk breaks that keep the effort easy the whole way. A steady finish still teaches you to run tired."
-          : "Walk breaks are the easiest way to keep easy running easy. Your heart rate stays in range, and the total running time still builds your base.",
+          ? "Same time on your feet as the long run, with walk breaks so the effort stays easy. The speed ladder means the finish is a real push."
+          : "Walk breaks keep easy running easy, and the ladder gives each run a target. The last two runs are at the pace you're working toward.",
       steps,
       outside: [
-        `3 min walk, then run 3 min at ${easyPace} and walk 1 min, over and over, for ${total} min.`,
-        `Heart rate under ${z.easy[1]} on the runs. If it creeps up, walk a little longer.`,
-        ...(id === "long" ? [`Last 10 min: run segments at ${steadyPace}, HR ${z.steady[0]} to ${z.steady[1]}.`] : []),
+        `3 min walk, then ${rounds} rounds of run 3 min, walk 1 min.`,
+        `Start the runs slower than ${easyPace} and make each one a little quicker. Heart rate under ${z.easy[1]} until the last two runs.`,
+        `Last two runs: a push, around ${steadyPace}, HR ${z.steady[0]} to ${z.steady[1]}.`,
       ],
     };
   }
+
 
   if (id === "long") {
     const total = opts.longMinutes;
