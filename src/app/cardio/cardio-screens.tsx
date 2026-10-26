@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { logCardio } from "@/lib/actions/cardio";
-import type { Machine, Session, SessionId } from "@/lib/program/running";
+import { isTreadmill, type Machine, type Session, type SessionId } from "@/lib/program/running";
 import { CardioTimer } from "../log/[sessionId]/cardio-timer";
 
 function useLog(session: SessionId, machine: Machine) {
@@ -29,7 +29,7 @@ export function CardioRun({ session }: { session: Session }) {
   const elapsed = useRef(0);
   const [started, setStarted] = useState(false);
   const total = session.steps.reduce((n, s) => n + s.seconds, 0);
-  const bySpeed = session.machine === "run" || session.machine === "runwalk" || session.machine === "creep";
+  const bySpeed = isTreadmill(session.machine);
 
   return (
     <div className="space-y-4">

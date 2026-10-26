@@ -8,7 +8,7 @@ import { KIND_FOR } from "@/lib/program/running";
 
 const logSchema = z.object({
   session: z.enum(["intervals", "long", "strides", "easy", "walk"]),
-  machine: z.enum(["run", "runwalk", "creep", "bike", "row", "elliptical", "walk", "outside"]),
+  machine: z.enum(["run", "runwalk", "creep", "pyramid", "ratio21", "ratio61", "ratio52", "hills", "fartlek", "negsplit", "bike", "row", "elliptical", "walk", "outside"]),
   minutes: z.number().int().min(1).max(600).nullable(),
 });
 

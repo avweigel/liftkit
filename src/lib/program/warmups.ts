@@ -22,7 +22,10 @@ export type WarmupSlot = "pulse" | "mobility" | "drill";
 // is meant to work at 5 am in a quiet gym: nothing loud, nothing that needs
 // a big floor space or a band.
 const PULSE: WarmupItem[] = [
-  { id: "machine-easy", name: "Easy on any machine", dose: "5 min", seconds: 300, chooser: true, detail: "Sleepy: elliptical, spin bike or incline walk. More awake: rower or assault bike.", tags: "cardio machine" },
+  // walking to the gym does most of this. the flow is the pulse raiser now;
+  // the machines stay as swaps for cold mornings
+  { id: "walked-here", name: "Walked here", dose: "Tick it off", detail: "The walk did the warming. Go straight to the flow, a bit longer than usual.", tags: "walk none skip" },
+  { id: "machine-easy", name: "Easy on any machine", dose: "5 min", seconds: 300, chooser: true, detail: "For a cold morning. Sleepy: elliptical, spin bike or incline walk. More awake: rower or assault bike.", tags: "cardio machine" },
   { id: "elliptical", name: "Elliptical", dose: "5 min", seconds: 300, setting: "Level 4", cue: "Easy pace, nose breathing", tags: "cardio machine" },
   { id: "spin-easy", name: "Spin bike", dose: "5 min", seconds: 300, setting: "Light, 85 rpm", cue: "Easy spin, seated", tags: "cardio machine" },
   { id: "incline-walk", name: "Incline walk", dose: "5 min", seconds: 300, setting: "5 km/h, 6%", cue: "Hands off the rails", tags: "cardio machine treadmill" },
@@ -33,7 +36,7 @@ const PULSE: WarmupItem[] = [
 ];
 
 const MOBILITY: WarmupItem[] = [
-  { id: "sun-lunge", name: "Sun salutations, then side lunges", dose: "3-5, then 3-5/side" },
+  { id: "sun-lunge", name: "Sun salutations, then side lunges", dose: "5, then 3-5/side", detail: "A steady flow. Five rounds is the pulse raiser when you walked here." },
   { id: "wgs-flow", name: "Lizard with reach flow", dose: "1 round", detail: "Lizard with reach 3/side (lunge, elbow to instep, then rotate and reach up), cat-cow 5, side lunge 5/side.", tags: "hips lunge rotation twist stretch" },
   { id: "sun-only", name: "Sun salutations", dose: "3-5" },
   { id: "hips-9090", name: "90/90 hip switches and cat-cow", dose: "8 switches, 5 cat-cow" },

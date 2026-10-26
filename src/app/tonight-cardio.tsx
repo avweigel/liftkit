@@ -36,9 +36,7 @@ export function TonightCardio({
   logged: LoggedCardio[];
   longMinutes: number;
 }) {
-  const [chosenId, setChosenId] = useState<SessionId>(pick);
-  const [showAll, setShowAll] = useState(false);
-  const chosen = options.find((o) => o.id === chosenId) ?? options.find((o) => o.id === pick)!;
+  const chosen = options.find((o) => o.id === pick)!;
   const title = (id: SessionId) => (id === "long" ? `${SESSION_TITLES.long}, ${longMinutes} min` : SESSION_TITLES[id]);
   const others = MACHINES_FOR[chosen.id].filter((m) => m !== chosen.fit.machine);
   const allDone = WEEKLY.every((id) => doneThisWeek.includes(id));
@@ -83,7 +81,7 @@ export function TonightCardio({
         </Link>
         {others.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[13px] text-(--muted)">Or:</span>
+            <span className="text-[13px] text-(--muted)">Same session, other ways:</span>
             {others.map((m) => (
               <Link key={m} href={`/cardio?session=${chosen.id}&machine=${m}`} className="chip h-9 px-3 text-[13px]">
                 {MACHINE_NAMES[m]}
@@ -93,46 +91,9 @@ export function TonightCardio({
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={() => setShowAll((v) => !v)}
-        aria-expanded={showAll}
-        className="flex w-full items-center justify-between border-t border-(--border) pt-3 text-[14px] font-semibold text-(--accent)"
-      >
-        Other sessions
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${showAll ? "rotate-180" : ""}`} aria-hidden>
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
-
-      {showAll && (
-        <ul className="space-y-1.5">
-          {options
-            .filter((o) => o.id !== chosen.id)
-            .map((o) => (
-              <li key={o.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setChosenId(o.id);
-                    setShowAll(false);
-                  }}
-                  className="w-full rounded-xl bg-(--surface-2) px-3 py-2.5 text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="min-w-0 flex-1 font-semibold">{SESSION_TITLES[o.id]}</span>
-                    <SessionShape steps={preview(o.id).steps} className="h-6 w-16 shrink-0" />
-                    <span className="num w-12 shrink-0 text-right text-[14px] text-(--muted)">{preview(o.id).minutes} min</span>
-                  </div>
-                  <p className="mt-0.5 text-[13px] text-(--muted)">{preview(o.id).plain}</p>
-                  {!o.fit.ok && (
-                    <p className="mt-1 text-[13px] font-semibold text-(--muted)">Better another day. {o.fit.note}</p>
-                  )}
-                </button>
-              </li>
-            ))}
-        </ul>
-      )}
+      <Link href="/cardio/all" className="btn btn-secondary btn-block">
+        See all sessions
+      </Link>
 
       <div>
         <div className="label pb-1.5">This week</div>

@@ -7,7 +7,26 @@ import type { Measurement } from "@/lib/display/units-core";
 // four sessions a week, done on whatever day and time fits.
 
 export type SessionId = "intervals" | "long" | "strides" | "easy" | "walk";
-export type Machine = "run" | "runwalk" | "creep" | "bike" | "row" | "elliptical" | "walk" | "outside";
+export type Machine =
+  | "run"
+  | "runwalk"
+  | "creep"
+  | "pyramid"
+  | "ratio21"
+  | "ratio61"
+  | "ratio52"
+  | "hills"
+  | "fartlek"
+  | "negsplit"
+  | "bike"
+  | "row"
+  | "elliptical"
+  | "walk"
+  | "outside";
+
+// the formats that run on a treadmill by speed
+export const TREADMILL: Machine[] = ["run", "runwalk", "creep", "pyramid", "ratio21", "ratio61", "ratio52", "hills", "fartlek", "negsplit"];
+export const isTreadmill = (m: Machine) => TREADMILL.includes(m);
 
 export type RunProfile = { maxHr: number; easyPaceS: number };
 export const DEFAULT_RUN_PROFILE: RunProfile = { maxHr: 190, easyPaceS: 466 };
@@ -35,6 +54,13 @@ export const MACHINE_NAMES: Record<Machine, string> = {
   run: "Treadmill",
   runwalk: "Run/walk",
   creep: "Creeping ladder",
+  pyramid: "Pyramid",
+  ratio21: "2:1 run/walk",
+  ratio61: "6:1 run/walk",
+  ratio52: "5:2 hard",
+  hills: "Hill climbs",
+  fartlek: "Fartlek",
+  negsplit: "Negative split",
   bike: "Bike",
   row: "Rower",
   elliptical: "Elliptical",
@@ -45,10 +71,10 @@ export const MACHINE_NAMES: Record<Machine, string> = {
 // which versions each session has. the long run stays a run (or outside):
 // its point is time on your feet.
 export const MACHINES_FOR: Record<SessionId, Machine[]> = {
-  intervals: ["run", "runwalk", "creep", "bike", "row", "outside"],
-  long: ["run", "runwalk", "outside"],
+  intervals: ["run", "runwalk", "creep", "pyramid", "ratio52", "hills", "fartlek", "bike", "row", "outside"],
+  long: ["run", "runwalk", "negsplit", "outside"],
   strides: ["run", "outside"],
-  easy: ["run", "runwalk", "elliptical", "bike", "row", "outside"],
+  easy: ["run", "runwalk", "ratio21", "ratio61", "elliptical", "bike", "row", "outside"],
   walk: ["walk", "outside"],
 };
 
@@ -180,12 +206,12 @@ export function buildSession(
     stride: "quick and relaxed, not a sprint",
     cool: "bring it down",
   };
-  const bySpeed = machine === "run" || machine === "runwalk" || machine === "creep" || machine === "row";
+  const bySpeed = isTreadmill(machine) || machine === "row";
 
   // the big number on the timer: a speed when the machine shows one,
   // otherwise the effort itself
   const label = (e: Effort): string => {
-    if (machine === "run" || machine === "runwalk" || machine === "creep") {
+    if (isTreadmill(machine)) {
       const kmh = { warm: v.warm, easy: v.easy, recover: v.recover, steady: v.steady, hard: v.hard, stride: v.stride, cool: v.recover }[e];
       return `${kmh} km/h`;
     }
@@ -208,12 +234,179 @@ export function buildSession(
   const steadyPace = pace(profile.easyPaceS / 1.2);
   const hardPace = pace(profile.easyPaceS / 1.33);
 
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+  const easyKmh = 3600 / profile.easyPaceS;
+  const walkStep = (minutes: number, sub = `Walk it off. ${hr("recover")}`): Step => ({
+    label: "4.5 km/h",
+    sub,
+    seconds: Math.round(minutes * 60),
+    level: 2,
+  });
+  const runAt = (kmh: number, minutes: number, sub: string, level: number): Step => ({
+    label: `${r1(kmh)} km/h`,
+    sub,
+    seconds: Math.round(minutes * 60),
+    level,
+  });
+  const km = (steps: Step[]) => r1(sessionKm(steps));
+
+  // ----- easy run/walk ratios: steady easy pace, walks at a fixed ratio -----
+  if (id === "easy" && (machine === "ratio21" || machine === "ratio61")) {
+    const run = machine === "ratio21" ? 2 : 6;
+    const steps: Step[] = [walkStep(3, `Warm-up walk. ${hr("easy")}`)];
+    let rounds = 0;
+    while (sessionKm(steps) < MIN_RUN_KM || rounds < 4) {
+      rounds++;
+      steps.push(runAt(easyKmh, run, `Run ${rounds}. Easy, ${hr("easy")}`, 3));
+      steps.push(walkStep(1, `Walk. ${hr("easy")}`));
+    }
+    return {
+      id,
+      machine,
+      title: `${run}:1 run/walk`,
+      minutes: Math.round(steps.reduce((n, st) => n + st.seconds, 0) / 60),
+      goal: "Aerobic base",
+      plain: `3 min walk, then ${rounds} rounds of run ${run} min at ${r1(easyKmh)} km/h, walk 1 min. About ${km(steps)} km.`,
+      why:
+        run === 2
+          ? "Short runs, lots of walks. The gentlest way to get 5 km of easy running in, good for a tired day."
+          : "Long runs with a short reset. Close to a steady easy run, with just enough walking to keep the heart rate honest.",
+      steps,
+      outside: [`Run ${run} min at ${easyPace}, walk 1 min, repeat for 5 km.`, `Heart rate under ${z.easy[1]} on the runs.`],
+    };
+  }
+
+  // ----- pyramid: runs of 1 to 5 min and back down, quicker toward the peak -----
+  if (id === "intervals" && machine === "pyramid") {
+    const lengths = [1, 2, 3, 4, 5, 4, 3, 2, 1];
+    const steps: Step[] = [walkStep(3, `Warm-up walk. ${hr("easy")}`)];
+    lengths.forEach((len, i) => {
+      // speed rises with the run length: 1 min runs are quick, the 5 is a push you can hold
+      const kmh = easyKmh * (1.12 + 0.05 * (5 - len));
+      steps.push(runAt(kmh, len, `Run ${i + 1} of 9, ${len} min. ${len >= 4 ? hr("steady") : hr("hard")}`, 5 + (6 - len)));
+      steps.push(walkStep(i < lengths.length - 1 ? 1 : 3, i < lengths.length - 1 ? `Walk. ${hr("recover")}` : "Cool-down walk"));
+    });
+    return {
+      id,
+      machine,
+      title: "Pyramid",
+      minutes: Math.round(steps.reduce((n, st) => n + st.seconds, 0) / 60),
+      goal: "VO2 max, pacing",
+      plain: `3 min walk, then runs of 1, 2, 3, 4, 5, 4, 3, 2, 1 min with 1 min walks. Short runs quick, long runs steady. About ${km(steps)} km.`,
+      why: "Every run is a different length and speed, so you never settle in. Climbing to the 5 and back down teaches pacing.",
+      steps,
+      outside: ["Runs of 1, 2, 3, 4, 5, 4, 3, 2, 1 min with 1 min walks.", `Short runs quick (HR ${z.hard[0]} to ${z.hard[1]}), the 4 and 5 steady (${z.steady[0]} to ${z.steady[1]}).`],
+    };
+  }
+
+  // ----- 5:2 hard: four 5 min efforts at a pace you can just hold -----
+  if (id === "intervals" && machine === "ratio52") {
+    const steps: Step[] = [walkStep(2, `Warm-up walk. ${hr("easy")}`), runAt(easyKmh, 3, `Easy. ${hr("easy")}`, 3)];
+    for (let i = 0; i < 4; i++) {
+      steps.push(runAt(easyKmh * 1.25, 5, `Run ${i + 1} of 4. Hard but steady, ${hr("hard")}`, 8));
+      steps.push(walkStep(2, `Walk. ${hr("recover")}`));
+    }
+    // an easy jog to round it up to 5 km, then a walk to finish
+    const short = MIN_RUN_KM - sessionKm(steps);
+    if (short > 0) steps.push(runAt(easyKmh, Math.ceil((short / easyKmh) * 60), `Easy jog to finish. ${hr("easy")}`, 3));
+    steps.push(walkStep(2, "Cool-down walk"));
+    return {
+      id,
+      machine,
+      title: "5:2 hard",
+      minutes: Math.round(steps.reduce((n, st) => n + st.seconds, 0) / 60),
+      goal: "Threshold",
+      plain: `2 min walk, 3 min easy, then 4 rounds of run 5 min at ${r1(easyKmh * 1.25)} km/h, walk 2 min, then an easy jog to 5 km. About ${km(steps)} km.`,
+      why: "Longer efforts at one honest pace. This is the one that moves your 5 km time.",
+      steps,
+      outside: [`4 x 5 min at about ${pace(profile.easyPaceS / 1.25)}, 2 min walks between.`, `HR ${z.hard[0]} to ${z.hard[1]} by the end of each.`],
+    };
+  }
+
+  // ----- hills: incline climbs at easy speed -----
+  if (id === "intervals" && machine === "hills") {
+    const steps: Step[] = [walkStep(3, `Warm-up walk. ${hr("easy")}`)];
+    const climbs = [4, 6, 8, 8, 6, 4];
+    climbs.forEach((inc, i) => {
+      steps.push({
+        label: `${r1(easyKmh)} km/h, ${inc}%`,
+        sub: `Climb ${i + 1} of 6 at ${inc}% incline. Short steps, ribs down. ${hr(inc >= 8 ? "hard" : "steady")}`,
+        seconds: 240,
+        level: 4 + inc / 2,
+      });
+      if (i < climbs.length - 1) steps.push({ label: `${r1(easyKmh)} km/h, 0%`, sub: `Flat and easy. ${hr("recover")}`, seconds: 120, level: 3 });
+    });
+    steps.push({ label: "4.5 km/h, 0%", sub: "Cool-down walk, flat", seconds: 180, level: 2 });
+    return {
+      id,
+      machine,
+      title: "Hill climbs",
+      minutes: Math.round(steps.reduce((n, st) => n + st.seconds, 0) / 60),
+      goal: "Strength, VO2 max",
+      plain: `3 min walk, then 6 climbs of 4 min at ${r1(easyKmh)} km/h on 4, 6, 8, 8, 6 and 4% incline, with 2 min flat jogs between. About ${km(steps)} km.`,
+      why: "Hills get the heart rate up at an easy speed, so the legs take less pounding than fast running. Good the day after lifting.",
+      steps,
+      outside: ["Find a hill that takes 3 to 4 min to climb. 6 climbs, jog down between.", `HR ${z.hard[0]} to ${z.hard[1]} at the top of each.`],
+    };
+  }
+
+  // ----- fartlek: run lengths and speeds drawn fresh each day -----
+  if (id === "intervals" && machine === "fartlek") {
+    // seeded by the date so a reload mid-run doesn't reshuffle it
+    let seed = Number(new Date().toISOString().slice(0, 10).replace(/-/g, "")) % 100000;
+    const rand = () => {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    };
+    const steps: Step[] = [walkStep(3, `Warm-up walk. ${hr("easy")}`)];
+    let i = 0;
+    while (sessionKm(steps) < MIN_RUN_KM || i < 6) {
+      i++;
+      const len = [1, 1.5, 2, 3, 4][Math.floor(rand() * 5)];
+      const factor = 1.05 + rand() * 0.35;
+      const walk = [1, 1, 1.5, 2][Math.floor(rand() * 4)];
+      steps.push(runAt(easyKmh * factor, len, `Run ${i}, ${len} min. ${factor > 1.25 ? hr("hard") : hr("steady")}`, Math.round(3 + factor * 4)));
+      steps.push(walkStep(walk, `Walk ${walk} min. ${hr("recover")}`));
+    }
+    return {
+      id,
+      machine,
+      title: "Fartlek",
+      minutes: Math.round(steps.reduce((n, st) => n + st.seconds, 0) / 60),
+      goal: "VO2 max, fun",
+      plain: `3 min walk, then ${i} runs of random length (1 to 4 min) and random speed (${r1(easyKmh * 1.05)} to ${r1(easyKmh * 1.4)} km/h) with short walks. New draw every day. About ${km(steps)} km.`,
+      why: "You don't know what's coming, so you can't pace it. That's the point. Run what the timer says and see what happens.",
+      steps,
+      outside: ["Pick landmarks: run hard to the next lamp post, jog to the corner, sprint the hill. No plan, keep it moving for 5 km."],
+    };
+  }
+
+  // ----- negative split: the second half quicker than the first -----
+  if (id === "long" && machine === "negsplit") {
+    const total = opts.longMinutes;
+    const half = Math.round(total / 2);
+    const steps: Step[] = [
+      runAt(easyKmh * 0.95, half, `First half, easy. ${hr("easy")}`, 3),
+      runAt(easyKmh * 1.08, total - half - 5, `Second half, a little quicker. ${hr("steady")}`, 5),
+      runAt(easyKmh * 1.2, 5, `Last 5 min, strong finish. ${hr("steady")}`, 7),
+    ];
+    return {
+      id,
+      machine,
+      title: `Negative split, ${total} min`,
+      minutes: total,
+      goal: "Aerobic engine, pacing",
+      plain: `${half} min easy at ${r1(easyKmh * 0.95)} km/h, then ${total - half - 5} min at ${r1(easyKmh * 1.08)}, then 5 min at ${r1(easyKmh * 1.2)}. About ${km(steps)} km.`,
+      why: "Starting slower than feels natural and finishing quicker is how long runs are meant to go. It trains patience and a strong finish.",
+      steps,
+      outside: [`First half at ${easyPace} or slower. Second half quicker, last 5 min around ${steadyPace}.`],
+    };
+  }
+
   // run/walk intervals: 4 min runs that climb every minute, 3 min walks.
   // "runwalk" restarts the climb each round and goes up in big steps.
   // "creep" keeps climbing in small steps across the whole session.
   if (id === "intervals" && (machine === "runwalk" || machine === "creep")) {
-    const easyKmh = 3600 / profile.easyPaceS;
-    const r1 = (n: number) => Math.round(n * 10) / 10;
     const start = r1(easyKmh * 1.12);
     // one round is about 0.9 km. five rounds, or more until it's 5 km
     const perRound = (4 * (start + 1.2) + 3 * 4.5) / 60;
@@ -302,8 +495,6 @@ export function buildSession(
     // every run a notch quicker: from a bit under easy pace to a push at
     // the end. the walks keep it honest, the ladder gives you something
     // to chase. the top of the ladder is about the goal easy pace.
-    const easyKmh = 3600 / profile.easyPaceS;
-    const r1 = (n: number) => Math.round(n * 10) / 10;
     const ramp = (i: number) => r1(easyKmh * (0.92 + (0.26 * i) / Math.max(1, rounds - 1)));
     const pushFrom = () => rounds - 2;
     const walkStep = (minutes: number): Step => ({

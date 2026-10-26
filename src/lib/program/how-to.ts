@@ -29,9 +29,9 @@ const H: Record<string, HowTo> = {
     how: "Kneel on one knee with a light dumbbell at the shoulder on the same side as the down knee. Press straight up and lower slowly.",
     cues: ["Ribs stay down at the top. If they lift, stop the set", "No side lean", "Glute of the down leg squeezed"],
   },
-  "hard-plank": {
-    how: "Forearm plank, elbows under your shoulders. Squeeze your glutes hard, pull your elbows toward your toes without moving, and breathe out long and slow. Ten to twenty seconds at full effort.",
-    cues: ["Tailbone tucked slightly", "Ribs down, back flat", "If you can hold it a minute, you're not squeezing hard enough"],
+  "long-lever-hard-plank": {
+    how: "Forearm plank with your elbows a hand's width ahead of your shoulders and your feet together. Squeeze your glutes, pull your elbows toward your toes without moving, and breathe out long and slow. Hold for the time.",
+    cues: ["Tailbone tucked slightly, no sag in the low back", "Ribs down the whole hold. If they lift, the set is over", "Once 45 s is clean, a plate on your back"],
   },
   "kettlebell-figure-8s": {
     how: "Wide stance, knees bent, chest up. Pass the bell around the outside of one leg, through your legs to the other hand, then around the outside of the other leg. Keep the eight going.",
