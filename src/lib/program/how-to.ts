@@ -17,6 +17,10 @@ const H: Record<string, HowTo> = {
     how: "Lie on your back with your arms pointing at the ceiling and your knees over your hips. Lower one arm and the opposite leg toward the floor, exhale, then bring them back and switch.",
     cues: ["Lower back pressed into the floor the whole time", "Only go as low as you can without arching", "Exhale as you reach"],
   },
+  "rotary-torso-machine": {
+    how: "Sit tall with the chest pad locked in and your hips pinned to the seat. Turn slowly from the ribs as you breathe out, pause, and come back under control. All reps one way, then switch.",
+    cues: ["Hips and legs stay still, only the trunk turns", "Ribs down, no leaning back into the pad", "Slow both directions, no swinging"],
+  },
   "front-hold-march": {
     how: "Hold a kettlebell or plate out in front of you at chest height with straight arms. March on the spot, lifting each knee to hip height, slow and steady.",
     cues: ["The weight tries to pull your ribs up: keep them down", "No lean back as the knee comes up", "Long exhale every few steps"],

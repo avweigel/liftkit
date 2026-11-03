@@ -1,3 +1,4 @@
+import { parseSetCode } from "@/lib/set-code";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -303,11 +304,23 @@ export default async function LogSessionPage({ params }: Props) {
     // choice of walks and stretches. an old plan row would show it twice.
     .filter((e) => !/^\s*(\[[A-Z]\d*\]\s*)?cooldown\b/i.test(e.notes ?? ""));
 
+  // an extra with a superset letter sits right after that letter's last
+  // plan row, so it joins the superset instead of landing at the end
+  const lastOrderForLetter = (letter: string | null): number | null => {
+    if (!letter) return null;
+    const rows = planExercises.filter(
+      (e) => parseSetCode(e.notes).code?.letter?.toUpperCase() === letter.toUpperCase(),
+    );
+    return rows.length ? Math.max(...rows.map((e) => e.order_index)) : null;
+  };
   const extraExercises = extras
     .filter((e) => !!e.exercise)
     .map((e) => ({
       id: e.id,
-      order_index: 10_000 + e.order_index,
+      order_index:
+        lastOrderForLetter(e.superset_code) != null
+          ? lastOrderForLetter(e.superset_code)! + 0.01 * (e.order_index + 1)
+          : 10_000 + e.order_index,
       exercise_id: e.exercise!.id,
       name: e.exercise!.name,
       equipment: e.exercise!.equipment ?? null,
