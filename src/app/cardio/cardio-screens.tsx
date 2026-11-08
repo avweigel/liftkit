@@ -161,8 +161,18 @@ export function CardioRun({
     }
     return steps[steps.length - 1];
   })();
-  const beltNow = current ? speedOf(current.label) : null;
   const inRun = !!current && isRunStep(current);
+  // the speed the control is about: the run you're in, or the next one
+  // when you're walking
+  const nextRun = (() => {
+    let start = 0;
+    for (const st of steps) {
+      if (start + st.seconds > elapsedS && isRunStep(st)) return st;
+      start += st.seconds;
+    }
+    return null;
+  })();
+  const beltNow = inRun && current ? speedOf(current.label) : nextRun ? speedOf(nextRun.label) : null;
 
   // carry the clock over: the new way picks up at the same elapsed time,
   // still running, and the old timer is cleared so it can't come back
@@ -187,20 +197,20 @@ export function CardioRun({
         onComplete={() => log(session.minutes, hasRunSteps ? kmTotal : null)}
       />
       {hasRunSteps && (
-        <div className="space-y-3 rounded-2xl bg-(--surface-2) p-4">
+        <div className="card space-y-3 p-4">
           <div className="flex items-baseline justify-between">
-            <span className="text-[15px] font-semibold">Your pace</span>
+            <span className="text-[15px] font-semibold">{inRun ? "This run" : "Next run"}</span>
             <span className="text-[13px] text-(--muted)">{offset === 0 ? "On plan" : `${showOffset} from plan`}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => nudge(-stepKmh)} className="btn btn-secondary h-14 w-16 shrink-0 px-0 text-[26px]" aria-label="Slower">
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => nudge(-stepKmh)} className="btn btn-secondary h-14 w-16 shrink-0 px-0 text-[28px] font-semibold" aria-label="Slower">
               −
             </button>
             <div className="min-w-0 flex-1 text-center">
-              <div className="num text-[30px] leading-none">{beltNow != null && inRun ? showSpeed(beltNow) : beltNow != null ? showSpeed(beltNow) : "—"}</div>
-              <div className="mt-1 text-[12px] text-(--muted)">{inRun ? "run steps, from now on" : "walking. Change applies to the runs"}</div>
+              <div className="num text-[32px] leading-none">{beltNow != null ? showSpeed(beltNow) : "—"}</div>
+              <div className="mt-1 text-[12px] text-(--muted)">Every run step moves with it. Walks stay at 4.5</div>
             </div>
-            <button type="button" onClick={() => nudge(stepKmh)} className="btn btn-secondary h-14 w-16 shrink-0 px-0 text-[26px]" aria-label="Faster">
+            <button type="button" onClick={() => nudge(stepKmh)} className="btn btn-secondary h-14 w-16 shrink-0 px-0 text-[28px] font-semibold" aria-label="Faster">
               +
             </button>
           </div>

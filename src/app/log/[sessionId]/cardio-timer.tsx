@@ -321,6 +321,7 @@ export function CardioTimer({
   const next = steps[stepIndex + 1];
   const flashing = running && now < flashUntil;
   const stepMs = (current?.seconds ?? totalSeconds) * 1000;
+  const longCue = (current?.sub?.length ?? 0) > 56;
   const stepFraction = steps.length === 0 ? remaining / totalMs : started ? stepEndsIn / stepMs : 1;
 
   return (
@@ -355,7 +356,7 @@ export function CardioTimer({
               ) : (
                 <p className={`display text-[22px] leading-tight ${flashing ? "" : "text-(--accent)"}`}>{doneAll ? "Nice work" : current && localize(current.label)}</p>
               )}
-              {current?.sub && !doneAll && (
+              {current?.sub && !doneAll && !longCue && (
                 <p className="mt-1 text-[14px] font-semibold">{localize(current.sub)}</p>
               )}
               {next && !doneAll && (
@@ -365,6 +366,8 @@ export function CardioTimer({
           )}
         </div>
       </div>
+      {/* a long cue reads better across the full width than squeezed beside the ring */}
+      {current?.sub && !doneAll && longCue && <p className="text-[14px] font-semibold leading-snug">{localize(current.sub)}</p>}
 
       {steps.length > 1 && (
         <div className="flex h-8 items-end gap-0.5" aria-hidden>
