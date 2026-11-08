@@ -6,8 +6,7 @@ import { logCardio } from "@/lib/actions/cardio";
 import { isTreadmill, MACHINE_NAMES, type Machine, type Session, type SessionId } from "@/lib/program/running";
 import { CardioTimer } from "../log/[sessionId]/cardio-timer";
 
-const dayKey = (session: SessionId, machine: Machine) =>
-  `liftkit.cardio.${session}.${machine}.${new Date().toISOString().slice(0, 10)}`;
+const dayKey = (session: SessionId, machine: Machine, day: string) => `liftkit.cardio.${session}.${machine}.${day}`;
 
 function useLog(session: SessionId, machine: Machine) {
   const router = useRouter();
@@ -38,6 +37,7 @@ export function CardioRun({
 }) {
   const router = useRouter();
   const { log, pending, error } = useLog(session.id, session.machine);
+  const [day] = useState(() => new Date().toISOString().slice(0, 10));
   const elapsed = useRef(0);
   const [started, setStarted] = useState(false);
   const total = session.steps.reduce((n, s) => n + s.seconds, 0);
@@ -50,9 +50,9 @@ export function CardioRun({
     try {
       const left = o.totalSeconds * 1000 - done;
       if (started && left > 0) {
-        window.localStorage.setItem(dayKey(session.id, o.machine), JSON.stringify({ endAt: Date.now() + left, leftMs: left }));
+        window.localStorage.setItem(dayKey(session.id, o.machine, day), JSON.stringify({ endAt: Date.now() + left, leftMs: left }));
       }
-      window.localStorage.removeItem(dayKey(session.id, session.machine));
+      window.localStorage.removeItem(dayKey(session.id, session.machine, day));
     } catch {}
     router.push(`/cardio?session=${session.id}&machine=${o.machine}`);
   };
@@ -63,7 +63,7 @@ export function CardioRun({
         totalSeconds={total}
         steps={session.steps}
         nowLabel={bySpeed ? "Set to" : "Now"}
-        persistKey={dayKey(session.id, session.machine)}
+        persistKey={dayKey(session.id, session.machine, day)}
         onElapsed={(ms) => {
           elapsed.current = ms;
           if (!started && ms > 0) setStarted(true);
