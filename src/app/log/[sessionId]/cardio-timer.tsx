@@ -12,10 +12,14 @@ export type CardioStep = { label: string; seconds: number; level?: number; sub?:
 export function parseCardio(
   reps: string,
   notes: string | null,
+  // a Steps: note names each piece of the time instead of inclines
+  stepsText: string | null = null,
 ): { totalSeconds: number; steps: CardioStep[] } | null {
   const m = reps.match(/(\d+)\s*min/i);
   if (!m) return null;
   const totalSeconds = Number(m[1]) * 60;
+  const named = parseSteps(stepsText);
+  if (named.length > 0) return { totalSeconds: named.reduce((t, s) => t + s.seconds, 0), steps: named };
   const pattern = (notes ?? "").match(/incline\s+([\d.,\s]+?)\s*\(\s*(\d+(?:\.\d+)?)\s*min each\s*\)/i);
   if (!pattern) return { totalSeconds, steps: [] };
   const each = Math.round(Number(pattern[2]) * 60);
@@ -25,6 +29,29 @@ export function parseCardio(
     .filter(Boolean)
     .map((v) => ({ label: `${v}%`, seconds: each, level: Number(v) }));
   return { totalSeconds: steps.reduce((t, s) => t + s.seconds, 0), steps };
+}
+
+// "Open books left 45 s, Open books right 45 s, Cat-cow 1 min" from a
+// Steps: note. Each piece is a name and a time. A name ending in a
+// parenthesis keeps it as the sub line: "Press (shin into the floor) 10 s".
+export function parseSteps(text: string | null): CardioStep[] {
+  if (!text) return [];
+  return text
+    .split(/\s*[,;]\s*/)
+    .map((piece) => {
+      const m = piece.match(/^(.*?)\s*(\d+(?:\.\d+)?)\s*(s|sec|secs|seconds|min|mins|minutes)\.?$/i);
+      if (!m) return null;
+      const n = Number(m[2]);
+      const seconds = /^m/i.test(m[3]) ? Math.round(n * 60) : Math.round(n);
+      const raw = m[1].trim();
+      const sub = raw.match(/\(([^)]*)\)\s*$/);
+      return {
+        label: sub ? raw.slice(0, sub.index).trim() : raw,
+        sub: sub ? sub[1] : undefined,
+        seconds,
+      } as CardioStep;
+    })
+    .filter((s): s is CardioStep => !!s && s.seconds > 0 && s.label.length > 0);
 }
 
 type SavedTimer = { endAt: number | null; leftMs: number };

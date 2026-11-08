@@ -9,6 +9,7 @@ export type DayKind =
   | "metcon"
   | "whole"
   | "core"
+  | "mobility"
   | "other";
 
 export type DayProfile = {
@@ -35,6 +36,9 @@ export function classifyDay(
 
   if (/\bcore\b|rib flare/.test(name)) {
     return { kind: "core", heavyLegs: false, hard: false };
+  }
+  if (/mobility|flexibility|stretch/.test(name)) {
+    return { kind: "mobility", heavyLegs: false, hard: false };
   }
   if (/metcon|conditioning/.test(name)) {
     return { kind: "metcon", heavyLegs: false, hard: true };

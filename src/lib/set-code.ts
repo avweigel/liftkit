@@ -7,11 +7,26 @@ export type SetCode = {
 const CODE_RE = /^\[([A-Za-z]+)(\d+)\]\s*/;
 const LEADING_BRACKET = /^\[([^\]]+)\]\s*/;
 
+// "Steps: Hold 45 s, Press 10 s, Lift 5 s" at the end of a note drives the
+// timer for that row. It's instructions for the clock, not for reading, so
+// it comes off the shown note and is handed back on its own.
+const STEPS_RE = /\bsteps:\s*/i;
+
+function splitSteps(text: string): { cleanNotes: string; stepsText: string | null } {
+  const m = text.match(STEPS_RE);
+  if (!m || m.index == null) return { cleanNotes: text.trim(), stepsText: null };
+  return {
+    cleanNotes: text.slice(0, m.index).trim().replace(/[.,;]\s*$/, ""),
+    stepsText: text.slice(m.index + m[0].length).trim(),
+  };
+}
+
 export function parseSetCode(notes: string | null): {
   code: SetCode | null;
   cleanNotes: string;
+  stepsText: string | null;
 } {
-  if (!notes) return { code: null, cleanNotes: "" };
+  if (!notes) return { code: null, cleanNotes: "", stepsText: null };
   const structured = notes.match(CODE_RE);
   if (structured) {
     return {
@@ -20,17 +35,17 @@ export function parseSetCode(notes: string | null): {
         letter: structured[1].toUpperCase(),
         number: Number(structured[2]),
       },
-      cleanNotes: notes.slice(structured[0].length).trim(),
+      ...splitSteps(notes.slice(structured[0].length)),
     };
   }
   const loose = notes.match(LEADING_BRACKET);
   if (loose) {
     return {
       code: { raw: loose[1], letter: null, number: null },
-      cleanNotes: notes.slice(loose[0].length).trim(),
+      ...splitSteps(notes.slice(loose[0].length)),
     };
   }
-  return { code: null, cleanNotes: notes };
+  return { code: null, ...splitSteps(notes) };
 }
 
 export type WithSetCode<T> = T & {

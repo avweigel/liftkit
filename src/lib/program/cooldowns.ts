@@ -73,6 +73,61 @@ const WALKS: CooldownItem[] = [
   },
 ];
 
+// the daily flexibility dose. static holds belong after training, so this
+// is where they live: 15 minutes matched to what the day loaded. Thursday
+// builds range, these keep it.
+const STRETCHES: CooldownItem[] = [
+  {
+    id: "stretch-lower-15",
+    name: "Lower body, 15 min",
+    dose: "15 min",
+    detail: "Hips, hamstrings, adductors, ankles. Long exhales, ribs down, nothing forced.",
+    tags: "stretch mobility legs hips hamstrings flexibility",
+    steps: [
+      ...sides("Couch stretch", 90),
+      ...sides("Pigeon", 90),
+      ...sides("Hamstring on the stall bars", 60),
+      ...sides("Seated twist", 45),
+      { label: "Straddle, chest forward", seconds: 60 },
+      { label: "Ankle rocks, both sides", seconds: 60 },
+      { label: "90/90 breathing", seconds: 60 },
+    ],
+  },
+  {
+    id: "stretch-upper-15",
+    name: "Upper body, 15 min",
+    dose: "15 min",
+    detail: "Lats, pecs, thoracic, wrists, forearm. The wrist pieces are the second dose of the day.",
+    tags: "stretch mobility shoulders chest back wrist flexibility",
+    steps: [
+      ...sides("Lat stretch on the stall bars", 60),
+      { label: "Pec opener on the stall bars", seconds: 90 },
+      ...sides("Thoracic rotation on all fours", 45),
+      { label: "Puppy pose", seconds: 60 },
+      ...sides("Wrist flexor stretch", 45),
+      ...sides("Wrist extensor stretch", 45),
+      ...sides("Forearm and thenar release", 60),
+      { label: "90/90 breathing", seconds: 60 },
+    ],
+  },
+  {
+    id: "stretch-run-15",
+    name: "After the run, 15 min",
+    dose: "15 min",
+    detail: "What running tightens: calves, ankles, hip flexors, hamstrings. Do it after the run, not before.",
+    tags: "stretch mobility run calves hips flexibility",
+    steps: [
+      ...sides("Calf on a step, straight knee", 45),
+      ...sides("Calf on a step, bent knee", 45),
+      ...sides("Couch stretch", 60),
+      ...sides("Pigeon", 60),
+      ...sides("Hamstring on the stall bars", 60),
+      ...sides("Supine twist", 45),
+      { label: "90/90 breathing", seconds: 60 },
+    ],
+  },
+];
+
 const OTHER: CooldownItem[] = [
   {
     id: "machine-easy",
@@ -125,21 +180,23 @@ const OTHER: CooldownItem[] = [
   },
 ];
 
-const ALL = [...WALKS, ...OTHER];
+const ALL = [...STRETCHES, ...WALKS, ...OTHER];
 
+// cooldown is mobility now, every day. you walk in and walk home, so a
+// treadmill walk after lifting is low value. the walks stay as swaps.
 const PREFERRED: Record<DayKind, string> = {
-  // legs already did hours of work: let them go, stretch instead
-  squat: "stretch-lower",
-  hinge: "stretch-lower",
-  // fresh legs after upper work: a longer walk is useful easy cardio
-  push: "walk-rolling",
-  pull: "walk-rolling",
-  arms: "walk-ladder",
-  whole: "walk-hill",
-  // the conditioning already happened
+  squat: "stretch-lower-15",
+  hinge: "stretch-lower-15",
+  push: "stretch-upper-15",
+  pull: "stretch-upper-15",
+  arms: "stretch-upper-15",
+  // sunday: the run comes after the lifting, so this one waits for it
+  whole: "stretch-run-15",
   metcon: "stretch-flow",
   core: "stretch-flow",
-  other: "walk-hill",
+  // thursday settles inside the session
+  mobility: "stretch-flow",
+  other: "stretch-lower-15",
 };
 
 export function cooldownChoices(): CooldownItem[] {

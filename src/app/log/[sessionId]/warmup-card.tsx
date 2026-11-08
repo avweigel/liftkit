@@ -12,7 +12,7 @@ import {
   type WarmupSlot,
 } from "@/lib/program/warmups";
 
-type Picks = { pulse: string; mobility: string; drills: string[] };
+type Picks = { pulse: string; care: string; mobility: string; drills: string[] };
 
 // swaps become the new default for that kind of day on this phone, and
 // check marks survive a refresh mid-workout
@@ -36,7 +36,7 @@ function writeJson(key: string, value: unknown) {
 
 function defaultPicks(kind: DayKind): Picks {
   const d = defaultWarmup(kind);
-  return { pulse: d.pulse.id, mobility: d.mobility.id, drills: d.drills.map((x) => x.id) };
+  return { pulse: d.pulse.id, care: d.care.id, mobility: d.mobility.id, drills: d.drills.map((x) => x.id) };
 }
 
 function loadPicks(kind: DayKind): Picks {
@@ -45,6 +45,7 @@ function loadPicks(kind: DayKind): Picks {
   if (!saved) return base;
   return {
     pulse: saved.pulse && warmupItem("pulse", saved.pulse) ? saved.pulse : base.pulse,
+    care: saved.care && warmupItem("care", saved.care) ? saved.care : base.care,
     mobility: saved.mobility && warmupItem("mobility", saved.mobility) ? saved.mobility : base.mobility,
     drills:
       Array.isArray(saved.drills) && saved.drills.every((id) => warmupItem("drill", id))
@@ -101,13 +102,14 @@ export default function WarmupCard({
   };
 
   const pulse = warmupItem("pulse", picks.pulse)!;
+  const care = warmupItem("care", picks.care)!;
   const mobility = warmupItem("mobility", picks.mobility)!;
   const drills = picks.drills.map((id) => warmupItem("drill", id)!);
   // the drills run as a superset: every drill back to back, then repeat
   const rounds = Math.max(1, ...drills.map((d) => splitDose(d.dose).rounds ?? 1));
   const roundsDone = Array.from({ length: rounds }, (_, i) => done.has(`round:${i + 1}`)).filter(Boolean).length;
   const complete =
-    done.has("pulse") && done.has("mobility") && (drills.length === 0 || roundsDone >= rounds);
+    done.has("pulse") && done.has("care") && done.has("mobility") && (drills.length === 0 || roundsDone >= rounds);
 
   const isDefault = JSON.stringify(picks) === JSON.stringify(defaultPicks(kind));
 
@@ -115,6 +117,9 @@ export default function WarmupCard({
     if (slot === "pulse") {
       updatePicks({ ...picks, pulse: id });
       dropDone("pulse");
+    } else if (slot === "care") {
+      updatePicks({ ...picks, care: id });
+      dropDone("care");
     } else if (slot === "mobility") {
       updatePicks({ ...picks, mobility: id });
       dropDone("mobility");
@@ -163,7 +168,7 @@ export default function WarmupCard({
         aria-expanded={open}
       >
         <span className="display text-[21px]">Warm-up</span>
-        <span className="label">About 10 min</span>
+        <span className="label">About {kind === "mobility" ? 25 : 15} min</span>
         {complete && <span className="chip chip-ok">Done</span>}
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={`ml-auto text-(--muted) transition-transform ${open ? "rotate-180" : ""}`} aria-hidden>
           <path d="M6 9l6 6 6-6" />
@@ -173,6 +178,7 @@ export default function WarmupCard({
         <div className={`space-y-4 ${standalone ? "" : "px-4 pb-4"}`}>
           <ul className="space-y-1.5">
             {row("pulse", 0, pulse, "pulse")}
+            {row("care", 0, care, "care")}
             {row("mobility", 0, mobility, "mobility")}
           </ul>
           {drills.length > 0 && (
@@ -298,8 +304,8 @@ function WarmupRow({
             <CardioTimer
               key={item.id}
               persistKey={`liftkit.warmup.timer.${item.id}.${new Date().toISOString().slice(0, 10)}`}
-              totalSeconds={item.seconds}
-              steps={item.setting ? [{ label: item.setting, sub: item.cue, seconds: item.seconds }] : []}
+              totalSeconds={item.steps ? item.steps.reduce((t, s) => t + s.seconds, 0) : item.seconds}
+              steps={item.steps ?? (item.setting ? [{ label: item.setting, sub: item.cue, seconds: item.seconds }] : [])}
               onComplete={onFinishTimer}
             />
           )}

@@ -15,7 +15,8 @@ type Saved = { pick?: string; state?: "done" | "skipped" };
 
 // your pick sticks for that kind of day on this phone, like the warm-up.
 // done or skipped is remembered per session so a refresh keeps it.
-const prefKey = (kind: DayKind) => `liftkit.cooldown.pref.${kind}`;
+// v2: cooldowns became stretching by default, so old walk picks don't carry
+const prefKey = (kind: DayKind) => `liftkit.cooldown.pref.v2.${kind}`;
 const stateKey = (sessionId: string) => `liftkit.cooldown.state.${sessionId}`;
 
 function read(key: string): string | null {

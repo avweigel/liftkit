@@ -35,7 +35,7 @@ import {
 } from "@/lib/display/units";
 
 // reads this device's saved warm-up picks, so it renders only in the browser
-import { CardioTimer, parseCardio, parseIntervals, type CardioStep } from "./cardio-timer";
+import { CardioTimer, parseCardio, parseIntervals, parseSteps, type CardioStep } from "./cardio-timer";
 import { swapExercise, undoSwap } from "@/lib/actions/swaps";
 import { createContext } from "react";
 
@@ -1249,14 +1249,15 @@ function SetList({
   // the first unlogged set is where this exercise is up to
   const nextUp = rows.find((r) => !r.logged)?.n ?? null;
 
-  const cardio = parseCardio(exercise.prescribed_reps, parseSetCode(exercise.notes).cleanNotes);
+  const parsedNotes = parseSetCode(exercise.notes);
+  const cardio = parseCardio(exercise.prescribed_reps, parsedNotes.cleanNotes, parsedNotes.stepsText);
   // "200 m" is a distance, not reps, and needs no weight
   const metres = /^\s*\d+\s*m\s*$/i.test(exercise.prescribed_reps);
   const intervals = cardio
     ? null
-    : parseIntervals(exercise.prescribed_sets, parseSetCode(exercise.notes).cleanNotes, fastKmh ?? undefined);
+    : parseIntervals(exercise.prescribed_sets, parsedNotes.cleanNotes, fastKmh ?? undefined);
   const hold = cardio || intervals ? null : parseHold(exercise.prescribed_reps);
-  const steps = hold ? holdSteps(hold) : [];
+  const steps = hold ? holdSteps(hold, parseSteps(parsedNotes.stepsText)) : [];
   return (
     <div className="space-y-2">
     {cardio && (
@@ -1264,6 +1265,21 @@ function SetList({
         totalSeconds={cardio.totalSeconds}
         steps={cardio.steps}
         persistKey={`liftkit.cardio-ex.${exercise.exercise_id}.${new Date().toISOString().slice(0, 10)}`}
+        onComplete={
+          nextUp != null
+            ? () => {
+                void onUpsert({
+                  id: null,
+                  set_number: nextUp,
+                  weight: null,
+                  reps: Math.max(1, Math.round(cardio.totalSeconds / 60)),
+                  rpe: null,
+                  is_warmup: false,
+                  notes: null,
+                });
+              }
+            : undefined
+        }
       />
     )}
     {intervals && (
@@ -1484,15 +1500,16 @@ function parseHold(reps: string): { seconds: number; perSide: boolean } | null {
   return { seconds: Number(m[1]), perSide: !!m[3] };
 }
 
-function holdSteps(h: { seconds: number; perSide: boolean }): CardioStep[] {
+// a plain hold is one step. a Steps: note (hold, press, lift...) replaces
+// it with the sequence, run once per side when the hold is per side.
+function holdSteps(h: { seconds: number; perSide: boolean }, named: CardioStep[] = []): CardioStep[] {
   const getSet = { label: "Get in position", seconds: 5 };
-  if (!h.perSide) return [getSet, { label: "Hold", seconds: h.seconds }];
-  return [
-    getSet,
-    { label: "Left side", seconds: h.seconds },
-    { label: "Switch sides", seconds: 5 },
-    { label: "Right side", seconds: h.seconds },
-  ];
+  const one = (side: string | null): CardioStep[] =>
+    named.length > 0
+      ? named.map((s) => ({ ...s, sub: side ? [side, s.sub].filter(Boolean).join(": ") : s.sub }))
+      : [{ label: side ? `${side} side` : "Hold", seconds: h.seconds }];
+  if (!h.perSide) return [getSet, ...one(null)];
+  return [getSet, ...one("Left"), { label: "Switch sides", seconds: 5 }, ...one("Right")];
 }
 
 function planContext(exercise: Exercise): string {
