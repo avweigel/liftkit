@@ -743,6 +743,89 @@ function useIsActive(exerciseIds: string[]): boolean {
 const ACTIVE_CARD =
   "ring-2 ring-(--accent-line) bg-[color-mix(in_oklab,var(--surface)_93%,var(--accent))]";
 
+// expanded by default. a finished exercise folds itself once, and any
+// card can be folded or opened by hand. remembered for the session.
+function useFold(exercise: Exercise, sets: SessionSet[], finished: boolean) {
+  const sessionId = useContext(SessionIdContext);
+  const key = `liftkit.fold.${sessionId}.${exercise.exercise_id}`;
+  const [state, setState] = useState<"open" | "folded" | "auto">("auto");
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(key);
+      // restoring from storage can only happen after mount
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (saved === "open" || saved === "folded") setState(saved);
+    } catch {}
+  }, [key]);
+  const working = sets.filter((st) => !st.is_warmup).length;
+  const sided = logsEachSide(exercise.name, exercise.prescribed_reps, parseSetCode(exercise.notes).cleanNotes);
+  const planned = exercise.prescribed_sets * (sided ? 2 : 1);
+  const done = planned > 0 && working >= planned;
+  const folded = state === "auto" ? done && !finished : state === "folded";
+  const toggle = () => {
+    const next = folded ? "open" : "folded";
+    setState(next);
+    try {
+      window.localStorage.setItem(key, next);
+    } catch {}
+  };
+  return { folded, toggle, done };
+}
+
+function FoldChevron({ folded, onToggle, name }: { folded: boolean; onToggle: () => void; name: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={!folded}
+      aria-label={folded ? `Open ${name}` : `Fold ${name}`}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-(--muted) hover:text-(--foreground)"
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={`transition-transform ${folded ? "" : "rotate-180"}`}
+        aria-hidden
+      >
+        <path d="M6 9l6 6 6-6" />
+      </svg>
+    </button>
+  );
+}
+
+// the one line a folded card shows: name, what got done, a chevron
+function FoldedRow({ exercise, sets, badge, onToggle }: { exercise: Exercise; sets: SessionSet[]; badge: string | null; onToggle: () => void }) {
+  const working = sets.filter((st) => !st.is_warmup);
+  const base = useContext(BaseUnitContext);
+  const [unit] = useEntryUnit(exercise.exercise_id);
+  const bw = isBodyweight(exercise.name, exercise.equipment);
+  const summary = lastTimeParts(
+    working.map((st) => ({ set_number: st.set_number, weight: st.weight, reps: st.reps, side: st.side ?? null })),
+    (w) => `${formatWeight(convert(w, base, unit))} ${unit}`,
+    bw,
+  ).join(", ");
+  return (
+    <button type="button" onClick={onToggle} className="flex min-h-12 w-full items-center gap-2 text-left" aria-expanded={false}>
+      {badge && <span className="chip chip-accent shrink-0">{badge}</span>}
+      <span className="min-w-0 flex-1 truncate text-[16px] font-semibold">{exercise.name}</span>
+      {working.length > 0 ? (
+        <span className="num shrink-0 truncate text-[13px] text-(--muted)" style={{ maxWidth: "40%" }}>
+          {summary}
+        </span>
+      ) : null}
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--ok) text-(--surface)">
+        <CheckGlyph />
+      </span>
+    </button>
+  );
+}
+
 function SoloExerciseCard({
   exercise,
   sets,
@@ -762,6 +845,14 @@ function SoloExerciseCard({
 }) {
   const letter = parseSetCode(exercise.notes).code?.letter ?? null;
   const active = useIsActive([exercise.exercise_id]);
+  const fold = useFold(exercise, sets, finished);
+  if (fold.folded) {
+    return (
+      <section className="card px-4 py-1">
+        <FoldedRow exercise={exercise} sets={sets} badge={letter} onToggle={fold.toggle} />
+      </section>
+    );
+  }
   return (
     <section className={`card space-y-3 p-4 transition-shadow ${active ? ACTIVE_CARD : ""}`}>
       <ExerciseHeader
@@ -769,6 +860,7 @@ function SoloExerciseCard({
         badge={letter}
         inEmom={!!parseIntervals(exercise.prescribed_sets, parseSetCode(exercise.notes).cleanNotes)}
         onRemoveExtra={onRemoveExtra}
+        fold={fold}
       />
       <SetList
         exercise={exercise}
@@ -844,30 +936,59 @@ function SupersetBlock({
       <EmomTickContext.Provider value={ticks}>
       <div className="divide-y divide-(--border)">
         {exercises.map((ex, i) => (
-          <div key={ex.id} className="space-y-3 p-4">
-            <ExerciseHeader
-              exercise={ex}
-              badge={`${letter}${i + 1}`}
-              inEmom={!!emom}
-              onRemoveExtra={
-                ex.is_extra && ex.extra_id && onRemoveExtra
-                  ? () => onRemoveExtra(ex.extra_id!)
-                  : undefined
-              }
-            />
-            <SetList
-              exercise={ex}
-              sets={setsByExercise[ex.exercise_id] ?? []}
-              carrySets={carryFor(ex.exercise_id)}
-              onUpsert={(set) => onUpsert(ex.exercise_id, set)}
-              onDelete={onDelete}
-              finished={finished}
-            />
-          </div>
+          <SupersetItem
+            key={ex.id}
+            exercise={ex}
+            badge={`${letter}${i + 1}`}
+            inEmom={!!emom}
+            sets={setsByExercise[ex.exercise_id] ?? []}
+            carrySets={carryFor(ex.exercise_id)}
+            onUpsert={(set) => onUpsert(ex.exercise_id, set)}
+            onDelete={onDelete}
+            onRemoveExtra={ex.is_extra && ex.extra_id && onRemoveExtra ? () => onRemoveExtra(ex.extra_id!) : undefined}
+            finished={finished}
+          />
         ))}
       </div>
       </EmomTickContext.Provider>
     </section>
+  );
+}
+
+function SupersetItem({
+  exercise,
+  badge,
+  inEmom,
+  sets,
+  carrySets,
+  onUpsert,
+  onDelete,
+  onRemoveExtra,
+  finished,
+}: {
+  exercise: Exercise;
+  badge: string;
+  inEmom: boolean;
+  sets: SessionSet[];
+  carrySets: SessionSet[] | null;
+  onUpsert: (set: UpsertPayload) => Promise<string>;
+  onDelete: (setId: string) => Promise<void>;
+  onRemoveExtra?: () => Promise<void> | void;
+  finished: boolean;
+}) {
+  const fold = useFold(exercise, sets, finished);
+  if (fold.folded) {
+    return (
+      <div className="px-4 py-1">
+        <FoldedRow exercise={exercise} sets={sets} badge={badge} onToggle={fold.toggle} />
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3 p-4">
+      <ExerciseHeader exercise={exercise} badge={badge} inEmom={inEmom} onRemoveExtra={onRemoveExtra} fold={fold} />
+      <SetList exercise={exercise} sets={sets} carrySets={carrySets} onUpsert={onUpsert} onDelete={onDelete} finished={finished} />
+    </div>
   );
 }
 
@@ -916,12 +1037,14 @@ function ExerciseHeader({
   badge,
   onRemoveExtra,
   inEmom = false,
+  fold,
 }: {
   exercise: Exercise;
   badge: string | null;
   // the EMOM clock sets the rest, so the plan's rest time would mislead
   inEmom?: boolean;
   onRemoveExtra?: () => Promise<void> | void;
+  fold?: { folded: boolean; toggle: () => void };
 }) {
   const { cleanNotes } = parseSetCode(exercise.notes);
   const conv = weightConvention(exercise.name, exercise.equipment, planContext(exercise));
@@ -957,6 +1080,7 @@ function ExerciseHeader({
             Swap
           </button>
         )}
+        {fold && <FoldChevron folded={fold.folded} onToggle={fold.toggle} name={exercise.name} />}
         {onRemoveExtra && (
           <button
             type="button"
