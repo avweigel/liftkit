@@ -8,6 +8,18 @@ import { CardioTimer } from "../log/[sessionId]/cardio-timer";
 
 const dayKey = (session: SessionId, machine: Machine, day: string) => `liftkit.cardio.${session}.${machine}.${day}`;
 
+// the new way picks up at the same elapsed time, still running, and the
+// old timer is cleared so it can't come back
+function carryTimer(fromKey: string, toKey: string, doneMs: number, totalSeconds: number, started: boolean) {
+  try {
+    const left = totalSeconds * 1000 - doneMs;
+    if (started && left > 0) {
+      window.localStorage.setItem(toKey, JSON.stringify({ endAt: Date.now() + left, leftMs: left }));
+    }
+    window.localStorage.removeItem(fromKey);
+  } catch {}
+}
+
 function useLog(session: SessionId, machine: Machine) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -46,14 +58,7 @@ export function CardioRun({
   // carry the clock over: the new way picks up at the same elapsed time,
   // still running, and the old timer is cleared so it can't come back
   const switchTo = (o: { machine: Machine; totalSeconds: number }) => {
-    const done = elapsed.current;
-    try {
-      const left = o.totalSeconds * 1000 - done;
-      if (started && left > 0) {
-        window.localStorage.setItem(dayKey(session.id, o.machine, day), JSON.stringify({ endAt: Date.now() + left, leftMs: left }));
-      }
-      window.localStorage.removeItem(dayKey(session.id, session.machine, day));
-    } catch {}
+    carryTimer(dayKey(session.id, session.machine, day), dayKey(session.id, o.machine, day), elapsed.current, o.totalSeconds, started);
     router.push(`/cardio?session=${session.id}&machine=${o.machine}`);
   };
 
