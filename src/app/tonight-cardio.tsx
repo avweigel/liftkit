@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { deleteCardio } from "@/lib/actions/cardio";
+import { markRoutine, unmarkRoutine } from "@/lib/actions/routines";
 import { SessionShape } from "@/components/session-shape";
 import {
   DEFAULT_RUN_PROFILE,
@@ -29,14 +30,33 @@ export function TonightCardio({
   doneThisWeek,
   logged,
   longMinutes,
+  skipped = false,
 }: {
   pick: SessionId;
   options: Array<{ id: SessionId; fit: Fit }>;
   doneThisWeek: SessionId[];
   logged: LoggedCardio[];
   longMinutes: number;
+  // "not today" was tapped: the card folds up and the day line moves on
+  skipped?: boolean;
 }) {
+  const [pendingSkip, startSkip] = useTransition();
   const chosen = options.find((o) => o.id === pick)!;
+  if (skipped && logged.length === 0) {
+    return (
+      <section className="card flex min-h-14 items-center gap-3 px-4">
+        <span className="text-[14px] text-(--muted)">No cardio today. Tomorrow&rsquo;s suggestion will take it into account.</span>
+        <button
+          type="button"
+          disabled={pendingSkip}
+          onClick={() => startSkip(async () => void (await unmarkRoutine("cardio")))}
+          className="ml-auto h-9 shrink-0 rounded-lg px-2 text-[13px] font-semibold text-(--accent)"
+        >
+          Undo
+        </button>
+      </section>
+    );
+  }
   const title = (id: SessionId) => (id === "long" ? `${SESSION_TITLES.long}, ${longMinutes} min` : SESSION_TITLES[id]);
   const others = MACHINES_FOR[chosen.id].filter((m) => m !== chosen.fit.machine);
   const allDone = WEEKLY.every((id) => doneThisWeek.includes(id));
@@ -91,9 +111,21 @@ export function TonightCardio({
         )}
       </div>
 
-      <Link href="/cardio/all" className="btn btn-secondary btn-block">
-        See all sessions
-      </Link>
+      <div className={`grid gap-1.5 ${logged.length === 0 ? "grid-cols-2" : "grid-cols-1"}`}>
+        <Link href="/cardio/all" className="btn btn-secondary btn-block">
+          See all sessions
+        </Link>
+        {logged.length === 0 && (
+          <button
+            type="button"
+            disabled={pendingSkip}
+            onClick={() => startSkip(async () => void (await markRoutine({ kind: "cardio", status: "skipped" })))}
+            className="btn btn-ghost btn-block"
+          >
+            {pendingSkip ? "…" : "Not today"}
+          </button>
+        )}
+      </div>
 
       <div>
         <div className="label pb-1.5">This week</div>

@@ -71,6 +71,7 @@ type ExtraRow = {
   id: string;
   exercise_id: string;
   superset_code: string | null;
+  after_code: string | null;
   order_index: number;
   prescribed_sets: number;
   prescribed_reps: string;
@@ -129,7 +130,7 @@ export default async function LogSessionPage({ params }: Props) {
   const { data: extrasRaw } = await supabase
     .from("session_extra_exercises")
     .select(
-      `id, exercise_id, superset_code, order_index,
+      `id, exercise_id, superset_code, after_code, order_index,
        prescribed_sets, prescribed_reps, prescribed_weight,
        rest_seconds, notes,
        exercise:exercises ( id, name, primary_muscle, equipment )`,
@@ -199,7 +200,7 @@ export default async function LogSessionPage({ params }: Props) {
     new Date(session.started_at).getTime() - 365 * 24 * 60 * 60 * 1000,
   ).toISOString();
 
-  const [{ data: sets }, { data: history }] = await Promise.all([
+  const [{ data: sets }, { data: history }, { data: setupRows }] = await Promise.all([
     supabase
       .from("session_sets")
       .select(
@@ -221,7 +222,17 @@ export default async function LogSessionPage({ params }: Props) {
           .order("logged_at", { ascending: false })
           .returns<HistoryRow[]>()
       : Promise.resolve({ data: [] as HistoryRow[] }),
+    exerciseIds.length > 0
+      ? supabase
+          .from("exercise_setups")
+          .select("exercise_id, setup")
+          .eq("user_id", session.user_id)
+          .in("exercise_id", exerciseIds)
+          .returns<Array<{ exercise_id: string; setup: string }>>()
+      : Promise.resolve({ data: [] as Array<{ exercise_id: string; setup: string }> }),
   ]);
+  // seat positions, box heights, pin heights: remembered per exercise
+  const setupOf = new Map((setupRows ?? []).map((r) => [r.exercise_id, r.setup]));
 
   const lastSessionByExercise = new Map<
     string,
@@ -297,6 +308,7 @@ export default async function LogSessionPage({ params }: Props) {
       extra_id: null as string | null,
       superset_code_override: null as string | null,
       last_session: attachLast(ex?.id ?? ""),
+      setup: setupOf.get(ex?.id ?? "") ?? null,
       };
     })
     .filter((e) => e.exercise_id.length > 0)
@@ -317,10 +329,14 @@ export default async function LogSessionPage({ params }: Props) {
     .filter((e) => !!e.exercise)
     .map((e) => ({
       id: e.id,
+      // joins its letter's superset, or sits just after the superset it was
+      // placed behind, or lands at the end
       order_index:
         lastOrderForLetter(e.superset_code) != null
           ? lastOrderForLetter(e.superset_code)! + 0.01 * (e.order_index + 1)
-          : 10_000 + e.order_index,
+          : lastOrderForLetter(e.after_code) != null
+            ? lastOrderForLetter(e.after_code)! + 0.5 + 0.001 * (e.order_index + 1)
+            : 10_000 + e.order_index,
       exercise_id: e.exercise!.id,
       name: e.exercise!.name,
       equipment: e.exercise!.equipment ?? null,
@@ -336,6 +352,7 @@ export default async function LogSessionPage({ params }: Props) {
       last_swap: null,
       superset_code_override: e.superset_code,
       last_session: attachLast(e.exercise!.id),
+      setup: setupOf.get(e.exercise!.id) ?? null,
     }));
 
   // sets logged under an exercise that's no longer on this day (the plan
@@ -370,6 +387,7 @@ export default async function LogSessionPage({ params }: Props) {
       extra_id: null,
       superset_code_override: null,
       last_session: null,
+      setup: null,
     }));
   }
 

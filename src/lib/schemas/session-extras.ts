@@ -12,6 +12,9 @@ const upperLetter = z.preprocess(
 export const sessionExtraInputSchema = z.object({
   exercise_id: z.string().uuid(),
   superset_code: upperLetter.optional().default(null),
+  // a new superset or solo exercise can sit after an existing superset
+  // instead of at the end of the workout
+  after_code: upperLetter.optional().default(null),
   prescribed_sets: z.number().int().positive().max(50).default(3),
   prescribed_reps: z.string().trim().min(1).max(50).default("8-12"),
   prescribed_weight: z.number().finite().nonnegative().nullable().optional(),

@@ -5,7 +5,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { localToday } from "@/lib/local-date";
 
-const kindSchema = z.enum(["warmup", "cooldown"]);
+// cardio is only ever skipped here: the "not today" on the suggestion
+const kindSchema = z.enum(["warmup", "cooldown", "cardio"]);
 const markSchema = z.object({
   kind: kindSchema,
   status: z.enum(["done", "skipped"]).default("done"),

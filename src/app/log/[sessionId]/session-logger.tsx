@@ -57,7 +57,9 @@ const SwapContext = createContext<{
   open: (ex: Exercise) => void;
   undo: (ex: Exercise) => Promise<void>;
 } | null>(null);
+const SessionIdContext = createContext<string>("");
 import { howTo } from "@/lib/program/how-to";
+import { saveSetup } from "@/lib/actions/setups";
 
 
 type LastSessionSet = {
@@ -92,6 +94,8 @@ type Exercise = {
     logged_at: string;
     sets: LastSessionSet[];
   } | null;
+  // seat position, box height, pin height. remembered per exercise
+  setup?: string | null;
 };
 
 type LibraryItem = {
@@ -413,6 +417,7 @@ export function SessionLogger({
 
   return (
     <BaseUnitContext.Provider value={baseUnit}>
+    <SessionIdContext.Provider value={sessionId}>
     <SwapContext.Provider value={finished ? null : swapApi}>
     <SidedContext.Provider value={sided}>
     <CurrentSetContext.Provider value={finished ? null : currentKey}>
@@ -587,6 +592,7 @@ export function SessionLogger({
     </CurrentSetContext.Provider>
     </SidedContext.Provider>
     </SwapContext.Provider>
+    </SessionIdContext.Provider>
     </BaseUnitContext.Provider>
   );
 }
@@ -1029,6 +1035,7 @@ function ExerciseHeader({
       {/* the slot note was written for the planned exercise, so a swap drops it */}
       {cleanNotes && !exercise.swapped_from && <p className="text-[14px] text-(--muted)">{sentence(cleanNotes)}</p>}
       <HowToToggle name={exercise.name} />
+      <SetupLine exerciseId={exercise.exercise_id} initial={exercise.setup ?? null} />
       {/palm rule/i.test(cleanNotes) && <PainScore context="handstand" label="Handstand pain this morning" />}
       {exercise.last_session && (
         <p className="text-[13px] text-(--muted)">
@@ -1459,6 +1466,71 @@ function SetList({
       </li>
     </ul>
     </div>
+  );
+}
+
+// "seat 4, pin 7", "45 cm box": the one line you'd otherwise have to
+// remember. saved per exercise, shown every time after.
+function SetupLine({ exerciseId, initial }: { exerciseId: string; initial: string | null }) {
+  const sessionId = useContext(SessionIdContext);
+  const [value, setValue] = useState(initial ?? "");
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(initial ?? "");
+  const [pending, startTransition] = useTransition();
+
+  const commit = () => {
+    const next = draft.trim();
+    setEditing(false);
+    if (next === value) return;
+    setValue(next);
+    startTransition(async () => {
+      try {
+        await saveSetup({ exerciseId, setup: next, sessionId });
+      } catch {}
+    });
+  };
+
+  if (editing) {
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          commit();
+        }}
+        className="flex items-center gap-1.5"
+      >
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          placeholder="Seat 4, pin 7, 45 cm box…"
+          aria-label="Setup for this exercise"
+          maxLength={120}
+          className="h-10 min-w-0 flex-1 rounded-lg border border-(--border) bg-(--background) px-3 text-[16px] outline-none placeholder:text-(--faint) focus:border-(--accent-line)"
+        />
+        <button type="submit" className="btn btn-primary btn-sm">
+          Save
+        </button>
+      </form>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setDraft(value);
+        setEditing(true);
+      }}
+      disabled={pending}
+      className={`flex h-8 items-center gap-1.5 text-[13px] font-semibold ${value ? "text-(--foreground)" : "text-(--muted)"}`}
+      aria-label={value ? `Setup: ${value}. Tap to change` : "Add a setup note"}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M4 8h10M4 16h6M18 6v4M16 8h4M14 14v4M12 16h4" />
+      </svg>
+      {value ? <span>Setup: {value}</span> : <span>Setup</span>}
+    </button>
   );
 }
 
@@ -2127,6 +2199,7 @@ function AddExercisePicker({
   onAdd: (input: {
     exercise_id: string;
     superset_code: string | null;
+    after_code: string | null;
     prescribed_sets: number;
     prescribed_reps: string;
   }) => Promise<void>;
@@ -2135,6 +2208,8 @@ function AddExercisePicker({
   const [query, setQuery] = useState("");
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [placement, setPlacement] = useState<string>("solo");
+  // where a solo exercise or new superset lands: after a superset, or last
+  const [after, setAfter] = useState<string>("end");
   const [prescribedSets, setPrescribedSets] = useState("3");
   const [prescribedReps, setPrescribedReps] = useState("8-12");
   const [saving, setSaving] = useState(false);
@@ -2186,6 +2261,7 @@ function AddExercisePicker({
       await onAdd({
         exercise_id: pickedId,
         superset_code: supersetCode,
+        after_code: supersetCode && placement !== "new" ? null : after === "end" ? null : after,
         prescribed_sets: setsNum,
         prescribed_reps: reps,
       });
@@ -2281,6 +2357,22 @@ function AddExercisePicker({
               ))}
             </div>
           </div>
+
+          {(placement === "solo" || placement === "new") && activeSupersetCodes.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="label">In the workout</div>
+              <div className="flex flex-wrap gap-1.5">
+                <PlacementOption active={after === "end"} onClick={() => setAfter("end")}>
+                  At the end
+                </PlacementOption>
+                {activeSupersetCodes.map((code) => (
+                  <PlacementOption key={code} active={after === code} onClick={() => setAfter(code)}>
+                    After {code}
+                  </PlacementOption>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-2">
             <label className="label block space-y-1">

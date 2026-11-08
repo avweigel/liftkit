@@ -33,6 +33,7 @@ export async function addSessionExtra(sessionId: string, input: unknown) {
     session_id: sessionId,
     exercise_id: parsed.exercise_id,
     superset_code: parsed.superset_code,
+    after_code: parsed.superset_code ? null : parsed.after_code,
     order_index: nextOrder,
     prescribed_sets: parsed.prescribed_sets,
     prescribed_reps: parsed.prescribed_reps,
@@ -103,6 +104,7 @@ type ExtraRow = {
   id: string;
   exercise_id: string;
   superset_code: string | null;
+  after_code: string | null;
   prescribed_sets: number;
   prescribed_reps: string;
   prescribed_weight: number | null;
@@ -111,6 +113,8 @@ type ExtraRow = {
 };
 
 type PdeRow = {
+  id: string;
+  order_index: number;
   notes: string | null;
 };
 
@@ -161,7 +165,7 @@ export async function saveExtrasToCurrentPhase(sessionId: string) {
   const { data: extras, error: exErr } = await supabase
     .from("session_extra_exercises")
     .select(
-      "id, exercise_id, superset_code, prescribed_sets, prescribed_reps, prescribed_weight, rest_seconds, notes",
+      "id, exercise_id, superset_code, after_code, prescribed_sets, prescribed_reps, prescribed_weight, rest_seconds, notes",
     )
     .eq("session_id", sessionId)
     .order("order_index", { ascending: true })
@@ -169,20 +173,11 @@ export async function saveExtrasToCurrentPhase(sessionId: string) {
   if (exErr) throw new Error(exErr.message);
   if (!extras || extras.length === 0) return { added: 0 };
 
-  const { data: lastPde, error: lastErr } = await supabase
-    .from("plan_day_exercises")
-    .select("order_index")
-    .eq("day_id", session.plan_day_id)
-    .order("order_index", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (lastErr) throw new Error(lastErr.message);
-  let nextOrder = (lastPde?.order_index ?? -1) + 1;
-
   const { data: existing, error: existErr } = await supabase
     .from("plan_day_exercises")
-    .select("notes")
+    .select("id, order_index, notes")
     .eq("day_id", session.plan_day_id)
+    .order("order_index", { ascending: true })
     .returns<PdeRow[]>();
   if (existErr) throw new Error(existErr.message);
   const withCodes = nextCodesForExtras(
@@ -190,21 +185,58 @@ export async function saveExtrasToCurrentPhase(sessionId: string) {
     (existing ?? []).map((r) => r.notes),
   );
 
-  const rows = withCodes.map(({ extra, codePrefix }) => ({
-    day_id: session.plan_day_id!,
-    exercise_id: extra.exercise_id,
-    order_index: nextOrder++,
-    prescribed_sets: extra.prescribed_sets,
-    prescribed_reps: extra.prescribed_reps,
-    prescribed_weight: extra.prescribed_weight,
-    rest_seconds: extra.rest_seconds,
-    notes: combineNotes(codePrefix, extra.notes),
-  }));
+  // each extra goes where it sat in the workout: after the last row of its
+  // superset, after the superset it was placed behind, or at the end.
+  // then the whole day is renumbered so the plan reads the same way.
+  const letterOf = (n: string | null) => n?.match(/^\[([A-Za-z]+)\d+\]/)?.[1]?.toUpperCase() ?? null;
+  type Slot = { kind: "old"; id: string } | { kind: "new"; row: (typeof withCodes)[number] };
+  const slots: Slot[] = (existing ?? []).map((r) => ({ kind: "old", id: r.id }));
+  const lastIndexForLetter = (letter: string | null) => {
+    if (!letter) return -1;
+    let idx = -1;
+    slots.forEach((s, i) => {
+      const n = s.kind === "old" ? existing!.find((r) => r.id === s.id)?.notes ?? null : combineNotes(s.row.codePrefix, s.row.extra.notes);
+      if (letterOf(n) === letter.toUpperCase()) idx = i;
+    });
+    return idx;
+  };
+  for (const w of withCodes) {
+    const anchor = w.extra.superset_code ?? w.extra.after_code;
+    const at = lastIndexForLetter(anchor);
+    slots.splice(at >= 0 ? at + 1 : slots.length, 0, { kind: "new", row: w });
+  }
 
-  const { error: insErr } = await supabase
-    .from("plan_day_exercises")
-    .insert(rows);
+  // two passes keep the (day, order) uniqueness happy: park the old rows
+  // high, insert the new ones, then settle everything into place
+  const park = (existing ?? []).map((r) => ({ id: r.id, order_index: r.order_index + 10_000 }));
+  for (const p of park) {
+    const { error } = await supabase.from("plan_day_exercises").update({ order_index: p.order_index }).eq("id", p.id);
+    if (error) throw new Error(error.message);
+  }
+  const inserts = slots.flatMap((s, i) =>
+    s.kind === "new"
+      ? [
+          {
+            day_id: session.plan_day_id!,
+            exercise_id: s.row.extra.exercise_id,
+            order_index: i,
+            prescribed_sets: s.row.extra.prescribed_sets,
+            prescribed_reps: s.row.extra.prescribed_reps,
+            prescribed_weight: s.row.extra.prescribed_weight,
+            rest_seconds: s.row.extra.rest_seconds,
+            notes: combineNotes(s.row.codePrefix, s.row.extra.notes),
+          },
+        ]
+      : [],
+  );
+  const { error: insErr } = await supabase.from("plan_day_exercises").insert(inserts);
   if (insErr) throw new Error(insErr.message);
+  for (const [i, s] of slots.entries()) {
+    if (s.kind !== "old") continue;
+    const { error } = await supabase.from("plan_day_exercises").update({ order_index: i }).eq("id", s.id);
+    if (error) throw new Error(error.message);
+  }
+  const rows = inserts;
 
   const { error: delErr } = await supabase
     .from("session_extra_exercises")
@@ -359,7 +391,7 @@ export async function saveExtrasAsNewPhase(
   const { data: extras, error: exErr } = await supabase
     .from("session_extra_exercises")
     .select(
-      "id, exercise_id, superset_code, prescribed_sets, prescribed_reps, prescribed_weight, rest_seconds, notes",
+      "id, exercise_id, superset_code, after_code, prescribed_sets, prescribed_reps, prescribed_weight, rest_seconds, notes",
     )
     .eq("session_id", sessionId)
     .order("order_index", { ascending: true })

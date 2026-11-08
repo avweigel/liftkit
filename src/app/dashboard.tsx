@@ -191,8 +191,8 @@ export async function Dashboard({ userId }: Props) {
     .select("kind, status")
     .eq("user_id", userId)
     .eq("logged_on", local.iso)
-    .returns<Array<{ kind: "warmup" | "cooldown"; status: "done" | "skipped" }>>();
-  const routine = (k: "warmup" | "cooldown") =>
+    .returns<Array<{ kind: "warmup" | "cooldown" | "cardio"; status: "done" | "skipped" }>>();
+  const routine = (k: "warmup" | "cooldown" | "cardio") =>
     routineRows?.find((r) => r.kind === k)?.status ?? null;
   // warm-up and cooldown only make sense around a lifting day
   const liftingDay = !!todayDay && todayProfile?.kind !== "core";
@@ -208,7 +208,7 @@ export async function Dashboard({ userId }: Props) {
       { key: "cooldown", show: liftingDay, done: !!routine("cooldown") },
     ],
     core: [{ key: "core", show: !!core, done: !!core?.doneToday }],
-    cardio: [{ key: "cardio", show: true, done: cardioTonight.length > 0 }],
+    cardio: [{ key: "cardio", show: true, done: cardioTonight.length > 0 || routine("cardio") === "skipped" }],
   };
   const steps = dayOrder.flatMap((b) => blockSteps[b]).filter((st) => st.show);
   const lastDone = steps.reduce((acc, st, i) => (st.done ? i : acc), -1);
@@ -335,6 +335,7 @@ export async function Dashboard({ userId }: Props) {
                         doneThisWeek={cardioWeek.map(sessionOf)}
                         logged={cardioTonight}
                         longMinutes={longMinutes}
+                        skipped={routine("cardio") === "skipped"}
                       />
                     </Step>
                   </>
