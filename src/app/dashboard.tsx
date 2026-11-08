@@ -270,7 +270,7 @@ export async function Dashboard({ userId }: Props) {
     if (key === "cardio")
       return {
         key,
-        title: running.pick === "walk" ? "Walk" : "Run",
+        title: cardioTonight.length > 0 ? (cardioTonight[0].session === "walk" ? "Walk" : "Run") : running.pick === "walk" ? "Walk" : "Run",
         line: cardioLine,
         state: stateOf("cardio"),
         href: cardioFit ? `/cardio?session=${running.pick}&machine=${cardioFit.machine}` : null,
@@ -353,6 +353,7 @@ export async function Dashboard({ userId }: Props) {
           todayDay={todayDay}
           todaySession={todaySession}
           savedOrder={savedOrder}
+          tomorrow={tomorrowDay ? formatDayLabel(tomorrowDay.day_number, tomorrowDay.name).name : "Rest day"}
         />
       )}
 
@@ -410,6 +411,7 @@ function MorningCard({
   todayDay,
   todaySession,
   savedOrder,
+  tomorrow,
 }: {
   steps: Array<{ key: string; title: string; line: string; state: StepState; href: string | null; minutes: number }>;
   cta: { label: string; href?: string; startDayId?: string; done?: boolean };
@@ -417,6 +419,7 @@ function MorningCard({
   todayDay: PlanDay | null;
   todaySession: SessionRow | null;
   savedOrder: DayBlock[];
+  tomorrow: string;
 }) {
   const label = todayDay ? formatDayLabel(todayDay.day_number, todayDay.name) : null;
   const hours = Math.floor(minutes / 60);
@@ -462,6 +465,15 @@ function MorningCard({
               </li>
             );
           })}
+          {/* an odd count leaves a hole. tomorrow fills it */}
+          {steps.length % 2 === 1 && (
+            <li>
+              <div className="block min-h-[68px] rounded-xl border border-dashed border-(--border) px-3 py-2.5">
+                <span className="label">Tomorrow</span>
+                <div className="mt-1 text-[14px] leading-snug text-(--muted)">{tomorrow}</div>
+              </div>
+            </li>
+          )}
         </ul>
 
         {cta.done ? (
