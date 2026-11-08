@@ -22,6 +22,27 @@ export type WarmupItem = {
 
 export type Step = { label: string; seconds: number; sub?: string; where?: string; level?: number };
 
+// a few seconds to get into position wherever the next piece happens
+// somewhere else. left to right doesn't count, so the list stays honest
+// about its length and the timer only pauses when you actually move.
+export const TRANSITION_SECONDS = 7;
+
+export function withTransitions(steps: Step[]): Step[] {
+  const out: Step[] = [];
+  steps.forEach((st, i) => {
+    const prev = steps[i - 1];
+    if (prev && st.where && st.where !== prev.where) {
+      out.push({ label: "Get set", sub: `Move to the ${st.where.toLowerCase()}`, seconds: TRANSITION_SECONDS, where: st.where });
+    }
+    out.push(st);
+  });
+  return out;
+}
+
+export function timerSeconds(steps: Step[]): number {
+  return withTransitions(steps).reduce((t, st) => t + st.seconds, 0);
+}
+
 export type WarmupSlot = "pulse" | "open";
 
 // every slot has a default for the day and a list to swap from. all of it
@@ -62,15 +83,15 @@ const barsChain: Seq = at("Stall bars", [
 ]);
 
 const standingChain: Seq = at("Standing at the bars", [
-  { label: "Radial nerve glide, left", sub: "Arm out and slightly back, palm facing behind you, fingers down. Tilt the head away to add, toward to release. Mild, never a zing", seconds: 45 },
-  { label: "Radial nerve glide, right", sub: "Same, lighter", seconds: 30 },
+  { label: "Radial nerve glide, left", sub: "Arm out and slightly back, palm facing behind you, fingers down. Tilt the head away to add, toward to release. Mild, never a zing. This side stays lighter", seconds: 45 },
+  { label: "Radial nerve glide, right", sub: "Same", seconds: 45 },
   { label: "Scalene release, left", sub: "Hand behind the back, ear toward the opposite shoulder, chin slightly up. Gentle", seconds: 30 },
   { label: "Scalene release, right", seconds: 30 },
   { label: "Overhead tricep stretch, left", sub: "Elbow up by the ear, hand down the back, other hand eases the elbow. Ribs down", seconds: 30 },
   { label: "Overhead tricep stretch, right", seconds: 30 },
   { label: "Wrist circles and finger spreads", sub: "20 each way, then fingers wide 20 times", seconds: 30 },
-  { label: "Thenar and forearm release, left", sub: "Ball into the pad under the thumb, then up the thumb side of the forearm. Slow", seconds: 60 },
-  { label: "Thenar and forearm release, right", sub: "Lighter", seconds: 30 },
+  { label: "Thenar and forearm release, left", sub: "Ball into the pad under the thumb, then up the thumb side of the forearm. Slow, and lighter on this side", seconds: 60 },
+  { label: "Thenar and forearm release, right", seconds: 60 },
 ]);
 
 const wallChain: Seq = at("Wall", [
@@ -148,8 +169,8 @@ const OPEN: WarmupItem[] = [
         { label: "Shoulder opener, hanging lean", sub: "Face the bars, hips back, chest sinks", seconds: 45 },
       ]),
       ...at("Standing at the bars", [
-        { label: "Radial nerve glide, left", sub: "Move the head, not the wrist", seconds: 40 },
-        { label: "Radial nerve glide, right", seconds: 25 },
+        { label: "Radial nerve glide, left", sub: "Move the head, not the wrist. Lighter on this side", seconds: 40 },
+        { label: "Radial nerve glide, right", seconds: 40 },
         { label: "Overhead tricep stretch, left", seconds: 25 },
         { label: "Overhead tricep stretch, right", seconds: 25 },
       ]),

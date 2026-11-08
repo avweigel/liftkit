@@ -8,6 +8,8 @@ import { StepList } from "@/components/step-list";
 import {
   PULSE_MACHINES,
   defaultWarmup,
+  timerSeconds,
+  withTransitions,
   warmupChoices,
   warmupItem,
   type WarmupItem,
@@ -95,7 +97,7 @@ export default function WarmupCard({
   const pulse = warmupItem("pulse", picks.pulse)!;
   const opener = warmupItem("open", picks.open)!;
   const complete = done.has("pulse") && done.has("open");
-  const totalMin = Math.round(((pulse.seconds ?? 0) + (opener.seconds ?? 0)) / 60) + 3;
+  const totalMin = Math.round(((pulse.seconds ?? 0) + (opener.steps ? timerSeconds(opener.steps) : (opener.seconds ?? 0))) / 60) + 3;
 
   const isDefault = JSON.stringify(picks) === JSON.stringify(defaultPicks(kind));
 
@@ -235,8 +237,8 @@ function WarmupRow({
             <CardioTimer
               key={item.id}
               persistKey={`liftkit.warmup.timer.${item.id}.${new Date().toISOString().slice(0, 10)}`}
-              totalSeconds={item.steps ? item.steps.reduce((t, s) => t + s.seconds, 0) : item.seconds}
-              steps={item.steps ?? (item.setting ? [{ label: item.setting, sub: item.cue, seconds: item.seconds }] : [])}
+              totalSeconds={item.steps ? timerSeconds(item.steps) : item.seconds}
+              steps={item.steps ? withTransitions(item.steps) : item.setting ? [{ label: item.setting, sub: item.cue, seconds: item.seconds }] : []}
               onComplete={onFinishTimer}
             />
           )}

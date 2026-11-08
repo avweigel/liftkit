@@ -5,12 +5,12 @@ import type { DayKind } from "@/lib/program/day-profile";
 import {
   cooldownChoices,
   cooldownItem,
-  cooldownSeconds,
   preferredCooldown,
 } from "@/lib/program/cooldowns";
 import { CardioTimer } from "./cardio-timer";
 import { SwapPicker } from "./warmup-card";
 import { StepList } from "@/components/step-list";
+import { timerSeconds, withTransitions } from "@/lib/program/warmups";
 
 type Saved = { pick?: string; state?: "done" | "skipped" };
 
@@ -61,7 +61,7 @@ export default function CooldownCard({
   const [open, setOpen] = useState(true);
 
   const item = cooldownItem(pickId) ?? preferred;
-  const total = cooldownSeconds(item);
+  const total = timerSeconds(item.steps);
 
   const pick = (id: string) => {
     setPickId(id);
@@ -145,7 +145,7 @@ export default function CooldownCard({
               key={item.id}
               persistKey={`liftkit.cooldown.timer.${item.id}.${new Date().toISOString().slice(0, 10)}`}
               totalSeconds={total}
-              steps={item.steps}
+              steps={withTransitions(item.steps)}
               onComplete={() => mark("done")}
             />
           )}
