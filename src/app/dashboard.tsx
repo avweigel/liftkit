@@ -1,4 +1,3 @@
-import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatDayLabel } from "@/lib/display/format-day";
@@ -16,7 +15,7 @@ import {
   weekStart,
 } from "@/lib/local-date";
 import { classifyDay, type DayProfile } from "@/lib/program/day-profile";
-import { pickForToday } from "@/lib/program/running";
+import { buildSession, DEFAULT_RUN_PROFILE, pickForToday, SESSION_TITLES } from "@/lib/program/running";
 import { loadLongMinutes, sessionOf, type CardioLog } from "@/lib/running-data";
 
 type SessionRow = {
@@ -226,22 +225,88 @@ export async function Dashboard({ userId }: Props) {
     if (steps[i].done) return "done";
     return i === nowIdx ? "now" : "later";
   };
-  const morningState = stateOf("workout");
-  // core and cardio say what they follow, since the order is yours to pick
-  const AFTER: Record<DayBlock, string> = {
-    strength: "After lifting",
-    core: "After core",
-    cardio: "After cardio",
+  // the morning as a list, in your order, with where each piece goes
+  const cardioFit = running.options.find((o) => o.id === running.pick)?.fit;
+  const cardioSession = cardioFit
+    ? buildSession(running.pick, cardioFit.machine, DEFAULT_RUN_PROFILE, { longMinutes, measurement: "metric" })
+    : null;
+  const cardioLine =
+    cardioTonight.length > 0
+      ? `${SESSION_TITLES[cardioTonight[0].session]} logged${cardioTonight[0].km ? `, ${Number(cardioTonight[0].km).toFixed(1)} km` : ""}`
+      : routine("cardio") === "skipped"
+        ? "Not today"
+        : cardioSession
+          ? `${SESSION_TITLES[running.pick]}, ${cardioSession.minutes} min`
+          : "Rest";
+  const workoutSets = todayDay ? todayDay.plan_day_exercises.reduce((n, e) => n + e.prescribed_sets, 0) : 0;
+  const workoutMinutes = todayDay ? Math.round(workoutSets * 1.6 + 5) : 0;
+  const cooldownMinutes = Number(cooldownPick?.dose?.match(/(\d+)/)?.[1] ?? 15);
+  const sessionHref = todaySession ? `/log/${todaySession.id}` : null;
+  type MorningStep = { key: string; title: string; line: string; state: StepState; href: string | null; minutes: number };
+  const stepFor = (key: string): MorningStep | null => {
+    if (key === "warmup") return liftingDay ? { key, title: "Warm-up", line: "Wrist routine, sun salutations, ramp sets", state: stateOf("warmup"), href: "/warmup", minutes: 15 } : null;
+    if (key === "workout")
+      return {
+        key,
+        title: todayDay ? "Workout" : "Rest",
+        line: todayDay ? `${formatDayLabel(todayDay.day_number, todayDay.name).name}, ${todayDay.plan_day_exercises.length} exercises` : "Nothing planned",
+        state: stateOf("workout"),
+        href: sessionHref,
+        minutes: workoutMinutes,
+      };
+    if (key === "cooldown")
+      return liftingDay && cooldownPick ? { key, title: "Cooldown", line: cooldownPick.name, state: stateOf("cooldown"), href: "/cooldown", minutes: cooldownMinutes } : null;
+    if (key === "core")
+      return core
+        ? {
+            key,
+            title: "Core",
+            line: core.doneToday ?? core.openToday?.name ?? core.suggested.name,
+            state: stateOf("core"),
+            href: core.openToday ? `/log/${core.openToday.id}` : null,
+            minutes: 25,
+          }
+        : null;
+    if (key === "cardio")
+      return {
+        key,
+        title: running.pick === "walk" ? "Walk" : "Run",
+        line: cardioLine,
+        state: stateOf("cardio"),
+        href: cardioFit ? `/cardio?session=${running.pick}&machine=${cardioFit.machine}` : null,
+        minutes: cardioTonight.length > 0 || routine("cardio") === "skipped" ? 0 : (cardioSession?.minutes ?? 0),
+      };
+    return null;
   };
-  const timeFor = (b: DayBlock) => {
-    const i = dayOrder.indexOf(b);
-    if (i === 0) return "First";
-    if (b === "core" && dayOrder[i - 1] === "strength" && !postRunCooldown) return "After cooldown";
-    if (b === "core" && dayOrder[i - 1] === "cardio" && postRunCooldown) return "After cooldown";
-    return AFTER[dayOrder[i - 1]];
-  };
-  const shown = dayOrder.filter((b) => b !== "core" || !!core);
-  const lastBlock = shown[shown.length - 1];
+  const morningSteps: MorningStep[] = dayOrder
+    .flatMap((b) =>
+      b === "strength"
+        ? ["warmup", "workout", ...(postRunCooldown ? [] : ["cooldown"])]
+        : b === "cardio"
+          ? ["cardio", ...(postRunCooldown ? ["cooldown"] : [])]
+          : ["core"],
+    )
+    .map(stepFor)
+    .filter((x): x is MorningStep => !!x);
+  const morningMinutes = morningSteps.filter((st) => st.state !== "done").reduce((n, st) => n + st.minutes, 0);
+  const nowStep = morningSteps.find((st) => st.state === "now") ?? null;
+  const nowKey = nowStep?.key ?? null;
+  // the one button: whatever comes next
+  const cta: { label: string; href?: string; startDayId?: string; done?: boolean } = !nowStep
+    ? { label: "Done for today", done: true }
+    : nowStep.key === "warmup" || nowStep.key === "workout"
+      ? todaySession
+        ? { label: "Continue the workout", href: `/log/${todaySession.id}` }
+        : todayDay
+          ? { label: "Start the morning", startDayId: todayDay.id }
+          : { label: "Rest day", done: true }
+      : nowStep.key === "cooldown"
+        ? { label: "Start the cooldown", href: "/cooldown" }
+        : nowStep.key === "core"
+          ? core?.openToday
+            ? { label: `Continue ${core.openToday.name}`, href: `/log/${core.openToday.id}` }
+            : { label: `Start ${core?.suggested.name ?? "core"}`, startDayId: core?.suggested.id }
+          : { label: running.pick === "walk" ? "Start the walk" : "Start the run", href: nowStep.href ?? "/cardio" };
 
   const dateLine = new Intl.DateTimeFormat("en-GB", {
     weekday: "long",
@@ -281,89 +346,27 @@ export async function Dashboard({ userId }: Props) {
       {!activePlan ? (
         <PickPlanCard hasAnyPlan={(planCount ?? 0) > 0} />
       ) : (
-        <div className="space-y-3">
-          <div className="-mt-4 flex justify-end">
-            <DayOrderControl order={savedOrder} />
-          </div>
-          <ol className="relative space-y-6">
-            {dayOrder.map((block) => (
-              <Fragment key={block}>
-                {block === "strength" && (
-                  <>
-                    {liftingDay && (
-                      <Step state={stateOf("warmup")} time="Before lifting" title="Warm-up">
-                        <RoutineCard
-                          href="/warmup"
-                          status={routine("warmup")}
-                          title="Warm-up"
-                          line="Pulse raiser, mobility, then a quick superset"
-                          cta="Start warm-up"
-                          active={stateOf("warmup") === "now"}
-                        />
-                      </Step>
-                    )}
+        <MorningCard
+          steps={morningSteps}
+          cta={cta}
+          minutes={morningMinutes}
+          todayDay={todayDay}
+          todaySession={todaySession}
+          savedOrder={savedOrder}
+        />
+      )}
 
-                    <Step state={morningState} time={dayOrder[0] === "strength" ? "Morning" : AFTER[dayOrder[dayOrder.indexOf("strength") - 1]]} title="Workout" last={lastBlock === "strength" && !(liftingDay && cooldownPick && !postRunCooldown)}>
-                      {todayDay ? (
-                        <WorkoutCard day={todayDay} session={todaySession} />
-                      ) : (
-                        <RestCard />
-                      )}
-                    </Step>
-
-                    {liftingDay && cooldownPick && !postRunCooldown && (
-                      <Step state={stateOf("cooldown")} time="After lifting" title="Cooldown" last={lastBlock === "strength"}>
-                        <RoutineCard
-                          href="/cooldown"
-                          status={routine("cooldown")}
-                          title={cooldownPick.name}
-                          line={`${cooldownPick.dose ?? ""}, or swap for ${/^stretch/.test(cooldownPick.id) ? "a walk" : "a stretch"}`}
-                          cta="Start cooldown"
-                          active={stateOf("cooldown") === "now"}
-                        />
-                      </Step>
-                    )}
-                  </>
-                )}
-                {block === "core" && (
-                  <>
-                    {core && (
-                      <Step state={stateOf("core")} time={timeFor("core")} title="Core" last={lastBlock === "core"}>
-                        <CoreCard core={core} />
-                      </Step>
-                    )}
-                  </>
-                )}
-                {block === "cardio" && (
-                  <>
-                    <Step state={stateOf("cardio")} time={timeFor("cardio")} title="Cardio" last={lastBlock === "cardio" && !postRunCooldown}>
-                      <TonightCardio
-                        pick={running.pick}
-                        options={running.options}
-                        doneThisWeek={cardioWeek.map(sessionOf)}
-                        logged={cardioTonight}
-                        longMinutes={longMinutes}
-                        skipped={routine("cardio") === "skipped"}
-                      />
-                    </Step>
-                    {liftingDay && cooldownPick && postRunCooldown && (
-                      <Step state={stateOf("cooldown")} time="After the run" title="Cooldown" last={lastBlock === "cardio"}>
-                        <RoutineCard
-                          href="/cooldown"
-                          status={routine("cooldown")}
-                          title={cooldownPick.name}
-                          line="Calves, hips, hamstrings. The run is what it's for"
-                          cta="Start cooldown"
-                          active={stateOf("cooldown") === "now"}
-                        />
-                      </Step>
-                    )}
-                  </>
-                )}
-              </Fragment>
-            ))}
-          </ol>
-        </div>
+      {/* the step you're on gets its own card when it has choices to make */}
+      {activePlan && nowKey === "core" && core && <CoreCard core={core} />}
+      {activePlan && nowKey === "cardio" && (
+        <TonightCardio
+          pick={running.pick}
+          options={running.options}
+          doneThisWeek={cardioWeek.map(sessionOf)}
+          logged={cardioTonight}
+          longMinutes={longMinutes}
+          skipped={routine("cardio") === "skipped"}
+        />
       )}
 
       {activePlan && (eveningNow() || todaySession?.finished_at) && (
@@ -396,6 +399,118 @@ function stockholmHour(): number {
 // from late afternoon on, the next thing you want to know is tomorrow
 function eveningNow(): boolean {
   return stockholmHour() >= 17;
+}
+
+// the whole morning on one card: what's in it, in your order, with the
+// pieces ticking off as they happen, and one button for whatever is next
+function MorningCard({
+  steps,
+  cta,
+  minutes,
+  todayDay,
+  todaySession,
+  savedOrder,
+}: {
+  steps: Array<{ key: string; title: string; line: string; state: StepState; href: string | null; minutes: number }>;
+  cta: { label: string; href?: string; startDayId?: string; done?: boolean };
+  minutes: number;
+  todayDay: PlanDay | null;
+  todaySession: SessionRow | null;
+  savedOrder: DayBlock[];
+}) {
+  const label = todayDay ? formatDayLabel(todayDay.day_number, todayDay.name) : null;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  const left = minutes === 0 ? "All done" : `About ${hours > 0 ? `${hours} h ` : ""}${mins > 0 || hours === 0 ? `${mins} min` : ""} left`;
+  return (
+    <section className="card overflow-hidden">
+      <div className="space-y-4 p-5">
+        <div>
+          <div className="label">{label?.weekday ?? "Today"}, {left.toLowerCase()}</div>
+          <h2 className="display text-[32px] leading-none">{label?.name ?? "Rest day"}</h2>
+        </div>
+
+        <ul className="grid grid-cols-2 gap-2">
+          {steps.map((st) => {
+            const inner = (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="label">{st.title}</span>
+                  {st.state === "done" ? (
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-(--ok) text-(--surface)" aria-label="done">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12.5l4.5 4.5L19 7.5" />
+                      </svg>
+                    </span>
+                  ) : st.state === "now" ? (
+                    <span className="h-2.5 w-2.5 rounded-full bg-(--accent) ring-4 ring-(--accent-soft)" aria-label="now" />
+                  ) : null}
+                </div>
+                <div className={`mt-1 text-[14px] leading-snug ${st.state === "done" ? "text-(--muted)" : ""}`}>{st.line}</div>
+              </>
+            );
+            const cls = `block min-h-[68px] rounded-xl px-3 py-2.5 ${st.state === "now" ? "bg-(--accent-soft) ring-1 ring-(--accent-line)" : "bg-(--surface-2)"}`;
+            return (
+              <li key={st.key}>
+                {st.href ? (
+                  <Link href={st.href} className={cls}>
+                    {inner}
+                  </Link>
+                ) : (
+                  <div className={cls}>{inner}</div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+
+        {cta.done ? (
+          <div className="btn btn-secondary btn-block pointer-events-none opacity-70">{cta.label}</div>
+        ) : cta.href ? (
+          <Link href={cta.href} className="btn btn-primary btn-block">
+            {cta.label}
+          </Link>
+        ) : cta.startDayId ? (
+          <StartDayButton dayId={cta.startDayId} label={cta.label} block />
+        ) : null}
+      </div>
+
+      {todayDay && (
+        <details className="group border-t border-(--border)">
+          <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-5 text-[14px] font-semibold text-(--accent) [&::-webkit-details-marker]:hidden">
+            See the workout
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="transition-transform group-open:rotate-180" aria-hidden>
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </summary>
+          <div className="px-5 pb-4">
+            <DayExerciseList day={todayDay} />
+            {todaySession && (
+              <Link href={`/log/${todaySession.id}`} className="btn btn-secondary btn-block mt-4">
+                {todaySession.finished_at ? "View today's workout" : "Open the workout"}
+              </Link>
+            )}
+          </div>
+        </details>
+      )}
+
+      <details className="group border-t border-(--border)">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-5 text-[14px] font-semibold text-(--muted) [&::-webkit-details-marker]:hidden">
+          Change today
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="transition-transform group-open:rotate-180" aria-hidden>
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </summary>
+        <div className="space-y-3 px-5 pb-4 text-[14px] text-(--muted)">
+          <div className="flex items-center justify-between gap-3">
+            <span>Order of the day</span>
+            <DayOrderControl order={savedOrder} />
+          </div>
+          <p>Another day&rsquo;s workout is under Other days, below the week.</p>
+        </div>
+      </details>
+    </section>
+  );
 }
 
 function TomorrowCard({ day }: { day: PlanDay | null }) {
@@ -498,189 +613,6 @@ function greeting() {
   if (hour < 11) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
-}
-
-// one stop on the day line: a dot on the rail, a time, then its card
-function Step({
-  state,
-  time,
-  title,
-  last = false,
-  children,
-}: {
-  state: StepState;
-  time: string;
-  title: string;
-  last?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <li className="relative pl-8">
-      {!last && (
-        <span
-          aria-hidden
-          className="absolute top-6 bottom-[-1.5rem] left-[9px] w-[2px] rounded-full bg-(--border)"
-        />
-      )}
-      <span
-        aria-hidden
-        className={`absolute top-[5px] left-0 flex h-5 w-5 items-center justify-center rounded-full ${
-          state === "done"
-            ? "bg-(--ok) text-(--surface)"
-            : state === "now"
-              ? "bg-(--accent) ring-4 ring-(--accent-soft)"
-              : "border-2 border-(--border) bg-(--background)"
-        }`}
-      >
-        {state === "done" && (
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 12.5l4.5 4.5L19 7.5" />
-          </svg>
-        )}
-      </span>
-      {/* a finished step folds to one line so the page is about what's next */}
-      <details open={state !== "done"} className="group">
-        <summary className="mb-2 flex min-h-8 cursor-pointer list-none items-baseline gap-2 [&::-webkit-details-marker]:hidden">
-          <h2 className="display text-[22px]">{title}</h2>
-          <span className="label">{time}</span>
-          {state === "done" && <span className="chip chip-ok ml-auto">Done</span>}
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={`${state === "done" ? "" : "ml-auto"} shrink-0 self-center text-(--faint) transition-transform group-open:rotate-180`}
-            aria-hidden
-          >
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </summary>
-        {children}
-      </details>
-    </li>
-  );
-}
-
-function WorkoutCard({
-  day,
-  session,
-}: {
-  day: PlanDay;
-  session: SessionRow | null;
-}) {
-  const label = formatDayLabel(day.day_number, day.name);
-  const ordered = day.plan_day_exercises
-    .slice()
-    .sort((a, b) => a.order_index - b.order_index);
-  const lead = ordered[0];
-  const leadIsStraight =
-    lead &&
-    ordered.filter(
-      (e) => parseSetCode(e.notes).code?.letter === parseSetCode(lead.notes).code?.letter,
-    ).length === 1;
-  const totalSets = ordered.reduce((n, e) => n + e.prescribed_sets, 0);
-
-  return (
-    <section className="card overflow-hidden">
-      <div className="space-y-3 p-5">
-        <div>
-          <div className="label">{label.weekday}</div>
-          <h3 className="display text-[30px]">{label.name}</h3>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          <span className="chip">
-            <span className="num text-[13px]">{ordered.length}</span> exercises
-          </span>
-          <span className="chip">
-            <span className="num text-[13px]">{totalSets}</span> sets
-          </span>
-          {lead?.exercise && leadIsStraight && (
-            <span className="chip chip-accent">
-              Big lift: {lead.exercise.name}
-            </span>
-          )}
-        </div>
-      </div>
-      <details className="group border-t border-(--border)">
-        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-5 text-[14px] font-semibold text-(--accent) [&::-webkit-details-marker]:hidden">
-          See the workout
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="transition-transform group-open:rotate-180" aria-hidden>
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </summary>
-        <div className="px-5 pb-4">
-          <DayExerciseList day={day} />
-        </div>
-      </details>
-      <div className="border-t border-(--border) bg-(--surface-2)/50 p-3">
-        {!session ? (
-          <StartDayButton dayId={day.id} label="Start workout" block />
-        ) : session.finished_at ? (
-          <Link href={`/log/${session.id}`} className="btn btn-secondary btn-block">
-            View today&rsquo;s workout
-          </Link>
-        ) : (
-          <Link href={`/log/${session.id}`} className="btn btn-primary btn-block">
-            Continue workout
-          </Link>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function RoutineCard({
-  href,
-  status,
-  title,
-  line,
-  cta,
-  active,
-}: {
-  href: string;
-  status: "done" | "skipped" | null;
-  title: string;
-  line: string;
-  cta: string;
-  active: boolean;
-}) {
-  if (status) {
-    return (
-      <Link href={href} className="card flex items-center justify-between gap-3 p-4">
-        <div className="min-w-0">
-          <div className="truncate font-semibold">{title}</div>
-          <div className="text-[13px] text-(--muted)">{status === "done" ? "Done" : "Skipped today"}</div>
-        </div>
-        <span className="text-[13px] font-semibold text-(--muted)">View</span>
-      </Link>
-    );
-  }
-  return (
-    <section className="card space-y-3 p-4">
-      <div>
-        <div className="display text-[20px]">{title}</div>
-        <p className="text-[14px] text-(--muted)">{line}</p>
-      </div>
-      <Link href={href} className={`btn btn-block ${active ? "btn-primary" : "btn-secondary"}`}>
-        {cta}
-      </Link>
-    </section>
-  );
-}
-
-function RestCard() {
-  return (
-    <section className="card space-y-1 p-5">
-      <h3 className="display text-[22px]">Rest day</h3>
-      <p className="text-[15px] text-(--muted)">
-        Nothing planned this morning. Pick any day below if you want to train.
-      </p>
-    </section>
-  );
 }
 
 function WeekStrip({
