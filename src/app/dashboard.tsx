@@ -15,7 +15,16 @@ import {
   weekStart,
 } from "@/lib/local-date";
 import { classifyDay, type DayProfile } from "@/lib/program/day-profile";
-import { buildSession, DEFAULT_RUN_PROFILE, pickForToday, SESSION_TITLES } from "@/lib/program/running";
+import {
+  buildSession,
+  DEFAULT_RUN_PROFILE,
+  MACHINES_FOR,
+  PLANNED_RUN,
+  pickForToday,
+  SESSION_TITLES,
+  SHORT_TITLES,
+  type SessionId,
+} from "@/lib/program/running";
 import { loadLongMinutes, sessionOf, type CardioLog } from "@/lib/running-data";
 
 type SessionRow = {
@@ -230,6 +239,44 @@ export async function Dashboard({ userId }: Props) {
   const cardioSession = cardioFit
     ? buildSession(running.pick, cardioFit.machine, DEFAULT_RUN_PROFILE, { longMinutes, measurement: "metric" })
     : null;
+  // the week's runs, one cell per day: what's planned, what got done,
+  // and what slipped. minutes come from the session as it would be built
+  // today, so the long run shows its current length
+  const plannedMinutes = (id: SessionId) =>
+    buildSession(id, MACHINES_FOR[id][0], DEFAULT_RUN_PROFILE, { longMinutes, measurement: "metric" }).minutes;
+  const doneIds = cardioWeek.map(sessionOf);
+  const weekCardio: WeekCardioDay[] = [1, 2, 3, 4, 5, 6, 7].map((d) => {
+    const iso = addDays(mondayIso, d - 1);
+    const planned = PLANNED_RUN[d] ?? null;
+    const logs = cardioWeek.filter((r) => r.logged_on === iso);
+    const log = logs.find((r) => sessionOf(r) !== "walk") ?? logs[0] ?? null;
+    const logged = log ? { session: sessionOf(log), minutes: log.minutes, km: log.km ?? null } : null;
+    const when: WeekCardioDay["when"] = d < local.weekday ? "past" : d === local.weekday ? "today" : "ahead";
+    const state: WeekCardioDay["state"] = logged
+      ? "done"
+      : !planned
+        ? "none"
+        : when === "ahead"
+          ? "planned"
+          : when === "today"
+            ? routine("cardio") === "skipped"
+              ? "skipped"
+              : "planned"
+            : doneIds.includes(planned)
+              ? "moved"
+              : "missed";
+    return {
+      weekday: d,
+      planned,
+      plannedMinutes: planned ? plannedMinutes(planned) : null,
+      logged,
+      when,
+      state,
+      href: planned ? `/cardio?session=${planned}&machine=${MACHINES_FOR[planned][0]}` : null,
+    };
+  });
+  const tomorrowRun = weekCardio.find((w) => w.weekday === nextWeekday(local.weekday)) ?? null;
+
   const cardioLine =
     cardioTonight.length > 0
       ? `${SESSION_TITLES[cardioTonight[0].session]} logged${cardioTonight[0].km ? `, ${Number(cardioTonight[0].km).toFixed(1)} km` : ""}`
@@ -357,6 +404,8 @@ export async function Dashboard({ userId }: Props) {
         />
       )}
 
+      {activePlan && <WeekCardio days={weekCardio} />}
+
       {/* the step you're on gets its own card when it has choices to make */}
       {activePlan && nowKey === "core" && core && <CoreCard core={core} />}
       {activePlan && nowKey === "cardio" && (
@@ -371,7 +420,7 @@ export async function Dashboard({ userId }: Props) {
       )}
 
       {activePlan && (eveningNow() || todaySession?.finished_at) && (
-        <TomorrowCard day={tomorrowDay} />
+        <TomorrowCard day={tomorrowDay} run={tomorrowRun} />
       )}
 
       {activePlan && planDays.length > 0 && (
@@ -525,14 +574,24 @@ function MorningCard({
   );
 }
 
-function TomorrowCard({ day }: { day: PlanDay | null }) {
+function TomorrowCard({ day, run }: { day: PlanDay | null; run: WeekCardioDay | null }) {
+  const evening = run?.planned ? (
+    <p className="text-[14px] text-(--muted)">
+      Evening: <span className="text-(--foreground)">{SESSION_TITLES[run.planned]}</span>
+      {run.plannedMinutes ? `, ${run.plannedMinutes} min` : ""}
+      {run.planned === "long" ? " (morning, after the lift)" : ""}
+    </p>
+  ) : (
+    <p className="text-[14px] text-(--muted)">No run tomorrow.</p>
+  );
   if (!day) {
     return (
       <section className="space-y-3">
         <h2 className="display text-[22px]">Tomorrow</h2>
-        <div className="card p-5">
+        <div className="card space-y-1 p-5">
           <div className="display text-[20px]">Rest day</div>
           <p className="text-[14px] text-(--muted)">Nothing planned.</p>
+          {evening}
         </div>
       </section>
     );
@@ -542,6 +601,7 @@ function TomorrowCard({ day }: { day: PlanDay | null }) {
   return (
     <section className="space-y-3">
       <h2 className="display text-[22px]">Tomorrow</h2>
+      <div className="px-1">{evening}</div>
       <details className="card group overflow-hidden" open>
         <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
           <div className="min-w-0 flex-1">
@@ -559,6 +619,90 @@ function TomorrowCard({ day }: { day: PlanDay | null }) {
           <DayExerciseList day={day} />
         </div>
       </details>
+    </section>
+  );
+}
+
+type WeekCardioDay = {
+  weekday: number;
+  planned: SessionId | null;
+  plannedMinutes: number | null;
+  logged: { session: SessionId; minutes: number | null; km: number | null } | null;
+  when: "past" | "today" | "ahead";
+  state: "done" | "planned" | "skipped" | "moved" | "missed" | "none";
+  href: string | null;
+};
+
+const WEEKDAY_SHORT = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+// the week's running at a glance, so an evening can be planned before it
+// arrives. a missed run stays visible until it's done on a free day.
+function WeekCardio({ days }: { days: WeekCardioDay[] }) {
+  const missed = days.filter((d) => d.state === "missed");
+  return (
+    <section className="space-y-3">
+      <div className="flex items-baseline justify-between px-1">
+        <h2 className="display text-[22px]">Cardio this week</h2>
+        <span className="text-[13px] text-(--muted)">
+          {days.filter((d) => d.state === "done").length} of {days.filter((d) => d.planned).length} runs
+        </span>
+      </div>
+      <div className="card p-2">
+        <ul className="grid grid-cols-7 gap-1">
+          {days.map((d) => {
+            const title = d.logged
+              ? SHORT_TITLES[d.logged.session]
+              : d.planned
+                ? SHORT_TITLES[d.planned]
+                : "";
+            const detail = d.logged
+              ? d.logged.km != null
+                ? `${Number(d.logged.km).toFixed(1)} km`
+                : d.logged.minutes
+                  ? `${d.logged.minutes} min`
+                  : ""
+              : d.plannedMinutes
+                ? `${d.plannedMinutes} min`
+                : "";
+            const tone =
+              d.state === "done"
+                ? "bg-(--ok-soft) text-(--ok)"
+                : d.state === "missed"
+                  ? "bg-(--surface-2) text-(--danger)"
+                  : d.state === "skipped" || d.state === "moved"
+                    ? "bg-(--surface-2) text-(--faint) line-through"
+                    : d.state === "planned"
+                      ? d.when === "today"
+                        ? "bg-(--accent-soft) text-(--accent)"
+                        : "bg-(--surface-2)"
+                      : "text-(--faint)";
+            const inner = (
+              <>
+                <span className={`label ${d.when === "today" ? "text-(--foreground)" : ""}`}>{WEEKDAY_SHORT[d.weekday]}</span>
+                <span className="mt-1 block text-[12px] font-semibold leading-tight">{title || "\u00a0"}</span>
+                <span className="num block text-[11px] leading-tight opacity-80">{detail || "\u00a0"}</span>
+              </>
+            );
+            const cls = `flex min-h-16 flex-col items-center rounded-lg px-0.5 py-1.5 text-center ${tone}`;
+            return (
+              <li key={d.weekday}>
+                {d.href && d.state !== "done" ? (
+                  <Link href={d.href} className={cls}>
+                    {inner}
+                  </Link>
+                ) : (
+                  <div className={cls}>{inner}</div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        {missed.length > 0 && (
+          <p className="px-1 pt-2 text-[13px] text-(--muted)">
+            {missed.map((d) => `${SESSION_TITLES[d.planned!]} (${WEEKDAY_SHORT[d.weekday]})`).join(" and ")} not done yet. It will be offered on the next free evening.
+          </p>
+        )}
+      </div>
     </section>
   );
 }
