@@ -538,12 +538,29 @@ function Step({
           </svg>
         )}
       </span>
-      <div className="mb-2 flex items-baseline gap-2">
-        <h2 className="display text-[22px]">{title}</h2>
-        <span className="label">{time}</span>
-        {state === "done" && <span className="chip chip-ok ml-auto">Done</span>}
-      </div>
-      {children}
+      {/* a finished step folds to one line so the page is about what's next */}
+      <details open={state !== "done"} className="group">
+        <summary className="mb-2 flex min-h-8 cursor-pointer list-none items-baseline gap-2 [&::-webkit-details-marker]:hidden">
+          <h2 className="display text-[22px]">{title}</h2>
+          <span className="label">{time}</span>
+          {state === "done" && <span className="chip chip-ok ml-auto">Done</span>}
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`${state === "done" ? "" : "ml-auto"} shrink-0 self-center text-(--faint) transition-transform group-open:rotate-180`}
+            aria-hidden
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </summary>
+        {children}
+      </details>
     </li>
   );
 }
