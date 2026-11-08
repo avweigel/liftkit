@@ -5,6 +5,14 @@ import { getUnitPrefs } from "@/lib/measurement";
 import { PageHeader } from "@/components/page-header";
 import { ExerciseBrowser, type LibraryItem, type RecentItem } from "./exercise-browser";
 import { NormalizeButton } from "./normalize-button";
+import { LiftProgress, RunningProgress, WristSnapshot, type LiftRow, type WeekRow } from "./progress-overview";
+import { addDays, localToday, weekStart } from "@/lib/local-date";
+import { buildSession, DEFAULT_RUN_PROFILE, sessionKm, WEEKLY, type SessionId } from "@/lib/program/running";
+import { sessionOf, type CardioLog } from "@/lib/running-data";
+
+const WEEKS = 12;
+// the lifts whose top set is the strength story
+const MAIN_LIFTS = ["Back Squat", "Deadlift", "Overhead Press", "Bench Press", "Chin-up", "Hip Thrust"];
 
 export const metadata: Metadata = {
   title: "Progress | LiftKit",
@@ -40,7 +48,9 @@ export default async function ExercisesPage() {
   } = await supabase.auth.getUser();
 
   const { stored, shown } = await getUnitPrefs();
-  const [{ data: library }, { data: recentSets }] = await Promise.all([
+  const today = localToday();
+  const firstWeek = addDays(weekStart(today), -7 * (WEEKS - 1));
+  const [{ data: library }, { data: recentSets }, { data: cardio }] = await Promise.all([
     supabase
       .from("exercises")
       .select("id,name,primary_muscle,equipment,owner_id")
@@ -55,7 +65,59 @@ export default async function ExercisesPage() {
       .order("logged_at", { ascending: false })
       .limit(2000)
       .returns<RecentSet[]>(),
+    supabase
+      .from("cardio_logs")
+      .select("id, logged_on, kind, session, machine, minutes, km")
+      .eq("user_id", user!.id)
+      .gte("logged_on", firstWeek)
+      .order("logged_on", { ascending: true })
+      .returns<CardioLog[]>(),
   ]);
+
+  // running, week by week. a run logged without a distance counts its
+  // planned kilometres so the weekly total isn't full of holes
+  const weeks: WeekRow[] = Array.from({ length: WEEKS }, (_, i) => {
+    const week = addDays(firstWeek, 7 * i);
+    const end = addDays(week, 6);
+    const rows = (cardio ?? []).filter((c) => c.logged_on >= week && c.logged_on <= end);
+    const runs = rows.filter((c) => (WEEKLY as string[]).includes(sessionOf(c)));
+    const kmOf = (c: CardioLog) => {
+      if (c.km != null) return Number(c.km);
+      const id = sessionOf(c) as SessionId;
+      const machine = (c.machine ?? "run") as Parameters<typeof buildSession>[1];
+      try {
+        return sessionKm(buildSession(id, machine, DEFAULT_RUN_PROFILE, { longMinutes: c.minutes ?? 45, measurement: "metric" }).steps);
+      } catch {
+        return 0;
+      }
+    };
+    const long = runs.find((c) => sessionOf(c) === "long");
+    return {
+      week,
+      label: new Date(`${week}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }),
+      runs: runs.length,
+      km: Math.round(runs.reduce((n, c) => n + kmOf(c), 0) * 10) / 10,
+      minutes: runs.reduce((n, c) => n + (c.minutes ?? 0), 0),
+      longMinutes: long?.minutes ?? null,
+      longKm: long ? kmOf(long) : null,
+    };
+  });
+
+  // the main lifts: top working set per session, in the shown unit
+  const lifts: LiftRow[] = MAIN_LIFTS.flatMap((name) => {
+    const ex = (library ?? []).find((r) => r.name === name);
+    if (!ex) return [];
+    const bySession = new Map<string, { date: string; weight: number | null; reps: number }>();
+    for (const st of recentSets ?? []) {
+      if (st.exercise_id !== ex.id) continue;
+      const cur = bySession.get(st.session_id);
+      const w = st.weight == null ? null : convert(Number(st.weight), stored, shown);
+      const better = !cur || (w ?? 0) > (cur.weight ?? 0) || ((w ?? 0) === (cur.weight ?? 0) && st.reps > cur.reps);
+      if (better) bySession.set(st.session_id, { date: st.logged_at, weight: w, reps: st.reps });
+    }
+    const points = [...bySession.values()].sort((a, b) => a.date.localeCompare(b.date)).slice(-12);
+    return [{ id: ex.id, name, unit: shown, points }];
+  });
 
   const items: LibraryItem[] = (library ?? []).map((r) => ({
     id: r.id,
@@ -73,10 +135,11 @@ export default async function ExercisesPage() {
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 space-y-8 px-4 pt-4 pb-tabbar">
-      <PageHeader
-        title="Progress"
-        subtitle="Your lifts over time. Tap an exercise to see its trend."
-      />
+      <PageHeader title="Progress" subtitle="Running, strength and the wrist. Every lift is further down." />
+
+      <RunningProgress weeks={weeks} goalRuns={WEEKLY.length} />
+      <LiftProgress lifts={lifts} />
+      <WristSnapshot />
 
       <ExerciseBrowser items={items} recent={recent} recentDays={RECENT_DAYS} />
 
