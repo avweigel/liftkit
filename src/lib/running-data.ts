@@ -10,6 +10,7 @@ export type CardioLog = {
   session: SessionId | null;
   machine: string | null;
   minutes: number | null;
+  km?: number | null;
 };
 
 // logs from before the running plan only have a kind

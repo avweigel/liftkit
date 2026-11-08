@@ -152,7 +152,7 @@ export async function Dashboard({ userId }: Props) {
   // a week of cardio, plus the day before monday so tuesday can see it
   const { data: cardioRows } = await supabase
     .from("cardio_logs")
-    .select("id, logged_on, kind, session, machine, minutes")
+    .select("id, logged_on, kind, session, machine, minutes, km")
     .eq("user_id", userId)
     .gte("logged_on", addDays(mondayIso, -1))
     .order("created_at", { ascending: true })
@@ -160,7 +160,7 @@ export async function Dashboard({ userId }: Props) {
   const cardioWeek = (cardioRows ?? []).filter((r) => r.logged_on >= mondayIso);
   const cardioTonight = cardioWeek
     .filter((r) => r.logged_on === local.iso)
-    .map((r) => ({ id: r.id, session: sessionOf(r), minutes: r.minutes, machine: r.machine }));
+    .map((r) => ({ id: r.id, session: sessionOf(r), minutes: r.minutes, machine: r.machine, km: r.km ?? null }));
   const yesterday = addDays(local.iso, -1);
   const metconOn = (day: string) =>
     sessions.some(

@@ -22,6 +22,7 @@ export type LoggedCardio = {
   session: SessionId;
   minutes: number | null;
   machine: string | null;
+  km?: number | null;
 };
 
 export function TonightCardio({
@@ -168,6 +169,12 @@ function LoggedCardioRow({ entry }: { entry: LoggedCardio }) {
       <span className="shrink-0 text-[13px] text-(--muted)">
         {entry.minutes ? <span className="num text-[15px] text-(--foreground)">{entry.minutes}</span> : null}
         {entry.minutes ? " min" : ""}
+        {entry.km ? (
+          <>
+            {", "}
+            <span className="num text-[15px] text-(--foreground)">{Number(entry.km).toFixed(1)}</span> km
+          </>
+        ) : null}
       </span>
       <button
         type="button"
