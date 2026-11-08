@@ -327,6 +327,203 @@ const H: Record<string, HowTo> = {
     how: "Bar in the front rack. Squat down, then drive up and use that to press the bar overhead in one motion.",
     cues: ["Elbows high in the squat", "Drive with the legs", "Ribs down overhead"],
   },
+  // ----- the rebuilt week -----
+  "chin-up-negative": {
+    how: "Jump or step to the top of a chin-up, chin over the bar. Lower yourself as slowly as you can, about 5 seconds, all the way to straight arms.",
+    cues: ["Shoulder blades down before you lower", "Fight the whole way", "Step off, never drop into a dead hang"],
+  },
+  "dumbbell-pullover": {
+    how: "Lie on a bench holding one dumbbell over your chest with both hands. Keeping a slight elbow bend, lower it in an arc behind your head until you feel the stretch in your lats, then pull it back.",
+    cues: ["Ribs pinned down the whole way", "Slow into the stretch", "Arms stay long"],
+  },
+  "z-press": {
+    how: "Sit on the floor, legs straight out in front, dumbbells at the shoulders. Press straight up without leaning back.",
+    cues: ["Sit tall, ribs down", "If you lean back, lighten it", "Lock out over the ears"],
+  },
+  "trap-3-raise": {
+    how: "Chest on an incline bench or bent over, light dumbbells hanging. Raise the arms up and out into a Y, thumbs up, from the lower traps rather than the arms.",
+    cues: ["Very light", "Shoulder blades down, not shrugged", "Hold a beat at the top"],
+  },
+  "landmine-press-standing": {
+    how: "Bar in the landmine, the end at your shoulder in one hand, staggered stance. Press it up and away along its arc, then bring it back to the shoulder.",
+    cues: ["Ribs down, no lean back", "Glute of the back leg tight", "Press away, not just up"],
+  },
+  "jefferson-curl": {
+    how: "Stand on a step holding a light dumbbell. Tuck the chin and roll down one segment of the spine at a time until you hang, then roll back up the same way.",
+    cues: ["Light, it's about range", "Slow, segment by segment", "Knees nearly straight"],
+  },
+  "single-leg-rdl": {
+    how: "Stand on one leg, dumbbell in the opposite hand. Hinge at the hip, the free leg reaching back, until the torso is near parallel, then drive the standing heel down to come up.",
+    cues: ["Hips square, not opening", "Soft knee, flat back", "Balance is the work"],
+  },
+  "half-kneeling-cable-external-rotation": {
+    how: "Cable at elbow height, light. Kneel side-on, outside knee up. Elbow pinned to your ribs at 90 degrees, hold the handle across your stomach, rotate the forearm out like a gate, pause, come back slow.",
+    cues: ["Elbow never leaves the ribs", "Wrist straight", "Slow back"],
+  },
+  "kb-halo": {
+    how: "Hold a kettlebell upside down by the horns at your chest. Circle it slowly around your head, close to the skull, then the other way.",
+    cues: ["Ribs down the whole circle", "Elbows tight, bell close", "Slow and even"],
+  },
+  "machine-row": {
+    how: "Chest on the pad, grab the handles, pull the elbows back past the ribs, squeeze, let it out slow.",
+    cues: ["Chest stays on the pad", "Elbows back, not up", "Full stretch at the front"],
+  },
+  "chest-press-machine": {
+    how: "Seat set so the handles sit at mid chest. Press out until the arms are nearly straight, return slow.",
+    cues: ["Shoulder blades back on the pad", "Ribs down, no arch", "Slow return"],
+  },
+  "straight-arm-pulldown": {
+    how: "Face a high cable with a bar, arms almost straight. Sweep the bar down to your thighs in an arc, then let it rise.",
+    cues: ["Soft elbows, same bend throughout", "Lats, not arms", "Ribs down at the bottom"],
+  },
+  "prone-dumbbell-hamstring-curl": {
+    how: "Face down on a flat bench, a dumbbell held between your feet. Curl the heels toward your glutes, lower slow.",
+    cues: ["Hips stay on the bench", "Squeeze at the top", "Light is plenty"],
+  },
+  "seated-knee-tucks": {
+    how: "Sit on the end of a bench, hands gripping the edge behind you, lean back slightly. Pull the knees to the chest, then extend the legs out straight without touching down.",
+    cues: ["Ribs down, no doming", "Slow out, controlled in", "Shorten the extension if the back arches"],
+  },
+  "tuck-front-lever": {
+    how: "Hang from the bar, pull the shoulder blades down and back, bring the knees to the chest and lift the hips until your back is flat to the floor. Hold.",
+    cues: ["Straight arms", "Shoulder blades down", "Back flat, hips up"],
+  },
+  "tuck-dragon-flag-negative": {
+    how: "Lie under the stall bars holding the bottom rung. Roll up onto the shoulders with the knees tucked, then lower the body as one piece, slowly, until just above the floor.",
+    cues: ["5 seconds down", "Hips never sag before the shoulders", "Tuck keeps it from doming"],
+  },
+  "side-plank-hip-dips": {
+    how: "Forearm side plank, feet stacked. Lower the hip toward the floor and lift it back up, slowly.",
+    cues: ["Elbow under the shoulder", "Ribs down, no twisting", "Full range both ways"],
+  },
+  "hanging-knee-raise": {
+    how: "Hang from the bar, shoulder blades down. Pull the knees to the chest on an exhale, lower slowly.",
+    cues: ["No swing", "Exhale as the knees come up", "Slow down"],
+  },
+  "hanging-knee-raise-with-twist": {
+    how: "Hang from the bar. Pull the knees up toward one elbow, lower, then toward the other.",
+    cues: ["Twist from the ribs, not the swing", "Shoulder blades down", "Slow lower"],
+  },
+  "russian-twist": {
+    how: "Sit with feet on the floor, lean back only until the abs engage with the ribs still down, plate at the chest. Rotate slowly to each side.",
+    cues: ["Feet down, this isn't a hollow hold", "If it domes, sit up more", "Slow, exhale as you turn"],
+  },
+  "step-up": {
+    how: "Box or bench at knee height, one dumbbell. Step up through the whole foot, stand tall at the top, lower under control.",
+    cues: ["Drive through the box leg, don't push off the floor", "Tall at the top", "All reps one side, then switch"],
+  },
+  "kettlebell-swing": {
+    how: "Hinge at the hips, hike the bell back between the legs, snap the hips forward and let the bell float to chest height. Let it swing back and repeat.",
+    cues: ["Hips, not arms", "Squeeze the glutes at the top", "Flat back, ribs down"],
+  },
+  "angled-leg-press-45": {
+    how: "Feet shoulder width on the plate, lower the sled until the knees are deep, press back up without locking out.",
+    cues: ["Log the plates, not the sled", "Low back stays on the pad", "Heavier than it looks"],
+  },
+  "seated-leg-press": {
+    how: "Feet shoulder width on the plate, press until the legs are nearly straight, return until the knees are deep.",
+    cues: ["Low back on the pad", "Don't lock out", "Full range"],
+  },
+  "hanging-leg-raise": {
+    how: "Hang from the bar, shoulder blades down. Raise straight legs toward the bar on an exhale, lower in 3 seconds.",
+    cues: ["Bend the knees as much as the midline needs", "No swing", "Slow down"],
+  },
+  "90-90-press-and-lift": {
+    how: "Sit in 90/90, fold over the front shin. Press the shin into the floor for 10 seconds, then lift the front leg an inch off the floor for 5, twice. Then lift the back leg up and down a few times.",
+    cues: ["Follow the clock", "Breathe through the presses", "Lift without leaning"],
+  },
+  "seated-pike-leg-lifts": {
+    how: "Sit in a pike, legs straight, hands beside the hips. Lift both heels off the floor and hold a beat, lower.",
+    cues: ["Knees locked", "Chest tall", "Small lift counts"],
+  },
+  "pancake-lift-offs": {
+    how: "Fold forward in a wide straddle. Take the hands off the floor and hold the chest forward for 5 seconds, relax, repeat.",
+    cues: ["Hips tilting forward", "Legs active", "Breathe"],
+  },
+  "couch-stretch-active": {
+    how: "Kneel facing away from the bench, back foot up on it, front foot forward. Ribs down, glute squeezed. Hold, then drive the back foot into the bench, then squeeze the glute to sink deeper, then lift the back foot off the bench a few times.",
+    cues: ["Ribs down, don't arch to find it", "Glute of the back leg squeezed", "Follow the clock"],
+  },
+  "front-split-heel-elevated": {
+    how: "Front heel on a plate, back knee down, hips square. Settle into the split, press both legs into the floor, lift the front leg briefly, then stand up out of it without hands if it's there.",
+    cues: ["Hips square", "Top of the back foot on the floor", "Raise the plate over weeks"],
+  },
+  "thoracic-extension-roller": {
+    how: "Roller under the mid back, hands behind the head or arms overhead, ribs held down. Extend over the roller, then move it up a few centimeters and repeat.",
+    cues: ["Bend comes from the upper back", "Ribs down, low back long", "Slow"],
+  },
+  bridge: {
+    how: "On your back, hands by the ears, feet near the hips. Press up into a full bridge. Push the floor away through the shoulders and straighten the legs to shift the arch up the spine.",
+    cues: ["Shoulders over the hands", "Ribs in, low back long", "Palm rule applies"],
+  },
+  "bridge-push-up": {
+    how: "In the bridge, bend the arms to lower the head toward the floor, then press back up.",
+    cues: ["Shoulders stay open", "Small range is fine", "Elbows track forward"],
+  },
+  "bridge-rocks": {
+    how: "In the bridge, rock the weight forward over the hands and back toward the feet.",
+    cues: ["Shoulders open as you rock forward", "Slow", "Ribs in"],
+  },
+  "drop-back": {
+    how: "From standing, reach back and lower into a bridge under control, hands landing soft. Stand back up only if it's there without a hand.",
+    cues: ["Hips forward first", "Near the wall", "Palm rule applies"],
+  },
+  "pancake-fold": {
+    how: "Sit in a wide straddle, tilt the hips forward and fold the chest toward the floor.",
+    cues: ["Hips tilt, back stays long", "Breathe", "Relax into it"],
+  },
+  camel: {
+    how: "Kneel, hands on the heels, push the hips forward and open the chest. Chin tucked.",
+    cues: ["Ribs in", "Hips over the knees", "Bend from the upper back"],
+  },
+  "supine-twist": {
+    how: "On your back, knees over to one side, arms wide, shoulders staying down.",
+    cues: ["Both shoulders down", "Long exhales", "Let gravity do it"],
+  },
+  "arnold-press": {
+    how: "Seated, dumbbells at the shoulders with palms facing you. Rotate the palms out as you press overhead, reverse on the way down.",
+    cues: ["Ribs down at the top", "Smooth rotation", "Full lockout"],
+  },
+  "seated-cable-row": {
+    how: "Sit tall at the low cable, neutral handle. Pull to the belly, elbows past the ribs, let it out slow.",
+    cues: ["Chest tall", "Elbows to the hips", "Full stretch forward"],
+  },
+  "lat-pulldown": {
+    how: "Grip just outside the shoulders, lean back slightly, pull the bar to the top of the chest, let it rise slow.",
+    cues: ["Elbows down and back", "Chest up", "No swinging"],
+  },
+  "dumbbell-rear-delt-fly": {
+    how: "Bent over or chest on an incline bench, light dumbbells hanging. Raise the arms out to the sides, pinkies up, pause.",
+    cues: ["Light", "Pinkies up", "Pause at the top"],
+  },
+  "cable-fly": {
+    how: "Cables at chest height, step forward, slight elbow bend. Bring the hands together in front of the chest, open slowly to the stretch.",
+    cues: ["Slow on the way out", "Same elbow bend throughout", "Squeeze in the middle"],
+  },
+  "skull-crusher": {
+    how: "Lying on the bench with the EZ bar over the chest. Bend the elbows to lower it to the forehead, press back up.",
+    cues: ["Elbows still", "Slow down", "Full extension"],
+  },
+  "barbell-row": {
+    how: "Hinge over the bar, flat back, torso near parallel. Pull the bar to the belly, lower under control.",
+    cues: ["Flat back", "Elbows to the hips", "No heaving"],
+  },
+  "incline-dumbbell-press": {
+    how: "Bench at 30 degrees, dumbbells at the chest. Press up and slightly back, lower to a stretch.",
+    cues: ["Shoulder blades pinned", "Ribs down", "Full range"],
+  },
+  "ez-bar-curl": {
+    how: "Stand tall, EZ bar at the thighs. Curl to the shoulders, lower slow.",
+    cues: ["Elbows at the sides", "No swing", "Slow down"],
+  },
+  "tricep-kickback": {
+    how: "Hinge over, elbows high and still. Extend the arms back until straight, return slow.",
+    cues: ["Elbows stay up", "Squeeze at the top", "Light"],
+  },
+  "pigeon-stretch": {
+    how: "Front shin across the mat, back leg long behind you. Fold over the front leg.",
+    cues: ["Hips square", "Long exhales", "Relax the glute"],
+  },
   // ----- cardio -----
   "incline-walk": {
     how: "Treadmill at a brisk walk on an incline. Follow the timer for each incline change.",

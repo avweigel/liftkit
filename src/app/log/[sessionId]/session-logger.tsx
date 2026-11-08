@@ -36,6 +36,7 @@ import {
 
 // reads this device's saved warm-up picks, so it renders only in the browser
 import { CardioTimer, parseCardio, parseIntervals, parseSteps, type CardioStep } from "./cardio-timer";
+import { PainScore } from "@/components/pain-score";
 import { swapExercise, undoSwap } from "@/lib/actions/swaps";
 import { createContext } from "react";
 
@@ -1025,8 +1026,10 @@ function ExerciseHeader({
           ))}
         </p>
       )}
-      {cleanNotes && <p className="text-[14px] text-(--muted)">{sentence(cleanNotes)}</p>}
+      {/* the slot note was written for the planned exercise, so a swap drops it */}
+      {cleanNotes && !exercise.swapped_from && <p className="text-[14px] text-(--muted)">{sentence(cleanNotes)}</p>}
       <HowToToggle name={exercise.name} />
+      {/palm rule/i.test(cleanNotes) && <PainScore context="handstand" label="Handstand pain this morning" />}
       {exercise.last_session && (
         <p className="text-[13px] text-(--muted)">
           {exercise.last_swap ? `Last time you did ${exercise.name}` : "Last time"}, {relativeDays(exercise.last_session.logged_at)}:{" "}

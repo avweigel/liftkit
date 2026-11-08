@@ -21,6 +21,7 @@ export type Machine =
   | "bike"
   | "row"
   | "elliptical"
+  | "stairs"
   | "walk"
   | "outside";
 
@@ -64,6 +65,7 @@ export const MACHINE_NAMES: Record<Machine, string> = {
   bike: "Bike",
   row: "Rower",
   elliptical: "Elliptical",
+  stairs: "Stair climber",
   walk: "Treadmill walk",
   outside: "Outside",
 };
@@ -74,8 +76,8 @@ export const MACHINES_FOR: Record<SessionId, Machine[]> = {
   intervals: ["run", "runwalk", "creep", "pyramid", "ratio52", "hills", "fartlek", "bike", "row", "outside"],
   long: ["run", "runwalk", "negsplit", "outside"],
   strides: ["run", "outside"],
-  easy: ["run", "runwalk", "ratio21", "ratio61", "elliptical", "bike", "row", "outside"],
-  walk: ["walk", "outside"],
+  easy: ["run", "runwalk", "ratio21", "ratio61", "elliptical", "bike", "row", "stairs", "outside"],
+  walk: ["walk", "stairs", "outside"],
 };
 
 // what logs as which kind, for the rest of the app
@@ -628,6 +630,27 @@ export function buildSession(
     };
   }
 
+  // walk on the stair climber: steady, easy zone, no rails. a bonus
+  // session, not training load, so it stays short and flat in effort
+  if (machine === "stairs") {
+    const stairs: Step[] = [
+      { label: "Easy", sub: `Slow steps, find the rhythm. ${hr("warm")}`, seconds: 300, level: 2 },
+      { label: "Steady, easy zone", sub: `Flat foot on each step, hands light on the rails. ${hr("easy")}`, seconds: 1200, level: 3 },
+      { label: "Easy", sub: `Slow it down. ${hr("warm")}`, seconds: 300, level: 2 },
+    ];
+    return {
+      id,
+      machine,
+      title: "Stair climb, easy",
+      minutes: 30,
+      goal: "Recovery, glutes",
+      plain: "5 min easy, 20 min steady in the easy zone, 5 min easy. One step rate you can hold without the rails.",
+      why: "Low impact and glute heavy. Stays easy on purpose: on a leg day or the day before a run, hard stairs is a fourth leg exercise.",
+      steps: stairs,
+      outside: ["30 min of stairs or a steep hill, easy effort.", "No pace goal."],
+    };
+  }
+
   // walk: the incline pattern you liked, effort only
   const walk: Array<[string, number, number]> = [
     ["3%", 3, 3], ["5%", 3, 5], ["7%", 3, 7], ["9%", 3, 9], ["11%", 4, 11], ["12%", 6, 12], ["10%", 4, 10], ["8%", 3, 8], ["5%", 3, 5], ["3%", 4, 3],
@@ -709,16 +732,38 @@ export function pickForToday(
   ctx: DayContext,
 ): { pick: SessionId; fit: Fit; options: Array<{ id: SessionId; fit: Fit }> } {
   const remaining: SessionId[] = WEEKLY.filter((id) => !done.includes(id));
-  // the long run leads at the weekend, when there's time for it. on
-  // weekdays the intervals lead, since it has the fewest days it fits.
-  const order: SessionId[] =
-    ctx.weekday >= 6 ? ["long", "intervals", "strides", "easy"] : ["intervals", "strides", "easy", "long"];
+  // the planned run for today leads. a run missed earlier in the week
+  // comes next, so it can be caught up on a free day. then the rest.
+  const planned = PLANNED_RUN[ctx.weekday] ?? null;
+  const missed = Object.entries(PLANNED_RUN)
+    .filter(([d, id]) => Number(d) < ctx.weekday && id && remaining.includes(id))
+    .map(([, id]) => id as SessionId);
+  const fallback: SessionId[] = ["intervals", "strides", "easy", "long"];
+  const order = [...new Set<SessionId>([...(planned ? [planned] : []), ...missed, ...fallback])];
   const ranked = order.filter((id) => remaining.includes(id));
-  const options = [...ranked, "walk" as SessionId].map((id) => ({ id, fit: fitFor(id, ctx) }));
+  const options = [...ranked, "walk" as SessionId].map((id) => {
+    const fit = fitFor(id, ctx);
+    const when = id === planned ? "Today's run." : missed.includes(id) ? "Missed earlier this week." : null;
+    return { id, fit: when ? { ...fit, note: `${when} ${fit.note}` } : fit };
+  });
 
-  // a metcon morning was the day's hard work: a walk is the suggestion,
-  // easy stays on the list
+  // on a day with no run planned the walk leads, unless there's a missed
+  // run that fits. a metcon morning was the day's hard work either way.
+  const first = options.find((o) => o.fit.ok && o.id !== "walk");
   const pick: SessionId =
-    ctx.today?.kind === "metcon" ? "walk" : (options.find((o) => o.fit.ok && o.id !== "walk")?.id ?? "walk");
-  return { pick, fit: fitFor(pick, ctx), options };
+    ctx.today?.kind === "metcon" ? "walk" : first && (planned || missed.includes(first.id)) ? first.id : "walk";
+  const chosen = options.find((o) => o.id === pick)!;
+  return { pick, fit: chosen.fit, options };
 }
+
+// which run goes on which weekday (1 = monday). spread out, with the
+// intervals away from both leg days and the long run on the free morning.
+export const PLANNED_RUN: Record<number, SessionId | null> = {
+  1: "easy",
+  2: null,
+  3: "intervals",
+  4: null,
+  5: "strides",
+  6: null,
+  7: "long",
+};

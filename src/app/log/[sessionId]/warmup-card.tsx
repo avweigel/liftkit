@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { DayKind } from "@/lib/program/day-profile";
 import { CardioTimer } from "./cardio-timer";
+import { PainScore } from "@/components/pain-score";
 import {
   PULSE_MACHINES,
   defaultWarmup,
@@ -309,6 +310,11 @@ function WarmupRow({
               onComplete={onFinishTimer}
             />
           )}
+        </div>
+      )}
+      {item.tags?.includes("handstand") && !swapOpen && (
+        <div className="px-3 pb-3">
+          <PainScore context="handstand" label="Handstand pain today" />
         </div>
       )}
       {swapOpen && <SwapPicker choices={choices} onPick={onPick} />}
