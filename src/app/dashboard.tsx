@@ -200,15 +200,22 @@ export async function Dashboard({ userId }: Props) {
 
   // the day line: the first step not done after the last one you did is
   // "now". anything you passed without logging just sits there, quiet.
-  const dayOrder = normalizeOrder((profile as { day_order?: string[] | null } | null)?.day_order);
+  const savedOrder = normalizeOrder((profile as { day_order?: string[] | null } | null)?.day_order);
+  // a post-run cooldown means the run comes straight after lifting and the
+  // stretch follows the run, whatever the usual order says. sunday.
+  const postRunCooldown = !!cooldownPick && /^stretch-run/.test(cooldownPick.id);
+  const dayOrder: DayBlock[] = postRunCooldown ? ["strength", "cardio", "core"] : savedOrder;
   const blockSteps: Record<DayBlock, Array<{ key: string; show: boolean; done: boolean }>> = {
     strength: [
       { key: "warmup", show: liftingDay, done: !!routine("warmup") },
       { key: "workout", show: true, done: !!todaySession?.finished_at },
-      { key: "cooldown", show: liftingDay, done: !!routine("cooldown") },
+      { key: "cooldown", show: liftingDay && !postRunCooldown, done: !!routine("cooldown") },
     ],
     core: [{ key: "core", show: !!core, done: !!core?.doneToday }],
-    cardio: [{ key: "cardio", show: true, done: cardioTonight.length > 0 || routine("cardio") === "skipped" }],
+    cardio: [
+      { key: "cardio", show: true, done: cardioTonight.length > 0 || routine("cardio") === "skipped" },
+      { key: "cooldown", show: liftingDay && postRunCooldown, done: !!routine("cooldown") },
+    ],
   };
   const steps = dayOrder.flatMap((b) => blockSteps[b]).filter((st) => st.show);
   const lastDone = steps.reduce((acc, st, i) => (st.done ? i : acc), -1);
@@ -229,7 +236,8 @@ export async function Dashboard({ userId }: Props) {
   const timeFor = (b: DayBlock) => {
     const i = dayOrder.indexOf(b);
     if (i === 0) return "First";
-    if (b === "core" && dayOrder[i - 1] === "strength") return "After cooldown";
+    if (b === "core" && dayOrder[i - 1] === "strength" && !postRunCooldown) return "After cooldown";
+    if (b === "core" && dayOrder[i - 1] === "cardio" && postRunCooldown) return "After cooldown";
     return AFTER[dayOrder[i - 1]];
   };
   const shown = dayOrder.filter((b) => b !== "core" || !!core);
@@ -275,7 +283,7 @@ export async function Dashboard({ userId }: Props) {
       ) : (
         <div className="space-y-3">
           <div className="-mt-4 flex justify-end">
-            <DayOrderControl order={dayOrder} />
+            <DayOrderControl order={savedOrder} />
           </div>
           <ol className="relative space-y-6">
             {dayOrder.map((block) => (
@@ -295,7 +303,7 @@ export async function Dashboard({ userId }: Props) {
                       </Step>
                     )}
 
-                    <Step state={morningState} time={dayOrder[0] === "strength" ? "Morning" : AFTER[dayOrder[dayOrder.indexOf("strength") - 1]]} title="Workout" last={lastBlock === "strength" && !(liftingDay && cooldownPick)}>
+                    <Step state={morningState} time={dayOrder[0] === "strength" ? "Morning" : AFTER[dayOrder[dayOrder.indexOf("strength") - 1]]} title="Workout" last={lastBlock === "strength" && !(liftingDay && cooldownPick && !postRunCooldown)}>
                       {todayDay ? (
                         <WorkoutCard day={todayDay} session={todaySession} />
                       ) : (
@@ -303,13 +311,13 @@ export async function Dashboard({ userId }: Props) {
                       )}
                     </Step>
 
-                    {liftingDay && cooldownPick && (
+                    {liftingDay && cooldownPick && !postRunCooldown && (
                       <Step state={stateOf("cooldown")} time="After lifting" title="Cooldown" last={lastBlock === "strength"}>
                         <RoutineCard
                           href="/cooldown"
                           status={routine("cooldown")}
                           title={cooldownPick.name}
-                          line={`${cooldownPick.dose ?? ""}, or swap for a stretch`}
+                          line={`${cooldownPick.dose ?? ""}, or swap for ${/^stretch/.test(cooldownPick.id) ? "a walk" : "a stretch"}`}
                           cta="Start cooldown"
                           active={stateOf("cooldown") === "now"}
                         />
@@ -328,7 +336,7 @@ export async function Dashboard({ userId }: Props) {
                 )}
                 {block === "cardio" && (
                   <>
-                    <Step state={stateOf("cardio")} time={timeFor("cardio")} title="Cardio" last={lastBlock === "cardio"}>
+                    <Step state={stateOf("cardio")} time={timeFor("cardio")} title="Cardio" last={lastBlock === "cardio" && !postRunCooldown}>
                       <TonightCardio
                         pick={running.pick}
                         options={running.options}
@@ -338,6 +346,18 @@ export async function Dashboard({ userId }: Props) {
                         skipped={routine("cardio") === "skipped"}
                       />
                     </Step>
+                    {liftingDay && cooldownPick && postRunCooldown && (
+                      <Step state={stateOf("cooldown")} time="After the run" title="Cooldown" last={lastBlock === "cardio"}>
+                        <RoutineCard
+                          href="/cooldown"
+                          status={routine("cooldown")}
+                          title={cooldownPick.name}
+                          line="Calves, hips, hamstrings. The run is what it's for"
+                          cta="Start cooldown"
+                          active={stateOf("cooldown") === "now"}
+                        />
+                      </Step>
+                    )}
                   </>
                 )}
               </Fragment>
