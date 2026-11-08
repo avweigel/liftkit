@@ -177,7 +177,7 @@ export async function Dashboard({ userId }: Props) {
   });
   const longMinutes = await loadLongMinutes(userId);
 
-  const core = await loadCore(supabase, userId, local.iso, todayProfile);
+  const core = await loadCore(supabase, userId, local.iso, local.weekday);
 
   // which plan days have a session this week (mon to today)
   const doneThisWeek = new Set(
@@ -816,11 +816,17 @@ type CoreInfo = {
   reason: string;
 };
 
+// which core day belongs to which weekday (1 = Monday). C sits on the
+// upper days so its lunges land on fresh legs, A is the leg-light one for
+// the day after squats and the long run, D is the heavy one on the day
+// with no lifting before it.
+const CORE_BY_WEEKDAY: Record<number, string> = { 1: "C", 2: "B", 3: "A", 4: "D", 5: "C", 6: "B", 7: "A" };
+
 async function loadCore(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   todayIso: string,
-  todayProfile: DayProfile | null,
+  weekday: number,
 ): Promise<CoreInfo | null> {
   const { data: plans } = await supabase
     .from("workout_plans")
@@ -857,21 +863,18 @@ async function loadCore(
   const openToday =
     startedToday && !last?.finished_at ? { id: last!.id as string, name: nameOf(lastDay!) } : null;
 
-  // rotate through every core day (A, B, C...). on heavy leg days skip any
-  // day that loads the adductors (Copenhagens), which leg day already hit.
-  const legSafe = (d: (typeof days)[number]) =>
-    !d.plan_day_exercises.some((x) => /copenhagen|adduct/i.test(x.exercises?.name ?? ""));
+  // each weekday has its core day. fall back to rotating if the plan's
+  // names don't carry letters.
+  const letter = CORE_BY_WEEKDAY[weekday];
+  const byLetter = days.find((d) => new RegExp(`^core\\s+${letter}\\b`, "i").test(d.name ?? ""));
   const lastIdx = lastDay ? days.findIndex((d) => d.id === lastDay.id) : -1;
   const order = days.map((_, i) => days[(lastIdx + 1 + i) % days.length]);
-  let pick = order[0];
-  let reason = lastDay ? `Next in the rotation after ${nameOf(lastDay)}.` : "Start the rotation with A.";
-  if (todayProfile?.heavyLegs && !legSafe(pick)) {
-    const safe = order.find(legSafe);
-    if (safe) {
-      pick = safe;
-      reason = `Heavy legs today, so ${nameOf(safe)} instead of Copenhagens.`;
-    }
-  }
+  const pick = byLetter ?? order[0];
+  const reason = byLetter
+    ? `${nameOf(byLetter)} is ${["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][weekday]}'s core day.`
+    : lastDay
+      ? `Next in the rotation after ${nameOf(lastDay)}.`
+      : "Start the rotation with A.";
   const others = days.filter((d) => d.id !== pick.id).map((d) => ({ id: d.id, name: nameOf(d) }));
 
   return {
