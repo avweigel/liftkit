@@ -3,8 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { logCardio } from "@/lib/actions/cardio";
-import { isTreadmill, type Machine, type Session, type SessionId } from "@/lib/program/running";
+import { isTreadmill, MACHINE_NAMES, type Machine, type Session, type SessionId } from "@/lib/program/running";
 import { CardioTimer } from "../log/[sessionId]/cardio-timer";
+
+const dayKey = (session: SessionId, machine: Machine) =>
+  `liftkit.cardio.${session}.${machine}.${new Date().toISOString().slice(0, 10)}`;
 
 function useLog(session: SessionId, machine: Machine) {
   const router = useRouter();
@@ -24,12 +27,35 @@ function useLog(session: SessionId, machine: Machine) {
   return { log, pending, error };
 }
 
-export function CardioRun({ session }: { session: Session }) {
+export function CardioRun({
+  session,
+  others = [],
+}: {
+  session: Session;
+  // the same session done other ways, so you can switch mid-run and keep
+  // the minutes you've already done
+  others?: Array<{ machine: Machine; totalSeconds: number }>;
+}) {
+  const router = useRouter();
   const { log, pending, error } = useLog(session.id, session.machine);
   const elapsed = useRef(0);
   const [started, setStarted] = useState(false);
   const total = session.steps.reduce((n, s) => n + s.seconds, 0);
   const bySpeed = isTreadmill(session.machine);
+
+  // carry the clock over: the new way picks up at the same elapsed time,
+  // still running, and the old timer is cleared so it can't come back
+  const switchTo = (o: { machine: Machine; totalSeconds: number }) => {
+    const done = elapsed.current;
+    try {
+      const left = o.totalSeconds * 1000 - done;
+      if (started && left > 0) {
+        window.localStorage.setItem(dayKey(session.id, o.machine), JSON.stringify({ endAt: Date.now() + left, leftMs: left }));
+      }
+      window.localStorage.removeItem(dayKey(session.id, session.machine));
+    } catch {}
+    router.push(`/cardio?session=${session.id}&machine=${o.machine}`);
+  };
 
   return (
     <div className="space-y-4">
@@ -37,7 +63,7 @@ export function CardioRun({ session }: { session: Session }) {
         totalSeconds={total}
         steps={session.steps}
         nowLabel={bySpeed ? "Set to" : "Now"}
-        persistKey={`liftkit.cardio.${session.id}.${session.machine}.${new Date().toISOString().slice(0, 10)}`}
+        persistKey={dayKey(session.id, session.machine)}
         onElapsed={(ms) => {
           elapsed.current = ms;
           if (!started && ms > 0) setStarted(true);
@@ -49,6 +75,19 @@ export function CardioRun({ session }: { session: Session }) {
           ? "Heart rate wins. If the speed puts you above the range, slow down. It logs itself when the timer ends."
           : "Go by heart rate and feel, no machine numbers needed. It logs itself when the timer ends."}
       </p>
+      {others.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="label">{started ? "Switch, keeping the time done" : "Do it as"}</div>
+          <div className="flex flex-wrap gap-1.5">
+            {others.map((o) => (
+              <button key={o.machine} type="button" onClick={() => switchTo(o)} className="chip h-10 px-4 text-[14px]">
+                {MACHINE_NAMES[o.machine]}
+              </button>
+            ))}
+          </div>
+          <p className="text-[12px] text-(--muted)">Same session either way. It counts as {session.title.toLowerCase().split(",")[0]} whichever way you do it.</p>
+        </div>
+      )}
       <button
         type="button"
         disabled={pending}

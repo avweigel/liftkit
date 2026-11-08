@@ -41,6 +41,12 @@ export default async function CardioPage({ searchParams }: Props) {
     loadLongMinutes(user.id),
   ]);
   const session = buildSession(id, machine, profile, { longMinutes, measurement });
+  const others = allowed
+    .filter((m) => m !== machine)
+    .map((m) => {
+      const alt = buildSession(id, m, profile, { longMinutes, measurement });
+      return { machine: m, totalSeconds: alt.steps.reduce((n, s) => n + s.seconds, 0) };
+    });
   const z = zonesFor(profile.maxHr);
   const local = (t: string) => localizeDistance(t, measurement);
 
@@ -52,6 +58,7 @@ export default async function CardioPage({ searchParams }: Props) {
         title={session.title}
       />
 
+      {machine === "outside" && (
       <nav aria-label="Where" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1">
         {allowed.map((m) => (
           <Link
@@ -64,6 +71,7 @@ export default async function CardioPage({ searchParams }: Props) {
           </Link>
         ))}
       </nav>
+      )}
 
       <section className="space-y-1.5 rounded-xl bg-(--surface-2) p-3">
         <SessionShape steps={session.steps} className="h-10 w-full" />
@@ -98,7 +106,7 @@ export default async function CardioPage({ searchParams }: Props) {
           <OutsideLog session={session} />
         </>
       ) : (
-        <CardioRun session={session} />
+        <CardioRun session={session} others={others} />
       )}
     </main>
   );

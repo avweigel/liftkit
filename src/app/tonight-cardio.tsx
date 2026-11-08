@@ -101,7 +101,7 @@ export function TonightCardio({
         </Link>
         {others.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[13px] text-(--muted)">Same session, other ways:</span>
+            <span className="text-[13px] text-(--muted)">Or do it as:</span>
             {others.map((m) => (
               <Link key={m} href={`/cardio?session=${chosen.id}&machine=${m}`} className="chip h-9 px-3 text-[13px]">
                 {MACHINE_NAMES[m]}
