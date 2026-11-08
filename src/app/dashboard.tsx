@@ -244,7 +244,7 @@ export async function Dashboard({ userId }: Props) {
   const sessionHref = todaySession ? `/log/${todaySession.id}` : null;
   type MorningStep = { key: string; title: string; line: string; state: StepState; href: string | null; minutes: number };
   const stepFor = (key: string): MorningStep | null => {
-    if (key === "warmup") return liftingDay ? { key, title: "Warm-up", line: "Wrist routine, sun salutations, ramp sets", state: stateOf("warmup"), href: "/warmup", minutes: 15 } : null;
+    if (key === "warmup") return liftingDay ? { key, title: "Warm-up", line: "Walk in, open up, ramp sets", state: stateOf("warmup"), href: "/warmup", minutes: 15 } : null;
     if (key === "workout")
       return {
         key,

@@ -18,7 +18,7 @@ export type WarmupItem = {
   steps?: Array<{ label: string; seconds: number; sub?: string }>;
 };
 
-export type WarmupSlot = "pulse" | "care" | "mobility" | "drill";
+export type WarmupSlot = "pulse" | "open";
 
 // every slot has a default for the day and a list to swap from. all of it
 // is meant to work at 5 am in a quiet gym: nothing loud, nothing that needs
@@ -40,122 +40,136 @@ const PULSE: WarmupItem[] = [
   { id: "rope-easy", name: "Jump rope, easy bounce", dose: "3 min", seconds: 180, setting: "Easy bounce", cue: "Small hops, quiet landings", tags: "cardio machine" },
 ];
 
-// the wrist and nerve routine. runs every day because the handstand does.
-// nerves want to slide, not stretch: everything slow and mild, stopping
-// short of any tingling. left side gets the work, right a lighter pass.
-const CARE: WarmupItem[] = [
-  {
-    id: "wrist-nerve",
-    name: "Wrist and nerve routine",
-    dose: "9 min",
-    detail: "Nerve glides, pec minor, scalenes, lower traps, forearm. Then one short handstand.",
-    tags: "wrist nerve shoulder neck pec rehab care handstand",
-    seconds: 530,
-    steps: [
-      { label: "Radial nerve glide, left", sub: "Arm out and slightly back, palm facing behind you, fingers down. Tilt the head away to add, toward to release. Mild, never a zing", seconds: 45 },
-      { label: "Radial nerve glide, right", sub: "Same, lighter", seconds: 30 },
-      { label: "Pec minor opener", sub: "Face away from the stall bars, hands on a bar above shoulder height, step forward. Ribs down, no arching", seconds: 60 },
-      { label: "Scalene release, left", sub: "Sit tall, hand behind the back, ear toward the opposite shoulder, chin slightly up. Gentle", seconds: 30 },
-      { label: "Scalene release, right", sub: "Same, lighter", seconds: 30 },
-      { label: "Serratus wall slides", sub: "Forearms on the wall, slide up, push the wall away at the top. About 10", seconds: 45 },
-      { label: "Trap-3 raise, light", sub: "Chest on a bench or bent over, arms in a Y, thumbs up. 2 x 10", seconds: 60 },
-      { label: "Thenar release, left", sub: "Ball or dumbbell handle into the pad under the thumb, then up the thumb side of the forearm. Slow, no digging", seconds: 60 },
-      { label: "Thenar release, right", sub: "Same, lighter", seconds: 30 },
-      { label: "Radial deviation, left", sub: "Thumb-up grip on a light dumbbell, arm at the side, lift the thumb end. 2 x 12", seconds: 45 },
-      { label: "Radial deviation, right", sub: "Same", seconds: 45 },
-      { label: "Wrist circles and finger spreads", sub: "20 each", seconds: 30 },
-      { label: "One handstand", sub: "Short. Stop before it hurts. That length is today's dose", seconds: 20 },
-    ],
-  },
-  {
-    id: "wrist-nerve-short",
-    name: "Wrist and nerve, the short version",
-    dose: "3 min",
-    detail: "Glide, pec opener, serratus slides, one handstand. For a rushed morning.",
-    tags: "wrist nerve short quick",
-    seconds: 175,
-    steps: [
-      { label: "Radial nerve glide, left", sub: "Arm out and back, palm behind you, move the head not the wrist", seconds: 40 },
-      { label: "Radial nerve glide, right", seconds: 25 },
-      { label: "Pec minor opener", sub: "Stall bars, ribs down", seconds: 50 },
-      { label: "Serratus wall slides", sub: "About 10", seconds: 40 },
-      { label: "One handstand", sub: "Short. Stop before it hurts", seconds: 20 },
-    ],
-  },
+// the warm-up after the walk in: one guided sequence, ordered by where
+// you stand so there's no wandering. stall bars first, then standing,
+// then the wall, then the mat, then light dumbbells next to the rack,
+// then the bar. the wrist and nerve chain runs every day, because the
+// nerve is compressed somewhere between the neck and the thumb and the
+// whole line (pecs, shoulders, triceps, forearm, wrist) wants opening
+// before anything is loaded.
+type Seq = Array<{ label: string; seconds: number; sub?: string }>;
+
+const barsChain: Seq = [
+  { label: "Pec minor opener", sub: "At the stall bars, facing away. Hands on a bar above the shoulders, step forward, chest open, ribs down", seconds: 60 },
+  { label: "Shoulder opener, hanging lean", sub: "Face the bars, grip a high rung, hips back, let the chest sink through. Lats and the long head of the triceps", seconds: 45 },
+  { label: "Side bend, left", sub: "Grip high with the right hand, lean the hips left", seconds: 30 },
+  { label: "Side bend, right", seconds: 30 },
 ];
 
-const MOBILITY: WarmupItem[] = [
-  { id: "sun-lunge", name: "Sun salutations, then side lunges", dose: "5, then 3-5/side", detail: "A steady flow. Five rounds is the pulse raiser when you walked here." },
-  { id: "wgs-flow", name: "Lizard with reach flow", dose: "1 round", detail: "Lizard with reach 3/side (lunge, elbow to instep, then rotate and reach up), cat-cow 5, side lunge 5/side.", tags: "hips lunge rotation twist stretch" },
-  { id: "sun-only", name: "Sun salutations", dose: "3-5" },
-  { id: "hips-9090", name: "90/90 hip switches and cat-cow", dose: "8 switches, 5 cat-cow" },
-  { id: "ankle-hip", name: "Ankle rocks, cossack shifts, deep squat hold", dose: "8/side, 5/side, 30 s", detail: "Good before squats." },
-  { id: "upper-flow", name: "Wall slides, open books, cat-cow", dose: "8, 5/side, 5", detail: "Good before pressing and pulling." },
-  { id: "squat-reach-flow", name: "Deep squat with T-spine reach, then leg swings", dose: "5/side, then 8-10 each way, twice", detail: "Swings: front, side, back with momentum, then again slow and controlled.", tags: "rotation twist hips" },
-  { id: "hinge-flow", name: "Hip hinge drill and leg swings", dose: "10, then 8-10 each way, twice", detail: "Good before deadlifts. Swings: front, side, back with momentum, then again slow and controlled." },
+const standingChain: Seq = [
+  { label: "Radial nerve glide, left", sub: "Arm out and slightly back, palm facing behind you, fingers down. Tilt the head away to add, toward to release. Mild, never a zing", seconds: 45 },
+  { label: "Radial nerve glide, right", sub: "Same, lighter", seconds: 30 },
+  { label: "Scalene release, left", sub: "Hand behind the back, ear toward the opposite shoulder, chin slightly up. Gentle", seconds: 30 },
+  { label: "Scalene release, right", seconds: 30 },
+  { label: "Overhead tricep stretch, left", sub: "Elbow up by the ear, hand down the back, other hand eases the elbow. Ribs down", seconds: 30 },
+  { label: "Overhead tricep stretch, right", seconds: 30 },
+  { label: "Wrist circles and finger spreads", sub: "20 each way, then fingers wide 20 times", seconds: 30 },
+  { label: "Thenar and forearm release, left", sub: "Ball into the pad under the thumb, then up the thumb side of the forearm. Slow", seconds: 60 },
+  { label: "Thenar and forearm release, right", sub: "Lighter", seconds: 30 },
 ];
 
-const DRILLS: Record<string, WarmupItem> = Object.fromEntries(
-  (
+const wallChain: Seq = [
+  { label: "Serratus wall slides", sub: "Forearms on the wall, slide up, push the wall away at the top. About 10", seconds: 45 },
+  { label: "Wall angels", sub: "Back and ribs against the wall, arms slide up and down. Ribs stay down", seconds: 45 },
+];
+
+const matUpper: Seq = [
+  { label: "Cat-cow", sub: "Slow, 10", seconds: 45 },
+  { label: "Thread the needle, left", seconds: 30 },
+  { label: "Thread the needle, right", seconds: 30 },
+  { label: "Sun salutations", sub: "Three, slow. Knees down on the chaturanga", seconds: 90 },
+];
+
+const matLower: Seq = [
+  { label: "Sun salutations", sub: "Three, slow. Knees down on the chaturanga", seconds: 90 },
+  { label: "Cat-cow", sub: "Slow, 8", seconds: 30 },
+  { label: "90/90 switches", sub: "Seated, knees swing side to side, 10 slow", seconds: 60 },
+  { label: "Side lunges", sub: "5 per side, slow, hips back", seconds: 60 },
+  { label: "Cossack squats", sub: "4 per side, bodyweight, pause at the bottom", seconds: 60 },
+  { label: "Glute bridges", sub: "10, 2 s squeeze at the top", seconds: 45 },
+  { label: "Slow bodyweight squats", sub: "10, 3 s down, full depth", seconds: 45 },
+];
+
+const dumbbellChain: Seq = [
+  { label: "Radial deviation, left", sub: "Light dumbbell, thumb-up grip, arm at the side, lift the thumb end. 2 x 12", seconds: 45 },
+  { label: "Radial deviation, right", seconds: 45 },
+  { label: "Trap-3 raise, light", sub: "Chest on a bench or bent over, arms in a Y, thumbs up. 2 x 10", seconds: 60 },
+];
+
+const sum = (seq: Seq) => seq.reduce((t, st) => t + st.seconds, 0);
+const minutes = (seq: Seq) => `${Math.round(sum(seq) / 60)} min`;
+
+const open = (id: string, name: string, detail: string, tags: string, steps: Seq): WarmupItem => ({
+  id,
+  name,
+  dose: minutes(steps),
+  detail,
+  tags,
+  seconds: sum(steps),
+  steps,
+});
+
+const OPEN: WarmupItem[] = [
+  open(
+    "open-upper",
+    "Open up, upper day",
+    "Stall bars, then standing, the wall, the mat, light dumbbells. The whole line from pec to thumb, then ramp sets.",
+    "upper shoulders chest wrist nerve pull push",
+    [...barsChain, ...standingChain, ...wallChain, ...matUpper, ...dumbbellChain],
+  ),
+  open(
+    "open-lower",
+    "Open up, lower day",
+    "Stall bars and the nerve chain, shorter, then hips and ankles on the mat, then ramp sets.",
+    "lower hips legs squat hinge wrist nerve",
     [
-      { id: "rope", name: "Jump rope", dose: "3 x 30 s", tags: "cardio" },
-      { id: "rower", name: "Rower power strokes", dose: "3 x 10", tags: "cardio" },
-      { id: "bike", name: "Assault bike sprint", dose: "3 x 8 s", tags: "cardio" },
-      { id: "skater", name: "Skater steps", dose: "3 x 6/side" },
-      { id: "squat-jump", name: "Squat jumps, low and soft", dose: "3 x 3" },
-      { id: "spin-sprint", name: "Standing spin bike sprint", dose: "3 x 10 s", tags: "cardio" },
-      { id: "stairs", name: "Stair climber, fast", dose: "2 min", tags: "cardio" },
-      { id: "db-swing", name: "Single dumbbell swing", dose: "3 x 8" },
-      { id: "explosive-pushup", name: "Explosive push-ups, hands stay down", dose: "3 x 5" },
-      { id: "cable-chop", name: "Half-kneeling cable chop, L then R", dose: "3 x 6/side" },
-      { id: "push-press", name: "Light dumbbell push press", dose: "3 x 5" },
-      { id: "bike-arms", name: "Assault bike sprint, arms driving", dose: "3 x 8 s", tags: "cardio" },
-      { id: "goblet-pause", name: "Light goblet squat, 3 s pause", dose: "2 x 5" },
-      { id: "glute-bridge", name: "Glute bridge, 2 s squeeze", dose: "2 x 10" },
-      { id: "lateral-step", name: "Lateral step-ups", dose: "2 x 8/side" },
-      { id: "scap-pushup", name: "Scap push-ups", dose: "2 x 10" },
-      { id: "light-row", name: "Light cable row, slow", dose: "2 x 12" },
-      { id: "leg-swings", name: "Leg swings, dynamic then controlled", dose: "8-10 each way, twice", detail: "Each leg: 8-10 front, 8-10 side, 8-10 back with momentum. Then the same three again, slow and controlled.", tags: "hips mobility hamstrings adductors" },
-      { id: "squat-reach", name: "Deep squat with T-spine reach", dose: "5/side", detail: "Sit in a deep squat. One hand stays down, the other reaches to the ceiling as you rotate. Switch sides.", tags: "rotation thoracic twist hips mobility" },
-    ] satisfies WarmupItem[]
-  ).map((d) => [d.id, d]),
-);
-
-const DRILL_DEFAULTS: Record<DayKind, string[]> = {
-  push: ["rope", "rower", "explosive-pushup"],
-  hinge: ["db-swing", "bike", "rope"],
-  pull: ["rower", "cable-chop", "rope"],
-  arms: ["push-press", "bike-arms", "rope"],
-  squat: ["squat-jump", "spin-sprint", "skater"],
-  // sunday is light on purpose: the long run follows
-  whole: ["glute-bridge", "goblet-pause"],
-  metcon: [],
-  core: [],
-  mobility: [],
-  other: ["rope", "rower", "bike"],
-};
+      ...barsChain.slice(0, 2),
+      ...standingChain.filter((st) => !/tricep|thenar/.test(st.label)),
+      ...matLower,
+    ],
+  ),
+  open(
+    "open-short",
+    "Open up, the short version",
+    "Pec opener, shoulder opener, nerve glides, tricep stretch, wall slides, two sun salutations. For a rushed morning.",
+    "short quick rushed",
+    [
+      { label: "Pec minor opener", sub: "Stall bars, facing away, ribs down", seconds: 45 },
+      { label: "Shoulder opener, hanging lean", sub: "Face the bars, hips back, chest sinks", seconds: 45 },
+      { label: "Radial nerve glide, left", sub: "Move the head, not the wrist", seconds: 40 },
+      { label: "Radial nerve glide, right", seconds: 25 },
+      { label: "Overhead tricep stretch, left", seconds: 25 },
+      { label: "Overhead tricep stretch, right", seconds: 25 },
+      { label: "Serratus wall slides", sub: "About 10", seconds: 40 },
+      { label: "Sun salutations", sub: "Two, slow", seconds: 60 },
+    ],
+  ),
+  open(
+    "open-chain",
+    "The nerve chain only",
+    "Stall bars and standing. For mobility day, where the floor sweep follows, and for core on its own.",
+    "mobility core chain nerve",
+    [...barsChain, ...standingChain],
+  ),
+];
 
 export type WarmupPlan = {
   pulse: WarmupItem;
-  care: WarmupItem;
-  mobility: WarmupItem;
-  drills: WarmupItem[];
+  open: WarmupItem;
 };
 
+const LOWER: DayKind[] = ["squat", "hinge"];
+
 export function defaultWarmup(kind: DayKind): WarmupPlan {
-  return {
-    pulse: kind === "mobility" ? PULSE.find((p) => p.id === "machine-10")! : PULSE[0],
-    care: CARE[0],
-    mobility: kind === "mobility" ? MOBILITY.find((m) => m.id === "sun-only")! : MOBILITY[0],
-    drills: DRILL_DEFAULTS[kind].map((id) => DRILLS[id]),
-  };
+  const pulse = kind === "mobility" ? PULSE.find((p) => p.id === "machine-10")! : PULSE[0];
+  const openId =
+    kind === "mobility" || kind === "core" ? "open-chain" : LOWER.includes(kind) ? "open-lower" : "open-upper";
+  return { pulse, open: OPEN.find((o) => o.id === openId)! };
 }
 
 export function warmupChoices(slot: WarmupSlot): WarmupItem[] {
   if (slot === "pulse") return PULSE;
-  if (slot === "care") return CARE;
-  if (slot === "mobility") return MOBILITY;
-  return Object.values(DRILLS);
+  return OPEN;
 }
 
 // the machines you can pick straight from the warm-up, in the order shown

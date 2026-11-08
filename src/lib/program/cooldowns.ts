@@ -1,7 +1,7 @@
 import type { DayKind } from "./day-profile";
 import type { WarmupItem } from "./warmups";
 
-export type CooldownStep = { label: string; seconds: number; level?: number };
+export type CooldownStep = { label: string; seconds: number; level?: number; sub?: string };
 
 export type CooldownItem = WarmupItem & {
   steps: CooldownStep[];
@@ -10,8 +10,8 @@ export type CooldownItem = WarmupItem & {
 const min = (m: number) => Math.round(m * 60);
 const hill = (levels: number[], minutes: number): CooldownStep[] =>
   levels.map((l) => ({ label: `${l}%`, seconds: min(minutes), level: l }));
-const sides = (name: string, seconds: number): CooldownStep[] => [
-  { label: `${name}, left`, seconds },
+const sides = (name: string, seconds: number, sub?: string): CooldownStep[] => [
+  { label: `${name}, left`, seconds, sub },
   { label: `${name}, right`, seconds },
 ];
 
@@ -75,55 +75,58 @@ const WALKS: CooldownItem[] = [
 
 // the daily flexibility dose. static holds belong after training, so this
 // is where they live: 15 minutes matched to what the day loaded. Thursday
-// builds range, these keep it.
+// builds range, these keep it. each one starts standing at the stall bars,
+// moves to the bench, then the mat, and never comes back up.
 const STRETCHES: CooldownItem[] = [
   {
     id: "stretch-lower-15",
     name: "Lower body, 15 min",
     dose: "15 min",
-    detail: "Hips, hamstrings, adductors, ankles. Long exhales, ribs down, nothing forced.",
+    detail: "Stall bars, then the bench, then the mat. Hips, hamstrings, adductors, ankles.",
     tags: "stretch mobility legs hips hamstrings flexibility",
     steps: [
-      ...sides("Couch stretch", 90),
-      ...sides("Pigeon", 90),
-      ...sides("Hamstring on the stall bars", 60),
+      ...sides("Hamstring on the stall bars", 60, "Heel on a rung, hips square, fold"),
+      { label: "Calf on the bottom rung", seconds: 60, sub: "Both feet, heels dropped" },
+      ...sides("Couch stretch at the bench", 90, "Back foot on the bench, ribs down, glute squeezed"),
+      ...sides("Pigeon", 90, "On the mat"),
       ...sides("Seated twist", 45),
       { label: "Straddle, chest forward", seconds: 60 },
-      { label: "Ankle rocks, both sides", seconds: 60 },
-      { label: "90/90 breathing", seconds: 60 },
+      { label: "Ankle rocks, kneeling", seconds: 60, sub: "Knee over the toes, heel down" },
+      { label: "90/90 breathing", seconds: 60, sub: "On your back, long exhales" },
     ],
   },
   {
     id: "stretch-upper-15",
     name: "Upper body, 15 min",
     dose: "15 min",
-    detail: "Lats, pecs, thoracic, wrists, forearm. The wrist pieces are the second dose of the day.",
+    detail: "Stall bars, then the mat. Lats, pecs, thoracic, triceps, forearm, wrists. The wrist pieces are the second dose of the day.",
     tags: "stretch mobility shoulders chest back wrist flexibility",
     steps: [
-      ...sides("Lat stretch on the stall bars", 60),
-      { label: "Pec opener on the stall bars", seconds: 90 },
-      ...sides("Thoracic rotation on all fours", 45),
+      ...sides("Lat stretch on the stall bars", 60, "Grip high, hips back, chest through"),
+      { label: "Pec opener on the stall bars", seconds: 90, sub: "Face away, hands on a bar above the shoulders, step forward" },
+      ...sides("Overhead tricep stretch", 30, "Standing, elbow by the ear"),
+      ...sides("Thoracic rotation on all fours", 45, "On the mat"),
       { label: "Puppy pose", seconds: 60 },
-      ...sides("Wrist flexor stretch", 45),
-      ...sides("Wrist extensor stretch", 45),
-      ...sides("Forearm and thenar release", 60),
-      { label: "90/90 breathing", seconds: 60 },
+      ...sides("Wrist flexor stretch", 45, "Kneeling, fingers pointing back"),
+      ...sides("Wrist extensor stretch", 45, "Backs of the hands down"),
+      ...sides("Forearm and thenar release", 60, "Ball or dumbbell handle"),
+      { label: "90/90 breathing", seconds: 60, sub: "On your back, long exhales" },
     ],
   },
   {
     id: "stretch-run-15",
     name: "After the run, 15 min",
     dose: "15 min",
-    detail: "What running tightens: calves, ankles, hip flexors, hamstrings. Do it after the run, not before.",
+    detail: "A step, then the stall bars, then the mat. What running tightens: calves, ankles, hip flexors, hamstrings. After the run, not before.",
     tags: "stretch mobility run calves hips flexibility",
     steps: [
       ...sides("Calf on a step, straight knee", 45),
       ...sides("Calf on a step, bent knee", 45),
-      ...sides("Couch stretch", 60),
-      ...sides("Pigeon", 60),
-      ...sides("Hamstring on the stall bars", 60),
+      ...sides("Hamstring on the stall bars", 60, "Heel on a rung, fold"),
+      ...sides("Couch stretch at the bench", 60, "Ribs down, glute squeezed"),
+      ...sides("Pigeon", 60, "On the mat"),
       ...sides("Supine twist", 45),
-      { label: "90/90 breathing", seconds: 60 },
+      { label: "90/90 breathing", seconds: 60, sub: "Long exhales" },
     ],
   },
 ];

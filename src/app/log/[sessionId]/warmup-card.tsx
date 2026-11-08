@@ -13,11 +13,11 @@ import {
   type WarmupSlot,
 } from "@/lib/program/warmups";
 
-type Picks = { pulse: string; care: string; mobility: string; drills: string[] };
+type Picks = { pulse: string; open: string };
 
 // swaps become the new default for that kind of day on this phone, and
-// check marks survive a refresh mid-workout
-const prefKey = (kind: DayKind) => `liftkit.warmup.pref.${kind}`;
+// check marks survive a refresh mid-workout. v2: the drill rounds are gone
+const prefKey = (kind: DayKind) => `liftkit.warmup.pref.v2.${kind}`;
 const doneKey = (sessionId: string) => `liftkit.warmup.done.${sessionId}`;
 
 function readJson<T>(key: string): T | null {
@@ -37,7 +37,7 @@ function writeJson(key: string, value: unknown) {
 
 function defaultPicks(kind: DayKind): Picks {
   const d = defaultWarmup(kind);
-  return { pulse: d.pulse.id, care: d.care.id, mobility: d.mobility.id, drills: d.drills.map((x) => x.id) };
+  return { pulse: d.pulse.id, open: d.open.id };
 }
 
 function loadPicks(kind: DayKind): Picks {
@@ -46,19 +46,8 @@ function loadPicks(kind: DayKind): Picks {
   if (!saved) return base;
   return {
     pulse: saved.pulse && warmupItem("pulse", saved.pulse) ? saved.pulse : base.pulse,
-    care: saved.care && warmupItem("care", saved.care) ? saved.care : base.care,
-    mobility: saved.mobility && warmupItem("mobility", saved.mobility) ? saved.mobility : base.mobility,
-    drills:
-      Array.isArray(saved.drills) && saved.drills.every((id) => warmupItem("drill", id))
-        ? saved.drills
-        : base.drills,
+    open: saved.open && warmupItem("open", saved.open) ? saved.open : base.open,
   };
-}
-
-// "3 x 6/side" is three rounds of 6/side. a dose with no rounds is one go.
-function splitDose(dose: string | undefined): { rounds: number | null; per: string } {
-  const m = (dose ?? "").match(/^\s*(\d+)\s*x\s*(.+)$/i);
-  return m ? { rounds: Number(m[1]), per: m[2] } : { rounds: null, per: dose ?? "" };
 }
 
 export default function WarmupCard({
@@ -103,34 +92,15 @@ export default function WarmupCard({
   };
 
   const pulse = warmupItem("pulse", picks.pulse)!;
-  const care = warmupItem("care", picks.care)!;
-  const mobility = warmupItem("mobility", picks.mobility)!;
-  const drills = picks.drills.map((id) => warmupItem("drill", id)!);
-  // the drills run as a superset: every drill back to back, then repeat
-  const rounds = Math.max(1, ...drills.map((d) => splitDose(d.dose).rounds ?? 1));
-  const roundsDone = Array.from({ length: rounds }, (_, i) => done.has(`round:${i + 1}`)).filter(Boolean).length;
-  const complete =
-    done.has("pulse") && done.has("care") && done.has("mobility") && (drills.length === 0 || roundsDone >= rounds);
+  const opener = warmupItem("open", picks.open)!;
+  const complete = done.has("pulse") && done.has("open");
+  const totalMin = Math.round(((pulse.seconds ?? 0) + (opener.seconds ?? 0)) / 60) + 3;
 
   const isDefault = JSON.stringify(picks) === JSON.stringify(defaultPicks(kind));
 
-  const swap = (slot: WarmupSlot, index: number, id: string) => {
-    if (slot === "pulse") {
-      updatePicks({ ...picks, pulse: id });
-      dropDone("pulse");
-    } else if (slot === "care") {
-      updatePicks({ ...picks, care: id });
-      dropDone("care");
-    } else if (slot === "mobility") {
-      updatePicks({ ...picks, mobility: id });
-      dropDone("mobility");
-    } else {
-      const old = picks.drills[index];
-      const drillsNext = [...picks.drills];
-      drillsNext[index] = id;
-      updatePicks({ ...picks, drills: drillsNext });
-      dropDone(`drill:${old}`);
-    }
+  const swap = (slot: WarmupSlot, id: string) => {
+    updatePicks({ ...picks, [slot]: id });
+    dropDone(slot);
     setSwapping(null);
   };
 
@@ -141,24 +111,19 @@ export default function WarmupCard({
     updateDone(next);
   };
 
-  const row = (slot: WarmupSlot, index: number, item: WarmupItem, key: string, checkable = true) => {
-    const swapId = `${slot}:${index}`;
-    const exclude = slot === "drill" ? new Set(picks.drills) : new Set([item.id]);
-    return (
-      <WarmupRow
-        key={swapId}
-        item={item}
-        done={done.has(key)}
-        onToggle={() => toggle(key)}
-        onFinishTimer={() => markDone(key)}
-        swapOpen={swapping === swapId}
-        onSwap={() => setSwapping(swapping === swapId ? null : swapId)}
-        choices={warmupChoices(slot).filter((c) => !exclude.has(c.id))}
-        onPick={(id) => swap(slot, index, id)}
-        checkable={checkable}
-      />
-    );
-  };
+  const row = (slot: WarmupSlot, item: WarmupItem) => (
+    <WarmupRow
+      key={slot}
+      item={item}
+      done={done.has(slot)}
+      onToggle={() => toggle(slot)}
+      onFinishTimer={() => markDone(slot)}
+      swapOpen={swapping === slot}
+      onSwap={() => setSwapping(swapping === slot ? null : slot)}
+      choices={warmupChoices(slot).filter((c) => c.id !== item.id)}
+      onPick={(id) => swap(slot, id)}
+    />
+  );
 
   return (
     <section className={standalone ? "" : "card overflow-hidden"}>
@@ -169,59 +134,20 @@ export default function WarmupCard({
         aria-expanded={open}
       >
         <span className="display text-[21px]">Warm-up</span>
-        <span className="label">About {kind === "mobility" ? 25 : 15} min</span>
+        <span className="label">About {totalMin} min</span>
         {complete && <span className="chip chip-ok">Done</span>}
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={`ml-auto text-(--muted) transition-transform ${open ? "rotate-180" : ""}`} aria-hidden>
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
       {(open || standalone) && (
-        <div className={`space-y-4 ${standalone ? "" : "px-4 pb-4"}`}>
+        <div className={`space-y-3 ${standalone ? "" : "px-4 pb-4"}`}>
           <ul className="space-y-1.5">
-            {row("pulse", 0, pulse, "pulse")}
-            {row("care", 0, care, "care")}
-            {row("mobility", 0, mobility, "mobility")}
+            {row("pulse", pulse)}
+            {row("open", opener)}
           </ul>
-          {drills.length > 0 && (
-            <div className="space-y-2 rounded-xl border border-(--accent-line) p-3">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-[15px] font-semibold">Superset</span>
-                <span className="label">
-                  {rounds > 1 ? `${rounds} rounds, back to back` : "Once through"}
-                </span>
-              </div>
-              <ul className="space-y-1.5">
-                {drills.map((d, i) =>
-                  row("drill", i, { ...d, dose: splitDose(d.dose).per }, `drill:${d.id}`, false),
-                )}
-              </ul>
-              <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${rounds}, minmax(0, 1fr))` }}>
-                {Array.from({ length: rounds }, (_, i) => {
-                  const key = `round:${i + 1}`;
-                  const on = done.has(key);
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => toggle(key)}
-                      aria-pressed={on}
-                      className={`flex h-12 items-center justify-center gap-1.5 rounded-xl text-[14px] font-semibold transition-colors ${
-                        on ? "bg-(--ok-soft) text-(--ok)" : "bg-(--surface-2) text-(--muted)"
-                      }`}
-                    >
-                      {on && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                          <path d="M5 12.5l4.5 4.5L19 7.5" />
-                        </svg>
-                      )}
-                      Round {i + 1}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="text-[13px] text-(--muted)">Rest 30 to 60 seconds after each round.</p>
-            </div>
-          )}
+          <p className="text-[13px] text-(--muted)">Then ramp sets on the first lift: two light sets of five before the work sets.</p>
+          <PainScore context="handstand" label="Handstand pain today" />
           {kind === "metcon" && (
             <p className="text-[14px] text-(--muted)">
               Low on energy? Do the easy version: a 20 minute EMOM with half the reps, and skip the runs.
@@ -254,9 +180,7 @@ function WarmupRow({
   onSwap,
   choices,
   onPick,
-  checkable = true,
 }: {
-  checkable?: boolean;
   item: WarmupItem;
   done: boolean;
   onToggle: () => void;
@@ -267,15 +191,15 @@ function WarmupRow({
   onPick: (id: string) => void;
 }) {
   return (
-    <li className={`rounded-xl transition-colors ${done && checkable ? "bg-(--ok-soft)" : "bg-(--surface-2)"}`}>
+    <li className={`rounded-xl transition-colors ${done ? "bg-(--ok-soft)" : "bg-(--surface-2)"}`}>
       <div className="flex items-start">
         <button
           type="button"
-          onClick={checkable ? onToggle : undefined}
-          aria-pressed={checkable ? done : undefined}
-          className={`flex min-h-12 flex-1 items-start gap-3 p-3 text-left ${checkable ? "" : "cursor-default"}`}
+          onClick={onToggle}
+          aria-pressed={done}
+          className="flex min-h-12 flex-1 items-start gap-3 p-3 text-left"
         >
-          <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${checkable ? "" : "hidden"} ${done ? "bg-(--ok) text-(--surface)" : "border-2 border-(--border)"}`}>
+          <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${done ? "bg-(--ok) text-(--surface)" : "border-2 border-(--border)"}`}>
             {done && (
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M5 12.5l4.5 4.5L19 7.5" />
@@ -310,11 +234,6 @@ function WarmupRow({
               onComplete={onFinishTimer}
             />
           )}
-        </div>
-      )}
-      {item.tags?.includes("handstand") && !swapOpen && (
-        <div className="px-3 pb-3">
-          <PainScore context="handstand" label="Handstand pain today" />
         </div>
       )}
       {swapOpen && <SwapPicker choices={choices} onPick={onPick} />}
