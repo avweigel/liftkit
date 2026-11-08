@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { DayKind } from "@/lib/program/day-profile";
 import { CardioTimer } from "./cardio-timer";
 import { PainScore } from "@/components/pain-score";
+import { StepList } from "@/components/step-list";
 import {
   PULSE_MACHINES,
   defaultWarmup,
@@ -221,6 +222,11 @@ function WarmupRow({
           {swapOpen ? "Close" : "Swap"}
         </button>
       </div>
+      {item.steps && !swapOpen && (
+        <div className="px-3 pb-3">
+          <StepList steps={item.steps} bring={item.bring} />
+        </div>
+      )}
       {item.seconds != null && !done && !swapOpen && (
         <div className="px-3 pb-3">
           {item.chooser ? (

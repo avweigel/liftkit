@@ -15,8 +15,12 @@ export type WarmupItem = {
   // extra words for search, so "hips" or "cardio" finds the right things
   tags?: string;
   // a guided sequence: the timer names each piece as it comes
-  steps?: Array<{ label: string; seconds: number; sub?: string }>;
+  steps?: Step[];
+  // what to carry over to the stall bars before starting
+  bring?: string;
 };
+
+export type Step = { label: string; seconds: number; sub?: string; where?: string; level?: number };
 
 export type WarmupSlot = "pulse" | "open";
 
@@ -47,16 +51,17 @@ const PULSE: WarmupItem[] = [
 // nerve is compressed somewhere between the neck and the thumb and the
 // whole line (pecs, shoulders, triceps, forearm, wrist) wants opening
 // before anything is loaded.
-type Seq = Array<{ label: string; seconds: number; sub?: string }>;
+type Seq = Step[];
+const at = (where: string, seq: Seq): Seq => seq.map((st) => ({ ...st, where }));
 
-const barsChain: Seq = [
+const barsChain: Seq = at("Stall bars", [
   { label: "Pec minor opener", sub: "At the stall bars, facing away. Hands on a bar above the shoulders, step forward, chest open, ribs down", seconds: 60 },
   { label: "Shoulder opener, hanging lean", sub: "Face the bars, grip a high rung, hips back, let the chest sink through. Lats and the long head of the triceps", seconds: 45 },
   { label: "Side bend, left", sub: "Grip high with the right hand, lean the hips left", seconds: 30 },
   { label: "Side bend, right", seconds: 30 },
-];
+]);
 
-const standingChain: Seq = [
+const standingChain: Seq = at("Standing at the bars", [
   { label: "Radial nerve glide, left", sub: "Arm out and slightly back, palm facing behind you, fingers down. Tilt the head away to add, toward to release. Mild, never a zing", seconds: 45 },
   { label: "Radial nerve glide, right", sub: "Same, lighter", seconds: 30 },
   { label: "Scalene release, left", sub: "Hand behind the back, ear toward the opposite shoulder, chin slightly up. Gentle", seconds: 30 },
@@ -66,21 +71,21 @@ const standingChain: Seq = [
   { label: "Wrist circles and finger spreads", sub: "20 each way, then fingers wide 20 times", seconds: 30 },
   { label: "Thenar and forearm release, left", sub: "Ball into the pad under the thumb, then up the thumb side of the forearm. Slow", seconds: 60 },
   { label: "Thenar and forearm release, right", sub: "Lighter", seconds: 30 },
-];
+]);
 
-const wallChain: Seq = [
+const wallChain: Seq = at("Wall", [
   { label: "Serratus wall slides", sub: "Forearms on the wall, slide up, push the wall away at the top. About 10", seconds: 45 },
   { label: "Wall angels", sub: "Back and ribs against the wall, arms slide up and down. Ribs stay down", seconds: 45 },
-];
+]);
 
-const matUpper: Seq = [
+const matUpper: Seq = at("Mat", [
   { label: "Cat-cow", sub: "Slow, 10", seconds: 45 },
   { label: "Thread the needle, left", seconds: 30 },
   { label: "Thread the needle, right", seconds: 30 },
   { label: "Sun salutations", sub: "Three, slow. Knees down on the chaturanga", seconds: 90 },
-];
+]);
 
-const matLower: Seq = [
+const matLower: Seq = at("Mat", [
   { label: "Sun salutations", sub: "Three, slow. Knees down on the chaturanga", seconds: 90 },
   { label: "Cat-cow", sub: "Slow, 8", seconds: 30 },
   { label: "90/90 switches", sub: "Seated, knees swing side to side, 10 slow", seconds: 60 },
@@ -88,23 +93,24 @@ const matLower: Seq = [
   { label: "Cossack squats", sub: "4 per side, bodyweight, pause at the bottom", seconds: 60 },
   { label: "Glute bridges", sub: "10, 2 s squeeze at the top", seconds: 45 },
   { label: "Slow bodyweight squats", sub: "10, 3 s down, full depth", seconds: 45 },
-];
+]);
 
-const dumbbellChain: Seq = [
+const dumbbellChain: Seq = at("Light dumbbells", [
   { label: "Radial deviation, left", sub: "Light dumbbell, thumb-up grip, arm at the side, lift the thumb end. 2 x 12", seconds: 45 },
   { label: "Radial deviation, right", seconds: 45 },
   { label: "Trap-3 raise, light", sub: "Chest on a bench or bent over, arms in a Y, thumbs up. 2 x 10", seconds: 60 },
-];
+]);
 
 const sum = (seq: Seq) => seq.reduce((t, st) => t + st.seconds, 0);
 const minutes = (seq: Seq) => `${Math.round(sum(seq) / 60)} min`;
 
-const open = (id: string, name: string, detail: string, tags: string, steps: Seq): WarmupItem => ({
+const open = (id: string, name: string, detail: string, tags: string, bring: string, steps: Seq): WarmupItem => ({
   id,
   name,
   dose: minutes(steps),
   detail,
   tags,
+  bring,
   seconds: sum(steps),
   steps,
 });
@@ -115,6 +121,7 @@ const OPEN: WarmupItem[] = [
     "Open up, upper day",
     "Stall bars, then standing, the wall, the mat, light dumbbells. The whole line from pec to thumb, then ramp sets.",
     "upper shoulders chest wrist nerve pull push",
+    "Ball, mat, one 1 to 2 kg dumbbell and a pair of 2 to 3 kg",
     [...barsChain, ...standingChain, ...wallChain, ...matUpper, ...dumbbellChain],
   ),
   open(
@@ -122,6 +129,7 @@ const OPEN: WarmupItem[] = [
     "Open up, lower day",
     "Stall bars and the nerve chain, shorter, then hips and ankles on the mat, then ramp sets.",
     "lower hips legs squat hinge wrist nerve",
+    "Mat",
     [
       ...barsChain.slice(0, 2),
       ...standingChain.filter((st) => !/tricep|thenar/.test(st.label)),
@@ -133,15 +141,20 @@ const OPEN: WarmupItem[] = [
     "Open up, the short version",
     "Pec opener, shoulder opener, nerve glides, tricep stretch, wall slides, two sun salutations. For a rushed morning.",
     "short quick rushed",
+    "Mat",
     [
-      { label: "Pec minor opener", sub: "Stall bars, facing away, ribs down", seconds: 45 },
-      { label: "Shoulder opener, hanging lean", sub: "Face the bars, hips back, chest sinks", seconds: 45 },
-      { label: "Radial nerve glide, left", sub: "Move the head, not the wrist", seconds: 40 },
-      { label: "Radial nerve glide, right", seconds: 25 },
-      { label: "Overhead tricep stretch, left", seconds: 25 },
-      { label: "Overhead tricep stretch, right", seconds: 25 },
-      { label: "Serratus wall slides", sub: "About 10", seconds: 40 },
-      { label: "Sun salutations", sub: "Two, slow", seconds: 60 },
+      ...at("Stall bars", [
+        { label: "Pec minor opener", sub: "Stall bars, facing away, ribs down", seconds: 45 },
+        { label: "Shoulder opener, hanging lean", sub: "Face the bars, hips back, chest sinks", seconds: 45 },
+      ]),
+      ...at("Standing at the bars", [
+        { label: "Radial nerve glide, left", sub: "Move the head, not the wrist", seconds: 40 },
+        { label: "Radial nerve glide, right", seconds: 25 },
+        { label: "Overhead tricep stretch, left", seconds: 25 },
+        { label: "Overhead tricep stretch, right", seconds: 25 },
+      ]),
+      ...at("Wall", [{ label: "Serratus wall slides", sub: "About 10", seconds: 40 }]),
+      ...at("Mat", [{ label: "Sun salutations", sub: "Two, slow", seconds: 60 }]),
     ],
   ),
   open(
@@ -149,6 +162,7 @@ const OPEN: WarmupItem[] = [
     "The nerve chain only",
     "Stall bars and standing. For mobility day, where the floor sweep follows, and for core on its own.",
     "mobility core chain nerve",
+    "Ball",
     [...barsChain, ...standingChain],
   ),
 ];

@@ -1,7 +1,7 @@
 import type { DayKind } from "./day-profile";
-import type { WarmupItem } from "./warmups";
+import type { Step, WarmupItem } from "./warmups";
 
-export type CooldownStep = { label: string; seconds: number; level?: number; sub?: string };
+export type CooldownStep = Step;
 
 export type CooldownItem = WarmupItem & {
   steps: CooldownStep[];
@@ -14,6 +14,7 @@ const sides = (name: string, seconds: number, sub?: string): CooldownStep[] => [
   { label: `${name}, left`, seconds, sub },
   { label: `${name}, right`, seconds },
 ];
+const at = (where: string, steps: CooldownStep[]): CooldownStep[] => steps.map((st) => ({ ...st, where }));
 
 // every walk keeps the job of a cooldown: climb to a moderate effort you
 // could still talk through, then come down slowly so the last few minutes
@@ -75,24 +76,30 @@ const WALKS: CooldownItem[] = [
 
 // the daily flexibility dose. static holds belong after training, so this
 // is where they live: 15 minutes matched to what the day loaded. Thursday
-// builds range, these keep it. each one starts standing at the stall bars,
-// moves to the bench, then the mat, and never comes back up.
+// builds range, these keep it. each one starts standing at the stall bars
+// (the bottom rung stands in for a bench or a step), then the mat in front
+// of them, and never comes back up.
 const STRETCHES: CooldownItem[] = [
   {
     id: "stretch-lower-15",
     name: "Lower body, 15 min",
     dose: "15 min",
-    detail: "Stall bars, then the bench, then the mat. Hips, hamstrings, adductors, ankles.",
+    detail: "Stall bars, then the mat in front of them. Hips, hamstrings, adductors, ankles.",
     tags: "stretch mobility legs hips hamstrings flexibility",
+    bring: "Mat",
     steps: [
-      ...sides("Hamstring on the stall bars", 60, "Heel on a rung, hips square, fold"),
-      { label: "Calf on the bottom rung", seconds: 60, sub: "Both feet, heels dropped" },
-      ...sides("Couch stretch at the bench", 90, "Back foot on the bench, ribs down, glute squeezed"),
-      ...sides("Pigeon", 90, "On the mat"),
-      ...sides("Seated twist", 45),
-      { label: "Straddle, chest forward", seconds: 60 },
-      { label: "Ankle rocks, kneeling", seconds: 60, sub: "Knee over the toes, heel down" },
-      { label: "90/90 breathing", seconds: 60, sub: "On your back, long exhales" },
+      ...at("Stall bars", [
+        ...sides("Hamstring on the bars", 60, "Heel on a rung, hips square, fold"),
+        { label: "Calf on the bottom rung", seconds: 60, sub: "Both feet, heels dropped" },
+        ...sides("Couch stretch at the bars", 90, "Back foot on the bottom rung, knee on the mat, ribs down, glute squeezed"),
+      ]),
+      ...at("Mat", [
+        ...sides("Pigeon", 90),
+        ...sides("Seated twist", 45),
+        { label: "Straddle, chest forward", seconds: 60 },
+        { label: "Ankle rocks, kneeling", seconds: 60, sub: "Knee over the toes, heel down" },
+        { label: "90/90 breathing", seconds: 60, sub: "On your back, long exhales" },
+      ]),
     ],
   },
   {
@@ -101,32 +108,42 @@ const STRETCHES: CooldownItem[] = [
     dose: "15 min",
     detail: "Stall bars, then the mat. Lats, pecs, thoracic, triceps, forearm, wrists. The wrist pieces are the second dose of the day.",
     tags: "stretch mobility shoulders chest back wrist flexibility",
+    bring: "Mat, ball",
     steps: [
-      ...sides("Lat stretch on the stall bars", 60, "Grip high, hips back, chest through"),
-      { label: "Pec opener on the stall bars", seconds: 90, sub: "Face away, hands on a bar above the shoulders, step forward" },
-      ...sides("Overhead tricep stretch", 30, "Standing, elbow by the ear"),
-      ...sides("Thoracic rotation on all fours", 45, "On the mat"),
-      { label: "Puppy pose", seconds: 60 },
-      ...sides("Wrist flexor stretch", 45, "Kneeling, fingers pointing back"),
-      ...sides("Wrist extensor stretch", 45, "Backs of the hands down"),
-      ...sides("Forearm and thenar release", 60, "Ball or dumbbell handle"),
-      { label: "90/90 breathing", seconds: 60, sub: "On your back, long exhales" },
+      ...at("Stall bars", [
+        ...sides("Lat stretch on the bars", 60, "Grip high, hips back, chest through"),
+        { label: "Pec opener on the bars", seconds: 90, sub: "Face away, hands on a bar above the shoulders, step forward" },
+        ...sides("Overhead tricep stretch", 30, "Standing, elbow by the ear"),
+      ]),
+      ...at("Mat", [
+        ...sides("Thoracic rotation on all fours", 45),
+        { label: "Puppy pose", seconds: 60 },
+        ...sides("Wrist flexor stretch", 45, "Kneeling, fingers pointing back"),
+        ...sides("Wrist extensor stretch", 45, "Backs of the hands down"),
+        ...sides("Forearm and thenar release", 60, "Ball"),
+        { label: "90/90 breathing", seconds: 60, sub: "On your back, long exhales" },
+      ]),
     ],
   },
   {
     id: "stretch-run-15",
     name: "After the run, 15 min",
     dose: "15 min",
-    detail: "A step, then the stall bars, then the mat. What running tightens: calves, ankles, hip flexors, hamstrings. After the run, not before.",
+    detail: "Stall bars, then the mat. What running tightens: calves, ankles, hip flexors, hamstrings. After the run, not before.",
     tags: "stretch mobility run calves hips flexibility",
+    bring: "Mat",
     steps: [
-      ...sides("Calf on a step, straight knee", 45),
-      ...sides("Calf on a step, bent knee", 45),
-      ...sides("Hamstring on the stall bars", 60, "Heel on a rung, fold"),
-      ...sides("Couch stretch at the bench", 60, "Ribs down, glute squeezed"),
-      ...sides("Pigeon", 60, "On the mat"),
-      ...sides("Supine twist", 45),
-      { label: "90/90 breathing", seconds: 60, sub: "Long exhales" },
+      ...at("Stall bars", [
+        ...sides("Calf on the bottom rung, straight knee", 45, "Ball of the foot on the rung, heel dropped"),
+        ...sides("Calf on the bottom rung, bent knee", 45),
+        ...sides("Hamstring on the bars", 60, "Heel on a rung, fold"),
+        ...sides("Couch stretch at the bars", 60, "Back foot on the bottom rung, knee on the mat, ribs down"),
+      ]),
+      ...at("Mat", [
+        ...sides("Pigeon", 60),
+        ...sides("Supine twist", 45),
+        { label: "90/90 breathing", seconds: 60, sub: "Long exhales" },
+      ]),
     ],
   },
 ];

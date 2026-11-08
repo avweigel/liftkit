@@ -10,6 +10,7 @@ import {
 } from "@/lib/program/cooldowns";
 import { CardioTimer } from "./cardio-timer";
 import { SwapPicker } from "./warmup-card";
+import { StepList } from "@/components/step-list";
 
 type Saved = { pick?: string; state?: "done" | "skipped" };
 
@@ -112,6 +113,11 @@ export default function CooldownCard({
                 {item.id === preferred.id && <span className="chip chip-accent">Best today</span>}
               </div>
               {item.detail && <p className="mt-0.5 text-[13px] text-(--muted)">{item.detail}</p>}
+              {!item.steps.every((st) => st.level != null) && (
+                <div className="mt-2">
+                  <StepList steps={item.steps} bring={item.bring} />
+                </div>
+              )}
             </div>
             <button
               type="button"
