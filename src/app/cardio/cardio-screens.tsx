@@ -28,16 +28,42 @@ function shifted(steps: CardioStep[], offsetKmh: number): CardioStep[] {
   });
 }
 
-// distance covered after a given number of elapsed seconds
-function kmAfter(steps: CardioStep[], elapsedS: number): number {
-  let left = elapsedS;
-  let km = 0;
+// a pace change at a moment in the run. before the first change the
+// plan applies, after it the new offset holds until the next change.
+type PaceChange = { at: number; kmh: number };
+const offsetAt = (changes: PaceChange[], t: number) => {
+  let o = 0;
+  for (const c of changes) if (c.at <= t) o = c.kmh;
+  return o;
+};
+
+// distance covered after a given number of elapsed seconds, with the
+// offset that was in force at each moment. a change made at minute 20
+// speeds up minutes 20 onward, not the 20 already run.
+function kmAfter(steps: CardioStep[], elapsedS: number, changes: PaceChange[]): number {
+  const cuts = new Set<number>([0, elapsedS, ...changes.map((c) => c.at)]);
+  let acc = 0;
   for (const st of steps) {
-    if (left <= 0) break;
-    const s = Math.min(st.seconds, left);
-    const v = speedOf(st.label);
-    if (v != null) km += (v * s) / 3600;
-    left -= s;
+    acc += st.seconds;
+    cuts.add(acc);
+  }
+  const points = [...cuts].filter((t) => t >= 0 && t <= elapsedS).sort((a, b) => a - b);
+  let km = 0;
+  for (let i = 0; i + 1 < points.length; i++) {
+    const a = points[i];
+    const b = points[i + 1];
+    if (b <= a) continue;
+    let start = 0;
+    const st = steps.find((x) => {
+      const end = start + x.seconds;
+      const hit = a >= start && a < end;
+      start = end;
+      return hit;
+    });
+    const v = st ? speedOf(st.label) : null;
+    if (v == null) continue;
+    const speed = st && isRunStep(st) ? Math.max(3, v + offsetAt(changes, a)) : v;
+    km += (speed * (b - a)) / 3600;
   }
   return Math.round(km * 100) / 100;
 }
@@ -92,34 +118,51 @@ export function CardioRun({
   const bySpeed = isTreadmill(session.machine);
   const metric = useContext(MeasurementContext) !== "imperial";
 
-  // your pace today, as a shift from the plan. remembered through a reload
-  const offsetKey = `${dayKey(session.id, session.machine, day)}.offset`;
-  const [offset, setOffset] = useState(0);
+  // pace changes, each stamped with when in the run it happened, so the
+  // distance is right and the plan on screen matches the belt
+  const offsetKey = `${dayKey(session.id, session.machine, day)}.pace`;
+  const [changes, setChanges] = useState<PaceChange[]>([]);
   useEffect(() => {
     try {
-      const saved = Number(window.localStorage.getItem(offsetKey) ?? 0) || 0;
+      const saved = JSON.parse(window.localStorage.getItem(offsetKey) ?? "[]");
       // restoring from storage can only happen after mount
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (saved) setOffset(saved);
+      if (Array.isArray(saved) && saved.length) setChanges(saved);
     } catch {}
   }, [offsetKey]);
+  const [elapsedS, setElapsedS] = useState(0);
+  const offset = offsetAt(changes, elapsedS);
   const nudge = (d: number) => {
     const next = Math.round((offset + d) * 10) / 10;
-    setOffset(next);
+    const at = Math.floor(elapsed.current / 1000);
+    const kept = changes.filter((c) => c.at !== at);
+    const list = [...kept, { at, kmh: next }].sort((a, b) => a.at - b.at);
+    setChanges(list);
     try {
-      if (next) window.localStorage.setItem(offsetKey, String(next));
-      else window.localStorage.removeItem(offsetKey);
+      window.localStorage.setItem(offsetKey, JSON.stringify(list));
     } catch {}
   };
   const steps = useMemo(() => shifted(session.steps, offset), [session.steps, offset]);
   const hasRunSteps = bySpeed && session.steps.some(isRunStep);
-  const [elapsedS, setElapsedS] = useState(0);
-  const kmSoFar = kmAfter(steps, elapsedS);
-  const kmTotal = kmAfter(steps, total);
+  const kmSoFar = kmAfter(session.steps, elapsedS, changes);
+  // the rest of the run at the offset that holds now
+  const kmTotal = kmAfter(session.steps, total, changes);
   // 0.2 km/h is about 0.1 mph, one tap on most treadmills
   const stepKmh = metric ? 0.2 : 0.16;
   const showKm = (km: number) => (metric ? `${km.toFixed(1)} km` : `${(km * 0.621371).toFixed(1)} mi`);
-  const showOffset = metric ? `${offset > 0 ? "+" : ""}${offset.toFixed(1)} km/h` : `${offset > 0 ? "+" : ""}${(offset * 0.621371).toFixed(1)} mph`;
+  const showSpeed = (kmh: number) => (metric ? `${kmh.toFixed(1)} km/h` : `${(kmh * 0.621371).toFixed(1)} mph`);
+  const showOffset = `${offset > 0 ? "+" : "−"}${showSpeed(Math.abs(offset))}`;
+  // the step you're in and the speed the belt should read right now
+  const current = (() => {
+    let start = 0;
+    for (const st of steps) {
+      if (elapsedS < start + st.seconds) return st;
+      start += st.seconds;
+    }
+    return steps[steps.length - 1];
+  })();
+  const beltNow = current ? speedOf(current.label) : null;
+  const inRun = !!current && isRunStep(current);
 
   // carry the clock over: the new way picks up at the same elapsed time,
   // still running, and the old timer is cleared so it can't come back
@@ -144,30 +187,29 @@ export function CardioRun({
         onComplete={() => log(session.minutes, hasRunSteps ? kmTotal : null)}
       />
       {hasRunSteps && (
-        <div className="space-y-2 rounded-xl bg-(--surface-2) p-3">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <div className="text-[14px] font-semibold">Pace today</div>
-              <div className="text-[12px] text-(--muted)">
-                {offset === 0 ? "On plan. Every run step moves together." : `${showOffset} on every run step. Walks unchanged.`}
-              </div>
+        <div className="space-y-3 rounded-2xl bg-(--surface-2) p-4">
+          <div className="flex items-baseline justify-between">
+            <span className="text-[15px] font-semibold">Your pace</span>
+            <span className="text-[13px] text-(--muted)">{offset === 0 ? "On plan" : `${showOffset} from plan`}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => nudge(-stepKmh)} className="btn btn-secondary h-14 w-16 shrink-0 px-0 text-[26px]" aria-label="Slower">
+              −
+            </button>
+            <div className="min-w-0 flex-1 text-center">
+              <div className="num text-[30px] leading-none">{beltNow != null && inRun ? showSpeed(beltNow) : beltNow != null ? showSpeed(beltNow) : "—"}</div>
+              <div className="mt-1 text-[12px] text-(--muted)">{inRun ? "run steps, from now on" : "walking. Change applies to the runs"}</div>
             </div>
-            <div className="flex items-center gap-1">
-              <button type="button" onClick={() => nudge(-stepKmh)} className="btn btn-secondary btn-sm w-11 px-0" aria-label="Slower">
-                −
-              </button>
-              <span className="num w-16 text-center text-[17px]">{offset === 0 ? "plan" : showOffset.replace(/ (km\/h|mph)$/, "")}</span>
-              <button type="button" onClick={() => nudge(stepKmh)} className="btn btn-secondary btn-sm w-11 px-0" aria-label="Faster">
-                +
-              </button>
-            </div>
+            <button type="button" onClick={() => nudge(stepKmh)} className="btn btn-secondary h-14 w-16 shrink-0 px-0 text-[26px]" aria-label="Faster">
+              +
+            </button>
           </div>
           <div className="flex items-baseline justify-between text-[13px] text-(--muted)">
             <span>
-              So far <span className="num text-[15px] text-(--foreground)">{showKm(kmSoFar)}</span>
+              So far <span className="num text-[16px] text-(--foreground)">{showKm(kmSoFar)}</span>
             </span>
             <span>
-              Finishes at <span className="num text-[15px] text-(--foreground)">{showKm(kmTotal)}</span>
+              Finishes at <span className="num text-[16px] text-(--foreground)">{showKm(kmTotal)}</span>
             </span>
           </div>
         </div>
@@ -196,7 +238,7 @@ export function CardioRun({
         onClick={() =>
           log(
             started ? Math.max(1, Math.round(elapsed.current / 60000)) : session.minutes,
-            hasRunSteps ? (started ? kmAfter(steps, Math.floor(elapsed.current / 1000)) : kmTotal) : null,
+            hasRunSteps ? (started ? kmAfter(session.steps, Math.floor(elapsed.current / 1000), changes) : kmTotal) : null,
           )
         }
         className="btn btn-secondary btn-block"
