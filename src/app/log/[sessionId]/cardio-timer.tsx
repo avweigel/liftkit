@@ -119,6 +119,23 @@ export function CardioTimer({
 }) {
   const localize = useLocalizeDistance();
   const incline = steps.length > 0 && steps.every((st) => st.level != null);
+  // a guided sequence can also be walked through by hand: same steps, no
+  // clock. the choice sticks on this phone. machine sessions keep the clock,
+  // their steps are minutes at a setting.
+  const canOwnPace = steps.length > 1 && !incline;
+  const [ownPace, setOwnPace] = useState(false);
+  useEffect(() => {
+    if (!canOwnPace) return;
+    // read after mount so the server and the first client render agree
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOwnPace(readOwnPace());
+  }, [canOwnPace]);
+  const chooseOwnPace = (v: boolean) => {
+    setOwnPace(v);
+    try {
+      window.localStorage.setItem(OWN_PACE_KEY, v ? "1" : "0");
+    } catch {}
+  };
   const completeRef = useRef(onComplete);
   const elapsedRef = useRef(onElapsed);
   useEffect(() => {
@@ -324,6 +341,18 @@ export function CardioTimer({
   const longCue = (current?.sub?.length ?? 0) > 56;
   const stepFraction = steps.length === 0 ? remaining / totalMs : started ? stepEndsIn / stepMs : 1;
 
+  if (ownPace && canOwnPace && !running) {
+    return (
+      <OwnPace
+        steps={steps}
+        persistKey={persistKey}
+        onStepEnd={(i) => stepEndRef.current?.(i)}
+        onComplete={() => completeRef.current?.()}
+        onUseTimer={() => chooseOwnPace(false)}
+      />
+    );
+  }
+
   return (
     <div
       className={`space-y-3 rounded-xl p-3 transition-colors duration-200 ${
@@ -441,6 +470,11 @@ export function CardioTimer({
                   Reset
                 </button>
               )}
+              {!started && canOwnPace && (
+                <button type="button" onClick={() => chooseOwnPace(true)} className="btn btn-ghost btn-sm">
+                  Own pace
+                </button>
+              )}
               <button type="button" onClick={start} className="btn btn-primary btn-sm">
                 {doneAll ? "Again" : started ? "Resume" : "Start timer"}
               </button>
@@ -448,6 +482,141 @@ export function CardioTimer({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+const OWN_PACE_KEY = "liftkit.timer.ownpace";
+
+function readOwnPace(): boolean {
+  try {
+    return window.localStorage.getItem(OWN_PACE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+// the same sequence as a list you step through: name, cue, what's next,
+// and a Next button. the get-set gaps between locations are dropped,
+// since you're already moving at your own speed. the place is kept per
+// session so a locked phone comes back where you were.
+function OwnPace({
+  steps,
+  persistKey,
+  onStepEnd,
+  onComplete,
+  onUseTimer,
+}: {
+  steps: CardioStep[];
+  persistKey?: string;
+  onStepEnd: (index: number) => void;
+  onComplete: () => void;
+  onUseTimer: () => void;
+}) {
+  const localize = useLocalizeDistance();
+  const list = steps.map((st, index) => ({ st, index })).filter((x) => x.st.label !== "Get set");
+  const key = persistKey ? `${persistKey}.own` : undefined;
+  const [pos, setPos] = useState(0);
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    if (!key) return;
+    try {
+      const saved = Number(window.localStorage.getItem(key) ?? "0");
+      // only after mount, like the timer's own restore
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (saved > 0 && saved < list.length) setPos(saved);
+    } catch {}
+    // only on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const save = (p: number | null) => {
+    if (!key) return;
+    try {
+      if (p == null) window.localStorage.removeItem(key);
+      else window.localStorage.setItem(key, String(p));
+    } catch {}
+  };
+
+  const cur = list[pos];
+  const next = list[pos + 1];
+  const last = pos >= list.length - 1;
+  const advance = () => {
+    // every original step up to and including this one counts as finished
+    const from = pos === 0 ? 0 : list[pos - 1].index + 1;
+    for (let i = from; i <= cur.index; i++) onStepEnd(i);
+    if (last) {
+      for (let i = cur.index + 1; i < steps.length; i++) onStepEnd(i);
+      setDone(true);
+      save(null);
+      onComplete();
+    } else {
+      setPos(pos + 1);
+      save(pos + 1);
+    }
+  };
+  const back = () => {
+    const p = Math.max(0, pos - 1);
+    setPos(p);
+    setDone(false);
+    save(p);
+  };
+  const again = () => {
+    setPos(0);
+    setDone(false);
+    save(null);
+  };
+  const secs = (n: number) => (n % 60 === 0 ? `${n / 60} min` : n > 60 ? `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}` : `${n} s`);
+  const longCue = (cur?.st.sub?.length ?? 0) > 56;
+
+  return (
+    <div className="space-y-3 rounded-xl bg-(--surface-2) p-3">
+      <div className="flex items-baseline justify-between">
+        <p className="label">{done ? "Finished" : `${pos + 1} of ${list.length}`}</p>
+        {cur && !done && <span className="num text-[13px] text-(--muted)">about {secs(cur.st.seconds)}</span>}
+      </div>
+      <p className="display text-[24px] leading-tight text-(--accent)">{done ? "Nice work" : cur && localize(cur.st.label)}</p>
+      {cur?.st.sub && !done && (
+        <p className={`text-[14px] font-semibold ${longCue ? "leading-snug" : ""}`}>{localize(cur.st.sub)}</p>
+      )}
+      {next && !done && <p className="text-[13px] text-(--muted)">Then {localize(next.st.label.toLowerCase())}</p>}
+
+      <div className="flex h-2 gap-0.5" aria-hidden>
+        {list.map((x, i) => (
+          <div
+            key={x.index}
+            className={`basis-0 rounded-sm ${done || i < pos ? "bg-(--accent)" : i === pos ? "bg-(--accent-line)" : "bg-(--border)"}`}
+            style={{ flexGrow: x.st.seconds }}
+          />
+        ))}
+      </div>
+
+      {done ? (
+        <div className="flex items-center gap-1.5">
+          <button type="button" onClick={onUseTimer} className="btn btn-ghost btn-sm">
+            Use the timer
+          </button>
+          <button type="button" onClick={again} className="btn btn-secondary btn-sm ml-auto">
+            Again
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-[auto_1fr] gap-1.5">
+          <button type="button" onClick={back} disabled={pos === 0} className="btn btn-ghost btn-sm" aria-label="Back to the previous step">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
+            Back
+          </button>
+          <button type="button" onClick={advance} className="btn btn-primary h-12">
+            {last ? "Done" : "Next"}
+          </button>
+        </div>
+      )}
+      {!done && (
+        <button type="button" onClick={onUseTimer} className="text-[13px] font-semibold text-(--muted) underline underline-offset-2">
+          Use the timer instead
+        </button>
+      )}
     </div>
   );
 }
